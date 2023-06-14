@@ -1,1 +1,1 @@
-# FinUQ
+# Finite precision Uncertainty Quantification (FinUQ)
