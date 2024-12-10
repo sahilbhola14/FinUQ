@@ -7,7 +7,7 @@ namespace config{
 const int K = 0; // Sampling interval when PowTwo distribution is used
 const int N = 1 << 10; // Problem size
 const int blockSize = 256; // Block size for CUDA kernel
-Distribution distType = Normal;
+const Distribution distType = ZeroOne;
 }
 
 #endif

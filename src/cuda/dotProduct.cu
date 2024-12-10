@@ -7,10 +7,10 @@
 #include "config.hpp"
 #include "definition.hpp"
 #include "dotProduct.cuh"
+#include "sampler.cuh"
 #include "utils.hpp"
 
 template <typename T>
-/* Sampler sampler = config::sampler; // Sampler */
 __global__ void dotProductKernel(int N, T *x, T *y, T *result) {
   int gid = threadIdx.x + blockIdx.x * blockDim.x;
   int stride = blockDim.x * gridDim.x;
@@ -23,11 +23,12 @@ void launchDotProductExperiment() {
 
   const int N = config::N;  // Vector size
   const int K = config::K;  // Sampling interval for PowTwo distribution
-  Distribution distType = config::distType;
-  std::cout << distType << std::endl;
+  Distribution dtype = config::distType;
 
   dim3 blockDim = config::blockSize;
   dim3 gridDim = getGridSize(blockDim.x, N);
+  unsigned long long seed = 123456789ULL;  // Seed for sampling
+
   printf("----- config -----\n");
   printf("Vector size: %d\n", N);
   printf("blockDim: %d gridDim: %d\n", blockDim.x, gridDim.x);
@@ -49,6 +50,7 @@ void launchDotProductExperiment() {
   cudaCheck(cudaMallocManaged(&partial_half, gridDim.x * sizeof(half)));
 
   // Sample (in the lowest precision to avoid representation error)
+  initializeVector(N, x_half, dtype, seed);
 
   // Free memory
   cudaFree(x_double);
