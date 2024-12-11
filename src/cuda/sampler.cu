@@ -25,6 +25,16 @@ __global__ void uniformSamplerKernel(int N, T *x, double lower, double upper,
 }
 
 template <typename T>
+__global__ void constantSamplerKernel(int N, T *x, double constant) {
+  int gid = blockIdx.x * blockDim.x + threadIdx.x;
+  int stride = blockDim.x * gridDim.x;
+  double r;
+  for (int i = gid; i < N; i += stride) {
+    x[i] = static_cast<T>(constant);
+  }
+}
+
+template <typename T>
 void initializeVector(const int N, T *x, Distribution dtype,
                       unsigned long long seed) {
   dim3 blockDim = config::blockSize;
@@ -37,20 +47,23 @@ void initializeVector(const int N, T *x, Distribution dtype,
     double upper = 1.0;
     uniformSamplerKernel<<<gridDim, blockDim>>>(N, x, lower, upper, seed);
     cudaCheck(cudaGetLastError());
-    cudaDeviceSynchronize();
+    /* cudaDeviceSynchronize(); */
   } else if (dtype == MinusOnePlusOne) {
     double lower = -1.0;
     double upper = 1.0;
     uniformSamplerKernel<<<gridDim, blockDim>>>(N, x, lower, upper, seed);
     cudaCheck(cudaGetLastError());
-    cudaDeviceSynchronize();
+    /* cudaDeviceSynchronize(); */
   } else if (dtype == PowTwo) {
     double K = config::K;
     double lower = pow(2.0, K);
     double upper = pow(2.0, K + 1);
     uniformSamplerKernel<<<gridDim, blockDim>>>(N, x, lower, upper, seed);
     cudaCheck(cudaGetLastError());
-    cudaDeviceSynchronize();
+    /* cudaDeviceSynchronize(); */
+  } else if (dtype == Ones) {
+    constantSamplerKernel<<<gridDim, blockDim>>>(N, x, 1.0);
+    cudaCheck(cudaGetLastError());
   } else {
     std::invalid_argument("Invalid distribution");
   }

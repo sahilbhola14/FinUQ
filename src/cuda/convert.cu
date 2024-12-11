@@ -1,4 +1,7 @@
+#include "checks.cuh"
+#include "config.hpp"
 #include "convert.cuh"
+#include "utils.hpp"
 
 // Double to Float (Round to Nearest)
 __global__ void DoubleToFloatKernel(int N, double *x_double, float *x_float) {
@@ -52,4 +55,20 @@ __global__ void HalfToFloatKernel(int N, half *x_half, float *x_float) {
   for (int i = index; i < N; i += stride) {
     x_float[i] = __half2float(x_half[i]);
   }
+}
+
+void convertHalfToDouble(int N, half *x_half, double *x_double) {
+  dim3 blockDim = config::blockSize;
+  dim3 gridDim = getGridSize(blockDim.x, N);
+  HalfToDoubleKernel<<<gridDim, blockDim>>>(N, x_half, x_double);
+  cudaCheck(cudaGetLastError());
+  /* cudaDeviceSynchronize(); */
+}
+
+void convertHalfToFloat(int N, half *x_half, float *x_float) {
+  dim3 blockDim = config::blockSize;
+  dim3 gridDim = getGridSize(blockDim.x, N);
+  HalfToFloatKernel<<<gridDim, blockDim>>>(N, x_half, x_float);
+  cudaCheck(cudaGetLastError());
+  /* cudaDeviceSynchronize(); */
 }
