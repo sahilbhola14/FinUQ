@@ -15,10 +15,10 @@ double computeUnitRoundOff(Precision prec) {
   if (prec == Half) {
     base = 2.0;
     precision = 11.0;
-  } else if (prec = Float) {
+  } else if (prec == Float) {
     base = 2.0;
     precision = 24.0;
-  } else if (prec = Double) {
+  } else if (prec == Double) {
     base = 2.0;
     precision = 53.0;
   } else {
@@ -27,4 +27,14 @@ double computeUnitRoundOff(Precision prec) {
   }
   urd = pow(base, -(precision - 1.0)) / 2.0;
   return urd;
+}
+
+void linspace(double start, double end, int N, double *x) {
+  if (N < 2) {
+    std::invalid_argument("Points must atleast be 2");
+  }
+  double step = (end - start) / (N - 1.0);
+  for (int i = 0; i < N; i++) {
+    x[i] = start + step * i;
+  }
 }
