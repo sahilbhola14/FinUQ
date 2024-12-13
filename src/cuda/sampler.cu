@@ -49,8 +49,10 @@ __global__ void constantSamplerKernel(int N, T *x, double constant) {
   int gid = blockIdx.x * blockDim.x + threadIdx.x;
   int stride = blockDim.x * gridDim.x;
   double r;
-  for (int i = gid; i < N; i += stride) {
-    x[i] = static_cast<T>(constant);
+  if (gid < N) {
+    x[gid] = static_cast<T>(constant);
+  } else {
+    x[gid] = static_cast<T>(0.0);
   }
 }
 

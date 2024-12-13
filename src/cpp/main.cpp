@@ -14,6 +14,6 @@ int main() {
   // Dot Product [Figure 2]
   /* launchDotProductExperiment(2<<5, 1, 15); */
   // Matrix-Vector Product
-  launchMatVecMultExperiment(2 << 5, 1, 9);
+  launchMatVecMultExperiment(2 << 5, 1, 5);
   return 0;
 }

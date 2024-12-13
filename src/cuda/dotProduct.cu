@@ -141,6 +141,7 @@ void launchRecursiveDotProduct(const int N, double *ebwd_float,
   float *x_float, *y_float, *result_float;
   half *x_half, *y_half, *result_half;
   double urd_float = computeUnitRoundOff(Float);
+  double urd_half = computeUnitRoundOff(Half);
 
   Distribution dtype = config::distType;  // Distribution for sampling
 
@@ -183,7 +184,7 @@ void launchRecursiveDotProduct(const int N, double *ebwd_float,
   // Compute the True dot product
   launchcublasDDot(N, x_double, y_double, result_double);
 
-  // Compute the perturbed True dot product
+  // Compute the Model dot product
   ModelRecursiveDotProductKernel<<<gridDim, blockDim>>>(
       N, x_double, y_double, result_double_model, urd_float);
   cudaCheck(cudaGetLastError());
@@ -207,11 +208,6 @@ void launchRecursiveDotProduct(const int N, double *ebwd_float,
 
   // Synchronize
   cudaDeviceSynchronize();
-
-  /* std::cout << *result_double << ", " << *result_double_model << ", " <<
-   * *result_float << ", " << static_cast<double>(*result_half) << std::endl; */
-  /* std::cout << "Abs products, True: " << *result_double_abs << " Model: " <<
-   * *result_double_model_abs << std::endl;; */
 
   // Compute the backward error
   computeBackwardErrorDotProduct(result_double, result_float, result_double_abs,
