@@ -135,11 +135,12 @@ void launchRecursiveDotProduct(const int N, double *ebwd_float,
                                unsigned long long seed) {
   // Note, blockDim and gridDim should be 1 for accumulation of error
   // This is the recursive summation
-  double *x_double, *y_double, *result_double;
-  double *result_double_model, *result_double_model_abs;
-  double *x_double_abs, *y_double_abs, *result_double_abs;
-  float *x_float, *y_float, *result_float;
-  half *x_half, *y_half, *result_half;
+  double *x_double, *y_double, *result_double;              //  True
+  double *x_double_abs, *y_double_abs, *result_double_abs;  // Absolute
+  double *result_float_model, *result_float_model_abs;      // Model for float
+  double *result_half_model, *result_half_model_abs;        // Model for half
+  float *x_float, *y_float, *result_float;                  // Float
+  half *x_half, *y_half, *result_half;                      // Half
   double urd_float = computeUnitRoundOff(Float);
   double urd_half = computeUnitRoundOff(Half);
 
@@ -153,9 +154,6 @@ void launchRecursiveDotProduct(const int N, double *ebwd_float,
   cudaCheck(cudaMallocManaged(&y_double, N * sizeof(double)));
   cudaCheck(cudaMallocManaged(&result_double, sizeof(double)));
 
-  cudaCheck(cudaMallocManaged(&result_double_model, sizeof(double)));
-  cudaCheck(cudaMallocManaged(&result_double_model_abs, sizeof(double)));
-
   cudaCheck(cudaMallocManaged(&x_double_abs, N * sizeof(double)));
   cudaCheck(cudaMallocManaged(&y_double_abs, N * sizeof(double)));
   cudaCheck(cudaMallocManaged(&result_double_abs, sizeof(double)));
@@ -164,9 +162,15 @@ void launchRecursiveDotProduct(const int N, double *ebwd_float,
   cudaCheck(cudaMallocManaged(&y_float, N * sizeof(float)));
   cudaCheck(cudaMallocManaged(&result_float, sizeof(float)));
 
+  cudaCheck(cudaMallocManaged(&result_float_model, sizeof(double)));
+  cudaCheck(cudaMallocManaged(&result_float_model_abs, sizeof(double)));
+
   cudaCheck(cudaMallocManaged(&x_half, N * sizeof(half)));
   cudaCheck(cudaMallocManaged(&y_half, N * sizeof(half)));
   cudaCheck(cudaMallocManaged(&result_half, sizeof(half)));
+
+  cudaCheck(cudaMallocManaged(&result_half_model, sizeof(double)));
+  cudaCheck(cudaMallocManaged(&result_half_model_abs, sizeof(double)));
 
   // Sample (in the lowest precision to avoid representation error)
   initializeVector(N, x_half, dtype, seed);
@@ -181,30 +185,33 @@ void launchRecursiveDotProduct(const int N, double *ebwd_float,
   copyVector(N, x_double, x_double_abs, true);
   copyVector(N, y_double, y_double_abs, true);
 
-  // Compute the True dot product
+  // Double
   launchcublasDDot(N, x_double, y_double, result_double);
-
-  // Compute the Model dot product
-  ModelRecursiveDotProductKernel<<<gridDim, blockDim>>>(
-      N, x_double, y_double, result_double_model, urd_float);
-  cudaCheck(cudaGetLastError());
-
-  // Compute the abs True dot product
   launchcublasDDot(N, x_double_abs, y_double_abs, result_double_abs);
 
-  // Compute the abs Model dot product
-  ModelRecursiveDotProductKernel<<<gridDim, blockDim>>>(
-      N, x_double_abs, y_double_abs, result_double_model_abs, urd_float);
-
-  // Compute Single precision dot product
+  // Float
   RecursiveDotProductKernel<<<gridDim, blockDim>>>(N, x_float, y_float,
                                                    result_float, Float);
   cudaCheck(cudaGetLastError());
 
-  // Compute Half precision dot product
+  ModelRecursiveDotProductKernel<<<gridDim, blockDim>>>(
+      N, x_double, y_double, result_float_model, urd_float);
+  cudaCheck(cudaGetLastError());
+
+  ModelRecursiveDotProductKernel<<<gridDim, blockDim>>>(
+      N, x_double_abs, y_double_abs, result_float_model_abs, urd_float);
+
+  // Half
   RecursiveDotProductKernel<<<gridDim, blockDim>>>(N, x_half, y_half,
                                                    result_half, Half);
   cudaCheck(cudaGetLastError());
+
+  ModelRecursiveDotProductKernel<<<gridDim, blockDim>>>(
+      N, x_double, y_double, result_half_model, urd_half);
+  cudaCheck(cudaGetLastError());
+
+  ModelRecursiveDotProductKernel<<<gridDim, blockDim>>>(
+      N, x_double_abs, y_double_abs, result_half_model_abs, urd_half);
 
   // Synchronize
   cudaDeviceSynchronize();
@@ -215,18 +222,15 @@ void launchRecursiveDotProduct(const int N, double *ebwd_float,
   computeBackwardErrorDotProduct(result_double, result_half, result_double_abs,
                                  ebwd_half);
 
-  computeBackwardErrorDotProduct(result_double_model, result_float,
-                                 result_double_abs, ebwd_float_model);
-  computeBackwardErrorDotProduct(result_double_model, result_half,
-                                 result_double_abs, ebwd_half_model);
+  computeBackwardErrorDotProduct(result_float_model, result_float,
+                                 result_float_model_abs, ebwd_float_model);
+  computeBackwardErrorDotProduct(result_half_model, result_half,
+                                 result_half_model_abs, ebwd_half_model);
 
   // Free memory
   cudaFree(x_double);
   cudaFree(y_double);
   cudaFree(result_double);
-
-  cudaFree(result_double_model);
-  cudaFree(result_double_model_abs);
 
   cudaFree(x_double_abs);
   cudaFree(y_double_abs);
@@ -236,9 +240,15 @@ void launchRecursiveDotProduct(const int N, double *ebwd_float,
   cudaFree(y_float);
   cudaFree(result_float);
 
+  cudaFree(result_float_model);
+  cudaFree(result_float_model_abs);
+
   cudaFree(x_half);
   cudaFree(y_half);
   cudaFree(result_half);
+
+  cudaFree(result_half_model);
+  cudaFree(result_half_model_abs);
 }
 
 void launchDotProductSingleRun(const int N, double *ebwd_float,
@@ -614,7 +624,8 @@ void launchDotProductExperiment(int N_lower, int bit_shift, int max_shift,
     std::cerr << "Error opening file: " << filename << std::endl;
     return;
   }
-  outfile << "Description: Backward error for dot product computed in FP16 "
+  outfile << "Description: Backward error (computed with Model) for dot "
+             "product computed in FP16 "
              "arithmetic (confidence: "
           << confidence << ")" << std::endl;
 
@@ -659,6 +670,7 @@ void launchDotProductExperiment(int N_lower, int bit_shift, int max_shift,
     outfile << std::endl;
     outfile << std::setw(width_int + 1) << "    ";
   }
+  outfile.close();
 
   // Free the memory
   free(ebwd);

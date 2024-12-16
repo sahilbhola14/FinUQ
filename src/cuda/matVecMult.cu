@@ -2,6 +2,8 @@
 
 #include <cassert>
 #include <ctime>
+#include <fstream>
+#include <iomanip>
 #include <iostream>
 
 #include "bounds.hpp"
@@ -39,9 +41,8 @@ void __global__ RecursiveMatVecMultKernel(int N, T *a, T *x, T *result,
   }
 }
 
-template <typename T>
-void __global__ ModelRecursiveMatVecMultKernel(int N, T *a, T *x, T *result,
-                                               Precision prec, double urd) {
+__global__ void ModelRecursiveMatVecMultKernel(int N, double *a, double *x,
+                                               double *result, double urd) {
   int tid = threadIdx.x;
   int gid = tid + blockIdx.x * blockDim.x;
 
@@ -51,22 +52,13 @@ void __global__ ModelRecursiveMatVecMultKernel(int N, T *a, T *x, T *result,
   curand_init(seed, gid, 0, &state);
 
   if (gid < N) {
-    T summation = static_cast<T>(0.0);
+    double summation = static_cast<double>(0.0);
     for (int k = 0; k < N; k++) {
       eta = 1.0 + sampleRelativeErrorKernel(urd, &state);
       xi = 1.0 + sampleRelativeErrorKernel(urd, &state);
-
-      if (prec == Double) {
-        summation = __dadd_rn(summation, __dmul_rn(a[gid * N + k], x[k]));
-      } else if (prec == Float) {
-        summation = __fadd_rn(summation, __fmul_rn(a[gid * N + k], x[k]));
-      } else if (prec == Half) {
-        summation = __hadd_rn(
-            summation, __hmul_rn(static_cast<half>(a[gid * N + k]), x[k]));
-      } else {
-        printf("invalid_argument: Invalid precision\n");
-        return;
-      }
+      summation = __dmul_rn(
+          __dadd_rn(summation, __dmul_rn(__dmul_rn(a[gid * N + k], x[k]), eta)),
+          xi);
     }
     result[gid] = summation;
   }
@@ -77,10 +69,18 @@ void launchRecursiveMatVecMult(const int N, double *ebwd_float,
                                double *ebwd_half_model,
                                unsigned long long seed) {
   // Declare
-  double *a_double, *x_double, *result_double;
-  double *a_double_abs, *x_double_abs, *result_double_abs;
-  float *a_float, *x_float, *result_float;
-  half *a_half, *x_half, *result_half;
+  double *a_double, *x_double, *result_double;              // True
+  double *a_double_abs, *x_double_abs, *result_double_abs;  // Absolute
+
+  double *result_float_model, *result_float_model_abs;  // Float model
+  double *result_half_model, *result_half_model_abs;    // Half model
+
+  float *a_float, *x_float, *result_float;  // Float
+  half *a_half, *x_half, *result_half;      // Half
+
+  double urd_float = computeUnitRoundOff(Float);
+  double urd_half = computeUnitRoundOff(Half);
+
   dim3 blockDim = config::blockSize;
   dim3 gridDim = getGridSize(blockDim.x, N);
   const int mat_size = N * N;
@@ -100,9 +100,15 @@ void launchRecursiveMatVecMult(const int N, double *ebwd_float,
   cudaCheck(cudaMallocManaged(&x_float, N * sizeof(float)));
   cudaCheck(cudaMallocManaged(&result_float, N * sizeof(float)));
 
+  cudaCheck(cudaMallocManaged(&result_float_model, N * sizeof(double)));
+  cudaCheck(cudaMallocManaged(&result_float_model_abs, N * sizeof(double)));
+
   cudaCheck(cudaMallocManaged(&a_half, mat_size * sizeof(half)));
   cudaCheck(cudaMallocManaged(&x_half, N * sizeof(half)));
   cudaCheck(cudaMallocManaged(&result_half, N * sizeof(half)));
+
+  cudaCheck(cudaMallocManaged(&result_half_model, N * sizeof(double)));
+  cudaCheck(cudaMallocManaged(&result_half_model_abs, N * sizeof(double)));
 
   // Sample (in the lowest precision to avoid representation error)
   initializeVector(mat_size, a_half, dtype, seed);
@@ -125,29 +131,57 @@ void launchRecursiveMatVecMult(const int N, double *ebwd_float,
   copyVector(N, x_double, x_double_abs, true);
   cudaCheck(cudaGetLastError());
 
-  // Compute the True matrix-vector product
+  // Double
   RecursiveMatVecMultKernel<<<gridDim, blockDim>>>(N, a_double, x_double,
                                                    result_double, Double);
   cudaCheck(cudaGetLastError());
 
-  // Compute the Model matrix-vector product
-  ModelRecursiveMatVecMultKernel<<<gridDim, blockDim>>>(N, a_double, x_double,
-                                                        result_double, Double);
-
-  // Compute the abs True dot product
   RecursiveMatVecMultKernel<<<gridDim, blockDim>>>(
       N, a_double_abs, x_double_abs, result_double_abs, Double);
   cudaCheck(cudaGetLastError());
 
-  // Compute the Single precision matrix-vector product
+  // Float
   RecursiveMatVecMultKernel<<<gridDim, blockDim>>>(N, a_float, x_float,
                                                    result_float, Float);
   cudaCheck(cudaGetLastError());
 
-  // Compute the Single precision matrix-vector product
+  ModelRecursiveMatVecMultKernel<<<gridDim, blockDim>>>(
+      N, a_double, x_double, result_float_model, urd_float);
+  cudaCheck(cudaGetLastError());
+
+  ModelRecursiveMatVecMultKernel<<<gridDim, blockDim>>>(
+      N, a_double_abs, x_double_abs, result_float_model_abs, urd_float);
+  cudaCheck(cudaGetLastError());
+
+  // Half
   RecursiveMatVecMultKernel<<<gridDim, blockDim>>>(N, a_half, x_half,
                                                    result_half, Half);
   cudaCheck(cudaGetLastError());
+
+  ModelRecursiveMatVecMultKernel<<<gridDim, blockDim>>>(
+      N, a_double, x_double, result_half_model, urd_half);
+  cudaCheck(cudaGetLastError());
+
+  ModelRecursiveMatVecMultKernel<<<gridDim, blockDim>>>(
+      N, a_double_abs, x_double_abs, result_half_model_abs, urd_half);
+  cudaCheck(cudaGetLastError());
+
+  // Synchronize
+  cudaDeviceSynchronize();
+
+  // Compute the Backward Error
+  computeBackwardErrorMatVecMult(N, result_double, result_float,
+                                 result_double_abs, ebwd_float);
+  computeBackwardErrorMatVecMult(N, result_float_model, result_float,
+                                 result_float_model_abs, ebwd_float_model);
+
+  computeBackwardErrorMatVecMult(N, result_double, result_half,
+                                 result_double_abs, ebwd_half);
+  computeBackwardErrorMatVecMult(N, result_half_model, result_half,
+                                 result_half_model_abs, ebwd_half_model);
+
+  /* std::cout << *ebwd_float << ", " <<  *ebwd_half << ", " */
+  /*     << *ebwd_float_model << ", " << *ebwd_half_model << std::endl; */
 
   // Sanity check
   if (dtype == Ones) {
@@ -161,17 +195,27 @@ void launchRecursiveMatVecMult(const int N, double *ebwd_float,
     }
   }
 
-  // Synchronize
-  cudaDeviceSynchronize();
+  cudaFree(a_double);
+  cudaFree(x_double);
+  cudaFree(result_double);
 
-  // Compute the backward error
-  computeBackwardErrorMatVecMult(N, result_double, result_float,
-                                 result_double_abs, ebwd_float);
+  cudaFree(a_double_abs);
+  cudaFree(x_double_abs);
+  cudaFree(result_double_abs);
 
-  computeBackwardErrorDotProduct(N, result_double, result_half,
-                                 result_double_abs, ebwd_half);
+  cudaFree(a_float);
+  cudaFree(x_float);
+  cudaFree(result_float);
 
-  std::cout << *ebwd_float << std::endl;
+  cudaFree(result_float_model);
+  cudaFree(result_float_model_abs);
+
+  cudaFree(a_half);
+  cudaFree(x_half);
+  cudaFree(result_half);
+
+  cudaFree(result_half_model);
+  cudaFree(result_half_model_abs);
 }
 
 void launchMatVecMultExperiment(int N_lower, int bit_shift, int max_shift,
@@ -194,7 +238,7 @@ void launchMatVecMultExperiment(int N_lower, int bit_shift, int max_shift,
   ebwd_model =
       static_cast<double *>(malloc(2 * max_shift * num_exps * sizeof(double)));
 
-  for (int ii = 0; ii < 1; ii++) {
+  for (int ii = 0; ii < max_shift; ii++) {
     std::cout << "Problem size: " << N << std::endl;
 
     // Compute backward bound (Float)
@@ -216,6 +260,7 @@ void launchMatVecMultExperiment(int N_lower, int bit_shift, int max_shift,
 
     // Carry experiment of matrix-vector products
     for (int jj = 0; jj < num_exps; jj++) {
+      std::cout << jj << std::endl;
       // Experiment seed
       unsigned long long base_seed =
           static_cast<unsigned long long>(std::time(nullptr));
@@ -228,11 +273,236 @@ void launchMatVecMultExperiment(int N_lower, int bit_shift, int max_shift,
           &ebwd[max_shift * num_exps + ii * num_exps + jj],
           &ebwd_model[ii * num_exps + jj],
           &ebwd_model[max_shift * num_exps + ii * num_exps + jj], base_seed);
-
-      // Single sequential experiment
     }
 
     // Increase the Matrix/vector size
     N = N << bit_shift;
   }
+
+  /* // Store the data // */
+  std::ofstream outfile;
+  std::string filename;
+
+  // Store ebwd for FP32
+  filename = "matVecMult_ebwd_fp32.txt";
+  outfile.open(filename);
+
+  if (!outfile) {
+    std::cerr << "Error opening file: " << filename << std::endl;
+    return;
+  }
+  outfile << "tDescription: Backward error for Mat-vec mult computed in FP32 "
+             "arithmetic (confidence: "
+          << confidence << ")" << std::endl;
+
+  outfile << std::setw(width_int) << "N: ";
+  N = N_lower;
+  for (int ii = 0; ii < max_shift; ii++) {
+    outfile << std::setw(width_double) << N;
+    if (ii < max_shift - 1) outfile << ", ";
+    N = N << bit_shift;
+  }
+  outfile << std::endl;
+
+  outfile << std::setw(width_int) << "Deter: ";
+  for (int ii = 0; ii < max_shift; ii++) {
+    outfile << std::setw(width_double) << std::scientific
+            << std::setprecision(8) << ebwd_bound_det[ii];
+    if (ii < max_shift - 1) outfile << ", ";
+  }
+  outfile << std::endl;
+  outfile << std::setw(width_int) << "Hoeff: ";
+  for (int ii = 0; ii < max_shift; ii++) {
+    outfile << std::setw(width_double) << std::scientific
+            << std::setprecision(8) << ebwd_bound_hoeff[ii];
+    if (ii < max_shift - 1) outfile << ", ";
+  }
+  outfile << std::endl;
+  outfile << std::setw(width_int) << "Berns: ";
+  for (int ii = 0; ii < max_shift; ii++) {
+    outfile << std::setw(width_double) << std::scientific
+            << std::setprecision(8) << ebwd_bound_bern[ii];
+    if (ii < max_shift - 1) outfile << ", ";
+  }
+  outfile << std::endl;
+  outfile << std::setw(width_int + 1) << "    ";
+  for (int ii = 0; ii < num_exps; ii++) {
+    for (int jj = 0; jj < max_shift; jj++) {
+      outfile << std::setw(width_double) << std::scientific
+              << std::setprecision(8) << ebwd[jj * num_exps + ii];
+      if (jj < max_shift - 1) outfile << ", ";
+    }
+    outfile << std::endl;
+    outfile << std::setw(width_int + 1) << "    ";
+  }
+
+  outfile.close();
+
+  // Store ebwd for FP16
+  filename = "matVecMult_ebwd_fp16.txt";
+  outfile.open(filename);
+
+  if (!outfile) {
+    std::cerr << "Error opening file: " << filename << std::endl;
+    return;
+  }
+  outfile << "Description: Backward error for Mat-vec mult computed in FP16 "
+             "arithmetic (confidence: "
+          << confidence << ")" << std::endl;
+
+  outfile << std::setw(width_int) << "N: ";
+  N = N_lower;
+  for (int ii = 0; ii < max_shift; ii++) {
+    outfile << std::setw(width_double) << N;
+    if (ii < max_shift - 1) outfile << ", ";
+    N = N << bit_shift;
+  }
+  outfile << std::endl;
+
+  outfile << std::setw(width_int) << "Deter: ";
+  for (int ii = 0; ii < max_shift; ii++) {
+    outfile << std::setw(width_double) << std::scientific
+            << std::setprecision(8) << ebwd_bound_det[max_shift + ii];
+    if (ii < max_shift - 1) outfile << ", ";
+  }
+  outfile << std::endl;
+  outfile << std::setw(width_int) << "Hoeff: ";
+  for (int ii = 0; ii < max_shift; ii++) {
+    outfile << std::setw(width_double) << std::scientific
+            << std::setprecision(8) << ebwd_bound_hoeff[max_shift + ii];
+    if (ii < max_shift - 1) outfile << ", ";
+  }
+  outfile << std::endl;
+  outfile << std::setw(width_int) << "Berns: ";
+  for (int ii = 0; ii < max_shift; ii++) {
+    outfile << std::setw(width_double) << std::scientific
+            << std::setprecision(8) << ebwd_bound_bern[max_shift + ii];
+    if (ii < max_shift - 1) outfile << ", ";
+  }
+  outfile << std::endl;
+  outfile << std::setw(width_int + 1) << "    ";
+  for (int ii = 0; ii < num_exps; ii++) {
+    for (int jj = 0; jj < max_shift; jj++) {
+      outfile << std::setw(width_double) << std::scientific
+              << std::setprecision(8)
+              << ebwd[max_shift * num_exps + jj * num_exps + ii];
+      if (jj < max_shift - 1) outfile << ", ";
+    }
+    outfile << std::endl;
+    outfile << std::setw(width_int + 1) << "    ";
+  }
+
+  outfile.close();
+
+  // Store ebwd computed with model for FP32
+  filename = "matVecMult_ebwd_model_fp32.txt";
+  outfile.open(filename);
+
+  if (!outfile) {
+    std::cerr << "Error opening file: " << filename << std::endl;
+    return;
+  }
+  outfile
+      << "Description: Backward error (computed with Model) for Mat-vec mult"
+         " computed in FP32 arithmetic (confidence: "
+      << confidence << ")" << std::endl;
+
+  outfile << std::setw(width_int) << "N: ";
+  N = N_lower;
+  for (int ii = 0; ii < max_shift; ii++) {
+    outfile << std::setw(width_double) << N;
+    if (ii < max_shift - 1) outfile << ", ";
+    N = N << bit_shift;
+  }
+  outfile << std::endl;
+
+  outfile << std::setw(width_int) << "Deter: ";
+  for (int ii = 0; ii < max_shift; ii++) {
+    outfile << std::setw(width_double) << std::scientific
+            << std::setprecision(8) << ebwd_bound_det[ii];
+    if (ii < max_shift - 1) outfile << ", ";
+  }
+  outfile << std::endl;
+  outfile << std::setw(width_int) << "Hoeff: ";
+  for (int ii = 0; ii < max_shift; ii++) {
+    outfile << std::setw(width_double) << std::scientific
+            << std::setprecision(8) << ebwd_bound_hoeff[ii];
+    if (ii < max_shift - 1) outfile << ", ";
+  }
+  outfile << std::endl;
+  outfile << std::setw(width_int) << "Berns: ";
+  for (int ii = 0; ii < max_shift; ii++) {
+    outfile << std::setw(width_double) << std::scientific
+            << std::setprecision(8) << ebwd_bound_bern[ii];
+    if (ii < max_shift - 1) outfile << ", ";
+  }
+  outfile << std::endl;
+  outfile << std::setw(width_int + 1) << "    ";
+  for (int ii = 0; ii < num_exps; ii++) {
+    for (int jj = 0; jj < max_shift; jj++) {
+      outfile << std::setw(width_double) << std::scientific
+              << std::setprecision(8) << ebwd_model[jj * num_exps + ii];
+      if (jj < max_shift - 1) outfile << ", ";
+    }
+    outfile << std::endl;
+    outfile << std::setw(width_int + 1) << "    ";
+  }
+
+  outfile.close();
+
+  // Store ebwd computed with Model for FP16
+  filename = "matVecMult_ebwd_model_fp16.txt";
+  outfile.open(filename);
+
+  if (!outfile) {
+    std::cerr << "Error opening file: " << filename << std::endl;
+    return;
+  }
+  outfile << "Description: Backward error (computed with Model) for Mat-vec "
+             "mult computed in FP16 "
+             "arithmetic (confidence: "
+          << confidence << ")" << std::endl;
+
+  outfile << std::setw(width_int) << "N: ";
+  N = N_lower;
+  for (int ii = 0; ii < max_shift; ii++) {
+    outfile << std::setw(width_double) << N;
+    if (ii < max_shift - 1) outfile << ", ";
+    N = N << bit_shift;
+  }
+  outfile << std::endl;
+
+  outfile << std::setw(width_int) << "Deter: ";
+  for (int ii = 0; ii < max_shift; ii++) {
+    outfile << std::setw(width_double) << std::scientific
+            << std::setprecision(8) << ebwd_bound_det[max_shift + ii];
+    if (ii < max_shift - 1) outfile << ", ";
+  }
+  outfile << std::endl;
+  outfile << std::setw(width_int) << "Hoeff: ";
+  for (int ii = 0; ii < max_shift; ii++) {
+    outfile << std::setw(width_double) << std::scientific
+            << std::setprecision(8) << ebwd_bound_hoeff[max_shift + ii];
+    if (ii < max_shift - 1) outfile << ", ";
+  }
+  outfile << std::endl;
+  outfile << std::setw(width_int) << "Berns: ";
+  for (int ii = 0; ii < max_shift; ii++) {
+    outfile << std::setw(width_double) << std::scientific
+            << std::setprecision(8) << ebwd_bound_bern[max_shift + ii];
+    if (ii < max_shift - 1) outfile << ", ";
+  }
+  outfile << std::endl;
+  outfile << std::setw(width_int + 1) << "    ";
+  for (int ii = 0; ii < num_exps; ii++) {
+    for (int jj = 0; jj < max_shift; jj++) {
+      outfile << std::setw(width_double) << std::scientific
+              << std::setprecision(8)
+              << ebwd_model[max_shift * num_exps + jj * num_exps + ii];
+      if (jj < max_shift - 1) outfile << ", ";
+    }
+    outfile << std::endl;
+    outfile << std::setw(width_int + 1) << "    ";
+  }
+  outfile.close();
 }
