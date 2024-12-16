@@ -1,5 +1,3 @@
-#include <cuda_fp16.h>
-
 #include <cmath>
 #include <iostream>
 #include <stdexcept>
@@ -54,6 +52,28 @@ __global__ void constantSamplerKernel(int N, T *x, double constant) {
   } else {
     x[gid] = static_cast<T>(0.0);
   }
+}
+
+void getODEParameters(const int N, half *parameters, unsigned long long seed) {
+  dim3 blockDim = config::blockSize;
+  dim3 gridDim = getGridSize(blockDim.x, N);
+  double lower, upper;
+  for (int ii = 0; ii < N; ii++) {
+    parameters[ii] = static_cast<half>(3.0);
+    parameters[N + ii] = static_cast<half>(4.0);
+  }
+  /* // Sample theta 1 */
+  /* lower = 0.1; */
+  /* upper = 1.1; */
+  /* uniformSamplerKernel<<<gridDim, blockDim>>>(N, parameters, lower, upper,
+   * seed); */
+  /* cudaCheck(cudaGetLastError()); */
+  /* // Sample theta 2 */
+  /* lower = 1.0; */
+  /* upper = 2.0; */
+  /* uniformSamplerKernel<<<gridDim, blockDim>>>(N, parameters + N, lower,
+   * upper, seed); */
+  /* cudaCheck(cudaGetLastError()); */
 }
 
 template <typename T>

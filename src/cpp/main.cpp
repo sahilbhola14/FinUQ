@@ -3,7 +3,7 @@
 #include "dotProduct.cuh"
 #include "gamma.hpp"
 #include "matVecMult.cuh"
-#include "ode.hpp"
+#include "ode.cuh"
 
 int main() {
   // Compare Gamma [Figure 1]
@@ -17,6 +17,8 @@ int main() {
   /* launchDotProductExperiment(2<<10, 1, 1); */
   // Matrix-Vector Product
   /* launchMatVecMultExperiment(2<<5, 1, 9); */
-  launchMatVecMultExperiment(2 << 10, 1, 1);
+  /* launchMatVecMultExperiment(2<<10, 1, 1); */
+  // Stochastic ODE
+  launchStochasticODEExperiment(2 << 1, 1, 1, 1);
   return 0;
 }
