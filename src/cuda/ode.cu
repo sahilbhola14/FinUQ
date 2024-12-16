@@ -4,9 +4,12 @@
 #include <ctime>
 #include <stdexcept>
 
+#include "bounds.hpp"
 #include "checks.cuh"
 #include "config.hpp"
+#include "convert.cuh"
 #include "definition.hpp"
+#include "ebwd.hpp"
 #include "ode.cuh"
 #include "sampler.cuh"
 #include "utils.hpp"
@@ -190,16 +193,15 @@ __global__ void reimannIntegrationKernel(const int N, T *u, T *p,
   *p = summation;
 }
 
-void launchODE(const int N, const int N_param_samples, double *ebwd_float,
+void launchODE(const int N, half *theta_1, half *theta_2, double *ebwd_float,
                double *ebwd_half, double *ebwd_float_model,
                double *ebwd_half_model, unsigned long long seed) {
-  // Declarations
-  half *parameters;     // parameters (always in lower precision to avoid
-                        // representation error)
   double dx = 1.0 / N;  // gridSize
 
   half *sub_diag, *main_diag, *super_diag,
       *rhs;  // Always in lower precision to avoid represenation error
+
+  double *sub_diag_double, *main_diag_double, *super_diag_double, *rhs_double;
 
   double *a_double, *b_double, *y_double, *u_double, *p_double;
   float *a_float, *b_float, *y_float, *u_float, *p_float;
@@ -212,103 +214,120 @@ void launchODE(const int N, const int N_param_samples, double *ebwd_float,
       getGridSize(blockDim.x, N_inner);  // Map inner elements to each thread
 
   // Allocation
-  cudaCheck(
-      cudaMallocManaged(&parameters, 2 * N_param_samples * sizeof(double)));
 
   cudaCheck(cudaMallocManaged(&sub_diag, N_inner * sizeof(half)));
   cudaCheck(cudaMallocManaged(&main_diag, N_inner * sizeof(half)));
   cudaCheck(cudaMallocManaged(&super_diag, N_inner * sizeof(half)));
   cudaCheck(cudaMallocManaged(&rhs, N_inner * sizeof(half)));
 
+  cudaCheck(cudaMallocManaged(&sub_diag_double, N_inner * sizeof(double)));
+  cudaCheck(cudaMallocManaged(&main_diag_double, N_inner * sizeof(double)));
+  cudaCheck(cudaMallocManaged(&super_diag_double, N_inner * sizeof(double)));
+  cudaCheck(cudaMallocManaged(&rhs_double, N_inner * sizeof(double)));
+
   cudaCheck(cudaMallocManaged(&a_double, N_inner * sizeof(double)));
   cudaCheck(cudaMallocManaged(&b_double, N_inner * sizeof(double)));
   cudaCheck(cudaMallocManaged(&y_double, N_inner * sizeof(double)));
   cudaCheck(cudaMallocManaged(&u_double, N_inner * sizeof(double)));
-  cudaCheck(cudaMallocManaged(&p_double, N_param_samples * sizeof(double)));
+  cudaCheck(cudaMallocManaged(&p_double, sizeof(double)));
 
   cudaCheck(cudaMallocManaged(&a_float, N_inner * sizeof(float)));
   cudaCheck(cudaMallocManaged(&b_float, N_inner * sizeof(float)));
   cudaCheck(cudaMallocManaged(&y_float, N_inner * sizeof(float)));
   cudaCheck(cudaMallocManaged(&u_float, N_inner * sizeof(float)));
-  cudaCheck(cudaMallocManaged(&p_float, N_param_samples * sizeof(float)));
+  cudaCheck(cudaMallocManaged(&p_float, sizeof(float)));
 
   cudaCheck(cudaMallocManaged(&a_half, N_inner * sizeof(half)));
   cudaCheck(cudaMallocManaged(&b_half, N_inner * sizeof(half)));
   cudaCheck(cudaMallocManaged(&y_half, N_inner * sizeof(half)));
   cudaCheck(cudaMallocManaged(&u_half, N_inner * sizeof(half)));
-  cudaCheck(cudaMallocManaged(&p_half, N_param_samples * sizeof(half)));
+  cudaCheck(cudaMallocManaged(&p_half, sizeof(half)));
 
-  // Sample the parameters
-  getODEParameters(N_param_samples, parameters, seed);
+  // Compute the Diagonals in lower precision
+  getDiagonalsKernel<<<gridDim, blockDim>>>(N, theta_1, theta_2, sub_diag,
+                                            main_diag, super_diag);
+  cudaCheck(cudaGetLastError());
 
-  // Compute the solution for each parameter
-  for (int ii = 0; ii < 1; ii++) {
-    // Compute the Diagonals in lower precision
-    getDiagonalsKernel<<<gridDim, blockDim>>>(N, &parameters[ii],
-                                              &parameters[N_param_samples + ii],
-                                              sub_diag, main_diag, super_diag);
-    cudaCheck(cudaGetLastError());
+  convertHalfToDouble(N_inner, sub_diag, sub_diag_double);
+  convertHalfToDouble(N_inner, main_diag, main_diag_double);
+  convertHalfToDouble(N_inner, super_diag, super_diag_double);
 
-    // Comute the rhs
-    getRhsKernel<<<gridDim, blockDim>>>(N, &parameters[ii],
-                                        &parameters[N_param_samples + ii], rhs);
-    cudaCheck(cudaGetLastError());
+  // Comute the rhs
+  getRhsKernel<<<gridDim, blockDim>>>(N, theta_1, theta_2, rhs);
+  cudaCheck(cudaGetLastError());
 
-    // Compute the decomposition
-    getDecompositionKernel<<<1, 1>>>(N, sub_diag, main_diag, super_diag,
-                                     a_double, b_double, Double);
-    cudaCheck(cudaGetLastError());
+  convertHalfToDouble(N_inner, rhs, rhs_double);
+  cudaDeviceSynchronize();
 
-    getDecompositionKernel<<<1, 1>>>(N, sub_diag, main_diag, super_diag,
-                                     a_float, b_float, Float);
-    cudaCheck(cudaGetLastError());
+  // Compute the decomposition
+  getDecompositionKernel<<<1, 1>>>(N, sub_diag, main_diag, super_diag, a_double,
+                                   b_double, Double);
+  cudaCheck(cudaGetLastError());
 
-    getDecompositionKernel<<<1, 1>>>(N, sub_diag, main_diag, super_diag, a_half,
-                                     b_half, Half);
-    cudaCheck(cudaGetLastError());
+  getDecompositionKernel<<<1, 1>>>(N, sub_diag, main_diag, super_diag, a_float,
+                                   b_float, Float);
+  cudaCheck(cudaGetLastError());
 
-    // Forward Substitution
-    forwardSubstitutionKernel<<<1, 1>>>(N, a_double, y_double, rhs, Double);
-    cudaCheck(cudaGetLastError());
+  getDecompositionKernel<<<1, 1>>>(N, sub_diag, main_diag, super_diag, a_half,
+                                   b_half, Half);
+  cudaCheck(cudaGetLastError());
 
-    forwardSubstitutionKernel<<<1, 1>>>(N, a_float, y_float, rhs, Float);
-    cudaCheck(cudaGetLastError());
+  // Forward Substitution
+  forwardSubstitutionKernel<<<1, 1>>>(N, a_double, y_double, rhs, Double);
+  cudaCheck(cudaGetLastError());
 
-    forwardSubstitutionKernel<<<1, 1>>>(N, a_half, y_half, rhs, Half);
-    cudaCheck(cudaGetLastError());
+  forwardSubstitutionKernel<<<1, 1>>>(N, a_float, y_float, rhs, Float);
+  cudaCheck(cudaGetLastError());
 
-    // Backward Substitution
-    backwardSubstitutionKernel<<<1, 1>>>(N, b_double, y_double, u_double,
-                                         super_diag, Double);
-    cudaCheck(cudaGetLastError());
+  forwardSubstitutionKernel<<<1, 1>>>(N, a_half, y_half, rhs, Half);
+  cudaCheck(cudaGetLastError());
 
-    backwardSubstitutionKernel<<<1, 1>>>(N, b_float, y_float, u_float,
-                                         super_diag, Float);
-    cudaCheck(cudaGetLastError());
+  // Backward Substitution
+  backwardSubstitutionKernel<<<1, 1>>>(N, b_double, y_double, u_double,
+                                       super_diag, Double);
+  cudaCheck(cudaGetLastError());
 
-    backwardSubstitutionKernel<<<1, 1>>>(N, b_half, y_half, u_half, super_diag,
-                                         Half);
-    cudaCheck(cudaGetLastError());
+  backwardSubstitutionKernel<<<1, 1>>>(N, b_float, y_float, u_float, super_diag,
+                                       Float);
+  cudaCheck(cudaGetLastError());
 
-    // Integrate
-    reimannIntegrationKernel<<<1, 1>>>(N, u_double, p_double[ii], Double);
-    cudaCheck(cudaGetLastError());
+  backwardSubstitutionKernel<<<1, 1>>>(N, b_half, y_half, u_half, super_diag,
+                                       Half);
+  cudaCheck(cudaGetLastError());
 
-    reimannIntegrationKernel<<<1, 1>>>(N, u_float, p_float[ii], Float);
-    cudaCheck(cudaGetLastError());
+  // Integrate
+  reimannIntegrationKernel<<<1, 1>>>(N, u_double, p_double, Double);
+  cudaCheck(cudaGetLastError());
 
-    reimannIntegrationKernel<<<1, 1>>>(N, u_half, p_half[ii], Half);
-    cudaCheck(cudaGetLastError());
+  reimannIntegrationKernel<<<1, 1>>>(N, u_float, p_float, Float);
+  cudaCheck(cudaGetLastError());
 
-    cudaDeviceSynchronize();
-  }
+  reimannIntegrationKernel<<<1, 1>>>(N, u_half, p_half, Half);
+  cudaCheck(cudaGetLastError());
+
+  // Synchronize
+  cudaDeviceSynchronize();
+
+  // Compute the backward error
+  computeBackwardErrorThomas(N, sub_diag_double, main_diag_double,
+                             super_diag_double, rhs_double, a_float, b_float,
+                             u_float, ebwd_float);
+  computeBackwardErrorThomas(N, sub_diag_double, main_diag_double,
+                             super_diag_double, rhs_double, a_half, b_half,
+                             u_half, ebwd_half);
+  std::cout << *ebwd_float << ", " << static_cast<double>(*ebwd_half)
+            << std::endl;
 
   // Free
-  cudaFree(parameters);
   cudaFree(sub_diag);
   cudaFree(main_diag);
   cudaFree(super_diag);
   cudaFree(rhs);
+
+  cudaFree(sub_diag_double);
+  cudaFree(main_diag_double);
+  cudaFree(super_diag_double);
+  cudaFree(rhs_double);
 
   cudaFree(a_double);
   cudaFree(b_double);
@@ -329,15 +348,18 @@ void launchODE(const int N, const int N_param_samples, double *ebwd_float,
   cudaFree(p_half);
 }
 
-void launchStochasticODEExperiment(int N_lower, int N_param_samples,
-                                   int bit_shift, int max_shift, int num_exps,
-                                   double confidence) {
+void launchStochasticODEExperiment(int N_lower, int bit_shift, int max_shift,
+                                   int num_exps, double confidence) {
   int N = N_lower;
   const int width_int = 6;      // For I/O
   const int width_double = 15;  // For I/O
 
   double *ebwd, *ebwd_model;
   double *ebwd_bound_det, *ebwd_bound_hoeff, *ebwd_bound_bern;
+  // Declarations
+  half *parameters;  // parameters (always in lower precision to avoid
+                     // representation error)
+
   ebwd_bound_det =
       static_cast<double *>(malloc(2 * max_shift * sizeof(double)));
   ebwd_bound_hoeff =
@@ -349,34 +371,41 @@ void launchStochasticODEExperiment(int N_lower, int N_param_samples,
   ebwd_model =
       static_cast<double *>(malloc(2 * max_shift * num_exps * sizeof(double)));
 
+  cudaCheck(cudaMallocManaged(&parameters, 2 * num_exps * sizeof(half)));
+
   for (int ii = 0; ii < max_shift; ii++) {
     std::cout << "Problem size: " << N << std::endl;
 
-    /* // Compute backward bound (Float) */
-    /* ebwd_bound_det[ii] = */
-    /*     dotProductBackwardBound(N, Float, Deterministic, confidence); */
-    /* ebwd_bound_hoeff[ii] = */
-    /*     dotProductBackwardBound(N, Float, Hoeffding, confidence); */
-    /* ebwd_bound_bern[ii] = */
-    /*     dotProductBackwardBound(N, Float, Bernstein, confidence); */
+    // Compute backward bound (Float)
+    ebwd_bound_det[ii] =
+        thomasBackwardBound(N - 1, Float, Deterministic, confidence);
+    ebwd_bound_hoeff[ii] =
+        thomasBackwardBound(N - 1, Float, Hoeffding, confidence);
+    ebwd_bound_bern[ii] = thomasBackwardBound(N, Float, Bernstein, confidence);
 
-    /* // Compute backward bound (Half) */
-    /* ebwd_bound_det[max_shift + ii] = */
-    /*     dotProductBackwardBound(N, Half, Deterministic, confidence); */
-    /* ebwd_bound_hoeff[max_shift + ii] = */
-    /*     dotProductBackwardBound(N, Half, Hoeffding, confidence); */
-    /* ebwd_bound_bern[max_shift + ii] = */
-    /*     dotProductBackwardBound(N, Half, Bernstein, confidence); */
+    // Compute backward bound (Half)
+    ebwd_bound_det[max_shift + ii] =
+        thomasBackwardBound(N - 1, Half, Deterministic, confidence);
+    ebwd_bound_hoeff[max_shift + ii] =
+        thomasBackwardBound(N - 1, Half, Hoeffding, confidence);
+    ebwd_bound_bern[max_shift + ii] =
+        thomasBackwardBound(N - 1, Half, Bernstein, confidence);
 
-    // Carry experiment of ODE
+    /* std::cout << ebwd_bound_det[ii]  << ", " << ebwd_bound_hoeff[ii] << ", "
+     * << ebwd_bound_bern[ii] << ", " */
+    /*     << ebwd_bound_det[max_shift + ii]  << ", " <<
+     * ebwd_bound_hoeff[max_shift + ii] << ", " << ebwd_bound_bern[max_shift +
+     * ii] << std::endl; */
+
+    // Carry experiment of ODE (each experiment is one parameter realization)
+    unsigned long long base_seed =
+        static_cast<unsigned long long>(std::time(nullptr));
+    base_seed += sqrt(ii * 231);
+    getODEParameters(num_exps, parameters, base_seed);  // Sample the parameters
+
     for (int jj = 0; jj < num_exps; jj++) {
-      // Experiment seed
-      unsigned long long base_seed =
-          static_cast<unsigned long long>(std::time(nullptr));
-      base_seed += sqrt(jj * 354);  // Experimental seed
-      base_seed += sqrt(ii * 231);  // Problem size seed
-
-      launchODE(N, N_param_samples, &ebwd[ii * num_exps + jj],
+      launchODE(N, &parameters[jj], &parameters[num_exps + jj],
+                &ebwd[ii * num_exps + jj],
                 &ebwd[max_shift * num_exps + ii * num_exps + jj],
                 &ebwd_model[ii * num_exps + jj],
                 &ebwd_model[max_shift * num_exps + ii * num_exps + jj],
@@ -385,4 +414,6 @@ void launchStochasticODEExperiment(int N_lower, int N_param_samples,
 
     N = N << bit_shift;  // Increase problem size
   }
+
+  // Free memory
 }

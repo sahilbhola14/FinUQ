@@ -5,5 +5,6 @@
 
 double dotProductBackwardBound(int N, Precision prec, BoundType btype, double confidence = 0.99);
 double matVecBackwardBound(int N, Precision prec, BoundType btype, double confidence = 0.99);
+double thomasBackwardBound(int N, Precision prec, BoundType btype, double confidence = 0.99);
 
 #endif

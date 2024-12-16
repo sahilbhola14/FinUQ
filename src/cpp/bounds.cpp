@@ -17,3 +17,11 @@ double matVecBackwardBound(int N, Precision prec, BoundType btype,
   double zeta = solveZetaGivenQ(N * N, confidence);
   return getGamma(N, prec, btype, zeta);
 }
+
+double thomasBackwardBound(int N, Precision prec, BoundType btype,
+                           double confidence) {
+  double zeta = solveZetaGivenQ(7 * N - 6, confidence);
+  double gamma_1 = getGamma(1, prec, btype, zeta);
+  double gamma_2 = getGamma(1, prec, btype, zeta);
+  return 2.0 * gamma_1 + gamma_2 + gamma_1 * gamma_2;
+}
