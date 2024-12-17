@@ -4,9 +4,12 @@
 
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
+#include <iomanip>
 #include <iostream>
 
 #include "ebwd.hpp"
+#include "gamma.hpp"
+#include "probability.hpp"
 
 void invertA(int N, double *sub_diag, double *main_diag, double *super_diag,
              double *abs_prod, double *efwd) {
@@ -85,20 +88,50 @@ void invertA(int N, double *sub_diag, double *main_diag, double *super_diag,
 template <typename T>
 void computeForwardErrorThomas(int N, double *sub_diag, double *main_diag,
                                double *super_diag, double *rhs, T *a, T *b,
-                               T *u, double *ebwd, double *efwd) {
+                               T *u, double *ebwd, double *efwd, double *C) {
   const int N_inner = N - 1;
   double *abs_prod = static_cast<double *>(malloc(N_inner * sizeof(double)));
   // Compute the absolute LU*u
   computeAbsoluteLUTimesSol(N, a, b, super_diag, u, abs_prod);
 
   invertA(N, sub_diag, main_diag, super_diag, abs_prod, efwd);
-  *efwd = *ebwd * *efwd;
+  *C = *efwd;
+  *efwd = *ebwd * *C;
+}
+
+template <typename T>
+void computeForwardErrorQoi(int N, T *u, double *C, double *efwd_bound,
+                            BoundType btype, Precision prec,
+                            double confidence) {
+  // Declarations
+  const int N_inner = N - 1;
+  const double dx = 1.0 / N;
+
+  // Solve the for zeta for the problem
+  double zeta = solveZetaGivenQ(8 * N - 14, confidence);
+  double gamma_1 = getGamma(1, prec, btype, zeta);
+  double gamma_2 = getGamma(1, prec, btype, zeta);
+
+  double gamma_ls = 2.0 * gamma_1 + gamma_2 + gamma_1 * gamma_2;
+  double gamma_n_inner = getGamma(N_inner, prec, btype, zeta);
+
+  // 1 Norm of solution
+  double norm = 0.0;
+  for (int ii = 0; ii < N_inner; ii++) {
+    norm += std::abs(static_cast<double>(u[ii]));
+  }
+  /* std::cout << norm << std::endl; */
+  *efwd_bound = dx * (N_inner * gamma_ls * *C + gamma_n_inner * norm);
 }
 
 // Template compilation
 template void computeForwardErrorThomas(int, double *, double *, double *,
                                         double *, float *, float *, float *,
-                                        double *, double *);
+                                        double *, double *, double *);
 template void computeForwardErrorThomas(int, double *, double *, double *,
                                         double *, half *, half *, half *,
-                                        double *, double *);
+                                        double *, double *, double *);
+template void computeForwardErrorQoi(int, float *, double *, double *,
+                                     BoundType, Precision, double);
+template void computeForwardErrorQoi(int, half *, double *, double *, BoundType,
+                                     Precision, double);

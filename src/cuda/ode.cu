@@ -194,11 +194,16 @@ __global__ void reimannIntegrationKernel(const int N, T *u, T *p,
   *p = summation;
 }
 
-void launchODE(const int N, half *theta_1, half *theta_2, double *ebwd_float,
-               double *ebwd_half, double *ebwd_float_model,
-               double *ebwd_half_model, double *efwd_float, double *efwd_half,
-               unsigned long long seed) {
+void launchODE(
+    const int N, half *theta_1, half *theta_2, double *ebwd_thomas_float,
+    double *ebwd_thomas_half, double *ebwd_model_float, double *ebwd_model_half,
+    double *efwd_thomas_float, double *efwd_thomas_half, double *efwd_qoi_float,
+    double *efwd_qoi_half, double *efwd_qoi_bound_det_float,
+    double *efwd_qoi_bound_det_half, double *efwd_qoi_bound_hoeff_float,
+    double *efwd_qoi_bound_hoeff_half, double *efwd_qoi_bound_bern_float,
+    double *efwd_qoi_bound_bern_half, double confidence) {
   double dx = 1.0 / N;  // gridSize
+  double *C_ls_float, *C_ls_half;
 
   half *sub_diag, *main_diag, *super_diag,
       *rhs;  // Always in lower precision to avoid represenation error
@@ -216,6 +221,9 @@ void launchODE(const int N, half *theta_1, half *theta_2, double *ebwd_float,
       getGridSize(blockDim.x, N_inner);  // Map inner elements to each thread
 
   // Allocation
+
+  C_ls_float = static_cast<double *>(malloc(sizeof(double)));
+  C_ls_half = static_cast<double *>(malloc(sizeof(double)));
 
   cudaCheck(cudaMallocManaged(&sub_diag, N_inner * sizeof(half)));
   cudaCheck(cudaMallocManaged(&main_diag, N_inner * sizeof(half)));
@@ -313,21 +321,48 @@ void launchODE(const int N, half *theta_1, half *theta_2, double *ebwd_float,
   // Compute the backward error for Thomas
   computeBackwardErrorThomas(N, sub_diag_double, main_diag_double,
                              super_diag_double, rhs_double, a_float, b_float,
-                             u_float, ebwd_float);
+                             u_float, ebwd_thomas_float);
   computeBackwardErrorThomas(N, sub_diag_double, main_diag_double,
                              super_diag_double, rhs_double, a_half, b_half,
-                             u_half, ebwd_half);
+                             u_half, ebwd_thomas_half);
 
-  // Comptue the forward errro for Thomas
-  /* computeForwardErrorThomas(N, sub_diag_double, main_diag_double,
-   * super_diag_double, rhs_double, a_float, b_float, u_float, ebwd_float,
-   * efwd_float); */
+  // Comptue the forward error for Thomas
   computeForwardErrorThomas(N, sub_diag_double, main_diag_double,
-                            super_diag_double, rhs_double, a_half, b_half,
-                            u_half, ebwd_half, efwd_half);
+                            super_diag_double, rhs_double, a_float, b_float,
+                            u_float, ebwd_thomas_float, efwd_thomas_float,
+                            C_ls_float);
+  computeForwardErrorThomas(
+      N, sub_diag_double, main_diag_double, super_diag_double, rhs_double,
+      a_half, b_half, u_half, ebwd_thomas_half, efwd_thomas_half, C_ls_half);
 
-  /* std::cout << *ebwd_float << ", " << static_cast<double>(*ebwd_half) */
-  /*           << std::endl; */
+  // Compute the forward error for the Qoi
+  *efwd_qoi_float = std::abs(static_cast<double>(*p_float) - *p_double);
+  *efwd_qoi_half = std::abs(static_cast<double>(*p_half) - *p_double);
+
+  // Compute the forward error bound for Qoi
+  computeForwardErrorQoi(N, u_float, C_ls_float, efwd_qoi_bound_det_float,
+                         Deterministic, Float, confidence);
+  computeForwardErrorQoi(N, u_float, C_ls_float, efwd_qoi_bound_hoeff_float,
+                         Hoeffding, Float, confidence);
+  computeForwardErrorQoi(N, u_float, C_ls_float, efwd_qoi_bound_bern_float,
+                         Bernstein, Float, confidence);
+
+  computeForwardErrorQoi(N, u_half, C_ls_half, efwd_qoi_bound_det_half,
+                         Deterministic, Half, confidence);
+  computeForwardErrorQoi(N, u_half, C_ls_half, efwd_qoi_bound_hoeff_half,
+                         Hoeffding, Half, confidence);
+  computeForwardErrorQoi(N, u_half, C_ls_half, efwd_qoi_bound_bern_half,
+                         Bernstein, Half, confidence);
+
+  std::cout << "efwd: " << *efwd_qoi_float << ", " << *efwd_qoi_half
+            << std::endl;
+  ;
+  std::cout << "Float bounds: " << *efwd_qoi_bound_det_float << ", "
+            << *efwd_qoi_bound_det_float << ", " << *efwd_qoi_bound_det_float
+            << std::endl;
+  std::cout << "Half bounds: " << *efwd_qoi_bound_det_half << ", "
+            << *efwd_qoi_bound_det_half << ", " << *efwd_qoi_bound_det_half
+            << std::endl;
 
   // Free
   cudaFree(sub_diag);
@@ -366,7 +401,10 @@ void launchStochasticODEExperiment(int N_lower, int bit_shift, int max_shift,
   const int width_double = 15;  // For I/O
 
   double *ebwd_thomas, *ebwd_model;
-  double *efwd_thomas;
+  double *efwd_thomas, *efwd_qoi;
+
+  double *efwd_qoi_bound_det, *efwd_qoi_bound_hoeff, *efwd_qoi_bound_bern;
+
   double *ebwd_bound_det, *ebwd_bound_hoeff, *ebwd_bound_bern;
   // Declarations
   half *parameters;  // parameters (always in lower precision to avoid
@@ -378,12 +416,22 @@ void launchStochasticODEExperiment(int N_lower, int bit_shift, int max_shift,
       static_cast<double *>(malloc(2 * max_shift * sizeof(double)));
   ebwd_bound_bern =
       static_cast<double *>(malloc(2 * max_shift * sizeof(double)));
+
   ebwd_thomas =
       static_cast<double *>(malloc(2 * max_shift * num_exps * sizeof(double)));
   ebwd_model =
       static_cast<double *>(malloc(2 * max_shift * num_exps * sizeof(double)));
 
   efwd_thomas =
+      static_cast<double *>(malloc(2 * max_shift * num_exps * sizeof(double)));
+
+  efwd_qoi =
+      static_cast<double *>(malloc(2 * max_shift * num_exps * sizeof(double)));
+  efwd_qoi_bound_det =
+      static_cast<double *>(malloc(2 * max_shift * num_exps * sizeof(double)));
+  efwd_qoi_bound_hoeff =
+      static_cast<double *>(malloc(2 * max_shift * num_exps * sizeof(double)));
+  efwd_qoi_bound_bern =
       static_cast<double *>(malloc(2 * max_shift * num_exps * sizeof(double)));
 
   cudaCheck(cudaMallocManaged(&parameters, 2 * num_exps * sizeof(half)));
@@ -419,18 +467,37 @@ void launchStochasticODEExperiment(int N_lower, int bit_shift, int max_shift,
     getODEParameters(num_exps, parameters, base_seed);  // Sample the parameters
 
     for (int jj = 0; jj < num_exps; jj++) {
-      launchODE(N, &parameters[jj], &parameters[num_exps + jj],
-                &ebwd_thomas[ii * num_exps + jj],
-                &ebwd_thomas[max_shift * num_exps + ii * num_exps + jj],
-                &ebwd_model[ii * num_exps + jj],
-                &ebwd_model[max_shift * num_exps + ii * num_exps + jj],
-                &efwd_thomas[ii * num_exps + jj],
-                &efwd_thomas[max_shift * num_exps + ii * num_exps + jj],
-                base_seed);
+      // Compute ODE solution
+      launchODE(
+          N, &parameters[jj], &parameters[num_exps + jj],
+          &ebwd_thomas[ii * num_exps + jj],
+          &ebwd_thomas[max_shift * num_exps + ii * num_exps + jj],
+          &ebwd_model[ii * num_exps + jj],
+          &ebwd_model[max_shift * num_exps + ii * num_exps + jj],
+          &efwd_thomas[ii * num_exps + jj],
+          &efwd_thomas[max_shift * num_exps + ii * num_exps + jj],
+          &efwd_qoi[ii * num_exps + jj],
+          &efwd_qoi[max_shift * num_exps + ii * num_exps + jj],
+          &efwd_qoi_bound_det[ii * num_exps + jj],
+          &efwd_qoi_bound_det[max_shift * num_exps + ii * num_exps + jj],
+          &efwd_qoi_bound_hoeff[ii * num_exps + jj],
+          &efwd_qoi_bound_hoeff[max_shift * num_exps + ii * num_exps + jj],
+          &efwd_qoi_bound_bern[ii * num_exps + jj],
+          &efwd_qoi_bound_bern[max_shift * num_exps + ii * num_exps + jj],
+          confidence);
     }
 
     N = N << bit_shift;  // Increase problem size
   }
 
   // Free memory
+  free(ebwd_thomas);
+  free(ebwd_model);
+
+  free(efwd_thomas);
+  free(efwd_qoi);
+
+  free(ebwd_bound_det);
+  free(ebwd_bound_hoeff);
+  free(ebwd_bound_bern);
 }
