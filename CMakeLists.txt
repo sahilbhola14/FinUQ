@@ -13,6 +13,7 @@ set(cmake_cxx_compiler "/usr/bin/g++-9")
 
 # Find CUDA package
 find_package(CUDA 12.1 REQUIRED)
+find_package(Eigen3 REQUIRED)
 # Attention: Update this using 'which nvcc' (if required)
 # set(CUDA_TOOLKIT_ROOT_DIR /usr/local/cuda-12.5/bin/nvcc)
 # set(CUDA_TOOLKIT_ROOT_DIR /sw/pkgs/arc/cuda/12.1.1/bin/nvcc)
@@ -31,6 +32,7 @@ set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -arch=sm_80 -O0 -Xptxas -O0 -Xcompiler
 include_directories(${CMAKE_SOURCE_DIR}/include/cpp)
 include_directories(${CMAKE_SOURCE_DIR}/include/cuda)
 include_directories(${CUDA_INCLUDE_DIRS})
+include_directories(${EIGEN3_INCLUDE_DIR})
 
 # Gather source files
 file(GLOB SOURCES "src/cpp/*.cpp" "src/cuda/*.cu")

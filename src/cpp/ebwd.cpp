@@ -107,3 +107,8 @@ template void computeBackwardErrorThomas(int, double *, double *, double *,
 template void computeBackwardErrorThomas(int, double *, double *, double *,
                                          double *, half *, half *, half *,
                                          double *);
+
+template void computeAbsoluteLUTimesSol(int, float *, float *, double *,
+                                        float *, double *);
+template void computeAbsoluteLUTimesSol(int, half *, half *, double *, half *,
+                                        double *);

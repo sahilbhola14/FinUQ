@@ -10,6 +10,7 @@
 #include "convert.cuh"
 #include "definition.hpp"
 #include "ebwd.hpp"
+#include "efwd.hpp"
 #include "ode.cuh"
 #include "sampler.cuh"
 #include "utils.hpp"
@@ -195,7 +196,8 @@ __global__ void reimannIntegrationKernel(const int N, T *u, T *p,
 
 void launchODE(const int N, half *theta_1, half *theta_2, double *ebwd_float,
                double *ebwd_half, double *ebwd_float_model,
-               double *ebwd_half_model, unsigned long long seed) {
+               double *ebwd_half_model, double *efwd_float, double *efwd_half,
+               unsigned long long seed) {
   double dx = 1.0 / N;  // gridSize
 
   half *sub_diag, *main_diag, *super_diag,
@@ -308,15 +310,24 @@ void launchODE(const int N, half *theta_1, half *theta_2, double *ebwd_float,
   // Synchronize
   cudaDeviceSynchronize();
 
-  // Compute the backward error
+  // Compute the backward error for Thomas
   computeBackwardErrorThomas(N, sub_diag_double, main_diag_double,
                              super_diag_double, rhs_double, a_float, b_float,
                              u_float, ebwd_float);
   computeBackwardErrorThomas(N, sub_diag_double, main_diag_double,
                              super_diag_double, rhs_double, a_half, b_half,
                              u_half, ebwd_half);
-  std::cout << *ebwd_float << ", " << static_cast<double>(*ebwd_half)
-            << std::endl;
+
+  // Comptue the forward errro for Thomas
+  /* computeForwardErrorThomas(N, sub_diag_double, main_diag_double,
+   * super_diag_double, rhs_double, a_float, b_float, u_float, ebwd_float,
+   * efwd_float); */
+  computeForwardErrorThomas(N, sub_diag_double, main_diag_double,
+                            super_diag_double, rhs_double, a_half, b_half,
+                            u_half, ebwd_half, efwd_half);
+
+  /* std::cout << *ebwd_float << ", " << static_cast<double>(*ebwd_half) */
+  /*           << std::endl; */
 
   // Free
   cudaFree(sub_diag);
@@ -354,7 +365,8 @@ void launchStochasticODEExperiment(int N_lower, int bit_shift, int max_shift,
   const int width_int = 6;      // For I/O
   const int width_double = 15;  // For I/O
 
-  double *ebwd, *ebwd_model;
+  double *ebwd_thomas, *ebwd_model;
+  double *efwd_thomas;
   double *ebwd_bound_det, *ebwd_bound_hoeff, *ebwd_bound_bern;
   // Declarations
   half *parameters;  // parameters (always in lower precision to avoid
@@ -366,9 +378,12 @@ void launchStochasticODEExperiment(int N_lower, int bit_shift, int max_shift,
       static_cast<double *>(malloc(2 * max_shift * sizeof(double)));
   ebwd_bound_bern =
       static_cast<double *>(malloc(2 * max_shift * sizeof(double)));
-  ebwd =
+  ebwd_thomas =
       static_cast<double *>(malloc(2 * max_shift * num_exps * sizeof(double)));
   ebwd_model =
+      static_cast<double *>(malloc(2 * max_shift * num_exps * sizeof(double)));
+
+  efwd_thomas =
       static_cast<double *>(malloc(2 * max_shift * num_exps * sizeof(double)));
 
   cudaCheck(cudaMallocManaged(&parameters, 2 * num_exps * sizeof(half)));
@@ -405,10 +420,12 @@ void launchStochasticODEExperiment(int N_lower, int bit_shift, int max_shift,
 
     for (int jj = 0; jj < num_exps; jj++) {
       launchODE(N, &parameters[jj], &parameters[num_exps + jj],
-                &ebwd[ii * num_exps + jj],
-                &ebwd[max_shift * num_exps + ii * num_exps + jj],
+                &ebwd_thomas[ii * num_exps + jj],
+                &ebwd_thomas[max_shift * num_exps + ii * num_exps + jj],
                 &ebwd_model[ii * num_exps + jj],
                 &ebwd_model[max_shift * num_exps + ii * num_exps + jj],
+                &efwd_thomas[ii * num_exps + jj],
+                &efwd_thomas[max_shift * num_exps + ii * num_exps + jj],
                 base_seed);
     }
 
