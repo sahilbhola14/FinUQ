@@ -71,19 +71,15 @@ void invertA(int N, double *sub_diag, double *main_diag, double *super_diag,
   int cols = mat_inv_dense.cols();
   double error = 0.0;
 
-  for (int ii = 0; ii < N_inner; ii++) {
-    std::cout << abs_prod[ii] << std::endl;
+  for (int ii = 0; ii < rows; ii++) {
+    double summation = 0.0;
+    for (int jj = 0; jj < cols; jj++) {
+      summation += std::abs(mat_inv_dense(ii, jj)) * abs_prod[jj];
+    }
+    error = std::max(error, summation);
   }
-  std::cout << mat_inv_dense << std::endl;
-  /* for (int ii = 0; ii < rows; ii++){ */
-  /*     for (int jj = 0; jj < cols; jj++){ */
-  /*         error = std::max(error, std::abs(mat_inv_dense(ii, jj)) *
-   * abs_prod[jj]); */
-  /*     } */
-  /* } */
-  /* /1* std::cout << error << std::endl; *1/ */
 
-  /* *efwd = error; */
+  *efwd = error;
 }
 
 template <typename T>
@@ -96,8 +92,7 @@ void computeForwardErrorThomas(int N, double *sub_diag, double *main_diag,
   computeAbsoluteLUTimesSol(N, a, b, super_diag, u, abs_prod);
 
   invertA(N, sub_diag, main_diag, super_diag, abs_prod, efwd);
-  /* *efwd = *ebwd * *efwd; */
-  /* std::cout << *efwd << std::endl; */
+  *efwd = *ebwd * *efwd;
 }
 
 // Template compilation
