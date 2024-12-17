@@ -1142,6 +1142,61 @@ void launchStochasticODEExperiment(int N_lower, int bit_shift, int max_shift,
           outfile);
   outfile.close();
 
+  // QoI
+  filename = "qoi_fp64.txt";
+  outfile.open(filename);
+  if (!outfile) {
+    std::cerr << "Error opening file: " << filename << std::endl;
+    return;
+  }
+  outfile << "Description: QoI (FP64)" << std::endl;
+  outfile << std::setw(width_int) << "N: ";
+  N = N_lower;
+  for (int ii = 0; ii < max_shift; ii++) {
+    outfile << std::setw(width_double) << N;
+    if (ii < max_shift - 1) outfile << ", ";
+    N = N << bit_shift;
+  }
+  outfile << std::endl;
+  saveMat(max_shift, num_exps, p, outfile);
+  outfile.close();
+
+  filename = "qoi_fp32.txt";
+  outfile.open(filename);
+  if (!outfile) {
+    std::cerr << "Error opening file: " << filename << std::endl;
+    return;
+  }
+  outfile << "Description: QoI (FP32)" << std::endl;
+  outfile << std::setw(width_int) << "N: ";
+  N = N_lower;
+  for (int ii = 0; ii < max_shift; ii++) {
+    outfile << std::setw(width_double) << N;
+    if (ii < max_shift - 1) outfile << ", ";
+    N = N << bit_shift;
+  }
+  outfile << std::endl;
+  saveMat(max_shift, num_exps, p + max_shift * num_exps, outfile);
+  outfile.close();
+
+  filename = "qoi_fp16.txt";
+  outfile.open(filename);
+  if (!outfile) {
+    std::cerr << "Error opening file: " << filename << std::endl;
+    return;
+  }
+  outfile << "Description: QoI (FP16)" << std::endl;
+  outfile << std::setw(width_int) << "N: ";
+  N = N_lower;
+  for (int ii = 0; ii < max_shift; ii++) {
+    outfile << std::setw(width_double) << N;
+    if (ii < max_shift - 1) outfile << ", ";
+    N = N << bit_shift;
+  }
+  outfile << std::endl;
+  saveMat(max_shift, num_exps, p + 2 * max_shift * num_exps, outfile);
+  outfile.close();
+
   // Free memory
   free(ebwd_thomas);
   free(ebwd_thomas_model);
