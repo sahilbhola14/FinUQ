@@ -260,7 +260,7 @@ void launchMatVecMultExperiment(int N_lower, int bit_shift, int max_shift,
 
     // Carry experiment of matrix-vector products
     for (int jj = 0; jj < num_exps; jj++) {
-      std::cout << jj << std::endl;
+      if (jj % 100 == 0) printf("Experiment : %d\n", jj);
       // Experiment seed
       unsigned long long base_seed =
           static_cast<unsigned long long>(std::time(nullptr));

@@ -3,7 +3,9 @@
 #include <curand_kernel.h>
 
 #include <ctime>
-#include <stdexcept>
+#include <fstream>
+#include <iomanip>
+#include <iostream>
 
 #include "bounds.hpp"
 #include "checks.cuh"
@@ -600,12 +602,28 @@ void launchODE(const int N, half *theta_1, half *theta_2,
   cudaFree(p_half);
 }
 
+void saveMat(const int iMax, const int jMax, double *data,
+             std::ofstream &outfile) {
+  const int width_int = 6;      // For I/O
+  const int width_double = 15;  // For I/O
+
+  outfile << std::setw(width_int + 1) << "    ";
+  for (int ii = 0; ii < jMax; ii++) {
+    for (int jj = 0; jj < iMax; jj++) {
+      outfile << std::setw(width_double) << std::scientific
+              << std::setprecision(8) << data[jj * jMax + ii];
+      if (jj < iMax - 1) outfile << ", ";
+    }
+    outfile << std::endl;
+    if (ii < jMax - 1) outfile << std::setw(width_int + 1) << "    ";
+  }
+}
+
 void launchStochasticODEExperiment(int N_lower, int bit_shift, int max_shift,
                                    int num_exps, double confidence) {
   int N = N_lower;
   const int width_int = 6;      // For I/O
   const int width_double = 15;  // For I/O
-
   double *p, *p_analytical;
 
   double *ebwd_thomas, *ebwd_thomas_model;
@@ -733,7 +751,396 @@ void launchStochasticODEExperiment(int N_lower, int bit_shift, int max_shift,
 
     N = N << bit_shift;  // Increase problem size
   }
-  // Save the data
+
+  /* // Save the data */
+  std::ofstream outfile;
+  std::string filename;
+
+  // Backward Error Thomas (FP32) with and Without Model
+  filename = "thomas_ebwd_fp32.txt";
+  outfile.open(filename);
+  if (!outfile) {
+    std::cerr << "Error opening file: " << filename << std::endl;
+    return;
+  }
+  outfile << "Description: Backward Error Thomas (FP32)" << std::endl;
+  outfile << std::setw(width_int) << "N: ";
+  N = N_lower;
+  for (int ii = 0; ii < max_shift; ii++) {
+    outfile << std::setw(width_double) << N;
+    if (ii < max_shift - 1) outfile << ", ";
+    N = N << bit_shift;
+  }
+  outfile << std::endl;
+  saveMat(max_shift, num_exps, ebwd_thomas, outfile);
+  outfile.close();
+
+  filename = "thomas_ebwd_model_fp32.txt";
+  outfile.open(filename);
+  if (!outfile) {
+    std::cerr << "Error opening file: " << filename << std::endl;
+    return;
+  }
+  outfile << "Description: Backward Model Error Thomas (FP32)" << std::endl;
+  outfile << std::setw(width_int) << "N: ";
+  N = N_lower;
+  for (int ii = 0; ii < max_shift; ii++) {
+    outfile << std::setw(width_double) << N;
+    if (ii < max_shift - 1) outfile << ", ";
+    N = N << bit_shift;
+  }
+  outfile << std::endl;
+  saveMat(max_shift, num_exps, ebwd_thomas_model, outfile);
+  outfile.close();
+
+  // Backward Error Thomas (FP16) with and Without Model
+  filename = "thomas_ebwd_fp16.txt";
+  outfile.open(filename);
+  if (!outfile) {
+    std::cerr << "Error opening file: " << filename << std::endl;
+    return;
+  }
+  outfile << "Description: Backward Error Thomas (FP16)" << std::endl;
+  outfile << std::setw(width_int) << "N: ";
+  N = N_lower;
+  for (int ii = 0; ii < max_shift; ii++) {
+    outfile << std::setw(width_double) << N;
+    if (ii < max_shift - 1) outfile << ", ";
+    N = N << bit_shift;
+  }
+  outfile << std::endl;
+  saveMat(max_shift, num_exps, ebwd_thomas + max_shift * num_exps, outfile);
+  outfile.close();
+
+  filename = "thomas_ebwd_model_fp16.txt";
+  outfile.open(filename);
+  if (!outfile) {
+    std::cerr << "Error opening file: " << filename << std::endl;
+    return;
+  }
+  outfile << "Description: Backward Model Error Thomas (FP16)" << std::endl;
+  outfile << std::setw(width_int) << "N: ";
+  N = N_lower;
+  for (int ii = 0; ii < max_shift; ii++) {
+    outfile << std::setw(width_double) << N;
+    if (ii < max_shift - 1) outfile << ", ";
+    N = N << bit_shift;
+  }
+  outfile << std::endl;
+  saveMat(max_shift, num_exps, ebwd_thomas_model + max_shift * num_exps,
+          outfile);
+  outfile.close();
+
+  // Forward Error Thomas (FP32) with and Without Model
+  filename = "thomas_efwd_fp32.txt";
+  outfile.open(filename);
+  if (!outfile) {
+    std::cerr << "Error opening file: " << filename << std::endl;
+    return;
+  }
+  outfile << "Description: Forward Error Thomas (FP32)" << std::endl;
+  outfile << std::setw(width_int) << "N: ";
+  N = N_lower;
+  for (int ii = 0; ii < max_shift; ii++) {
+    outfile << std::setw(width_double) << N;
+    if (ii < max_shift - 1) outfile << ", ";
+    N = N << bit_shift;
+  }
+  outfile << std::endl;
+  saveMat(max_shift, num_exps, efwd_thomas, outfile);
+  outfile.close();
+
+  filename = "thomas_efwd_model_fp32.txt";
+  outfile.open(filename);
+  if (!outfile) {
+    std::cerr << "Error opening file: " << filename << std::endl;
+    return;
+  }
+  outfile << "Description: Forward Model Error Thomas (FP32)" << std::endl;
+  outfile << std::setw(width_int) << "N: ";
+  N = N_lower;
+  for (int ii = 0; ii < max_shift; ii++) {
+    outfile << std::setw(width_double) << N;
+    if (ii < max_shift - 1) outfile << ", ";
+    N = N << bit_shift;
+  }
+  outfile << std::endl;
+  saveMat(max_shift, num_exps, efwd_thomas_model, outfile);
+  outfile.close();
+
+  // Forward Error Thomas (FP16) with and Without Model
+  filename = "thomas_efwd_fp16.txt";
+  outfile.open(filename);
+  if (!outfile) {
+    std::cerr << "Error opening file: " << filename << std::endl;
+    return;
+  }
+  outfile << "Description: Forward Error Thomas (FP16)" << std::endl;
+  outfile << std::setw(width_int) << "N: ";
+  N = N_lower;
+  for (int ii = 0; ii < max_shift; ii++) {
+    outfile << std::setw(width_double) << N;
+    if (ii < max_shift - 1) outfile << ", ";
+    N = N << bit_shift;
+  }
+  outfile << std::endl;
+  saveMat(max_shift, num_exps, efwd_thomas + max_shift * num_exps, outfile);
+  outfile.close();
+
+  filename = "thomas_efwd_model_fp16.txt";
+  outfile.open(filename);
+  if (!outfile) {
+    std::cerr << "Error opening file: " << filename << std::endl;
+    return;
+  }
+  outfile << "Description: Forward Model Error Thomas (FP16)" << std::endl;
+  outfile << std::setw(width_int) << "N: ";
+  N = N_lower;
+  for (int ii = 0; ii < max_shift; ii++) {
+    outfile << std::setw(width_double) << N;
+    if (ii < max_shift - 1) outfile << ", ";
+    N = N << bit_shift;
+  }
+  outfile << std::endl;
+  saveMat(max_shift, num_exps, efwd_thomas_model + max_shift * num_exps,
+          outfile);
+  outfile.close();
+
+  // Forward Error QoI (FP32) with and Without Model
+  filename = "qoi_efwd_fp32.txt";
+  outfile.open(filename);
+  if (!outfile) {
+    std::cerr << "Error opening file: " << filename << std::endl;
+    return;
+  }
+  outfile << "Description: Forward Error QoI (FP32)" << std::endl;
+  outfile << std::setw(width_int) << "N: ";
+  N = N_lower;
+  for (int ii = 0; ii < max_shift; ii++) {
+    outfile << std::setw(width_double) << N;
+    if (ii < max_shift - 1) outfile << ", ";
+    N = N << bit_shift;
+  }
+  outfile << std::endl;
+  saveMat(max_shift, num_exps, efwd_qoi, outfile);
+  outfile.close();
+
+  filename = "qoi_efwd_model_fp32.txt";
+  outfile.open(filename);
+  if (!outfile) {
+    std::cerr << "Error opening file: " << filename << std::endl;
+    return;
+  }
+  outfile << "Description: Forward Model Error QoI (FP32)" << std::endl;
+  outfile << std::setw(width_int) << "N: ";
+  N = N_lower;
+  for (int ii = 0; ii < max_shift; ii++) {
+    outfile << std::setw(width_double) << N;
+    if (ii < max_shift - 1) outfile << ", ";
+    N = N << bit_shift;
+  }
+  outfile << std::endl;
+  saveMat(max_shift, num_exps, efwd_qoi_model, outfile);
+  outfile.close();
+
+  // Forward Error QoI (FP16) with and Without Model
+  filename = "qoi_efwd_fp16.txt";
+  outfile.open(filename);
+  if (!outfile) {
+    std::cerr << "Error opening file: " << filename << std::endl;
+    return;
+  }
+  outfile << "Description: Forward Error QoI (FP16)" << std::endl;
+  outfile << std::setw(width_int) << "N: ";
+  N = N_lower;
+  for (int ii = 0; ii < max_shift; ii++) {
+    outfile << std::setw(width_double) << N;
+    if (ii < max_shift - 1) outfile << ", ";
+    N = N << bit_shift;
+  }
+  outfile << std::endl;
+  saveMat(max_shift, num_exps, efwd_qoi + max_shift * num_exps, outfile);
+  outfile.close();
+
+  filename = "qoi_efwd_model_fp16.txt";
+  outfile.open(filename);
+  if (!outfile) {
+    std::cerr << "Error opening file: " << filename << std::endl;
+    return;
+  }
+  outfile << "Description: Forward Model Error QoI (FP16)" << std::endl;
+  outfile << std::setw(width_int) << "N: ";
+  N = N_lower;
+  for (int ii = 0; ii < max_shift; ii++) {
+    outfile << std::setw(width_double) << N;
+    if (ii < max_shift - 1) outfile << ", ";
+    N = N << bit_shift;
+  }
+  outfile << std::endl;
+  saveMat(max_shift, num_exps, efwd_qoi_model + max_shift * num_exps, outfile);
+  outfile.close();
+
+  // Backward Error Bound Thomas (FP32 and FP16)
+  filename = "thomas_ebwd_bound_fp32.txt";
+  outfile.open(filename);
+  if (!outfile) {
+    std::cerr << "Error opening file: " << filename << std::endl;
+    return;
+  }
+  outfile << "Description: Backward Error Bound Thomas (FP32)" << std::endl;
+  outfile << "Rows: Deterministic, Hoeffding, Bersnstein" << std::endl;
+  outfile << std::setw(width_int) << "N: ";
+  N = N_lower;
+  for (int ii = 0; ii < max_shift; ii++) {
+    outfile << std::setw(width_double) << N;
+    if (ii < max_shift - 1) outfile << ", ";
+    N = N << bit_shift;
+  }
+  outfile << std::endl;
+  saveMat(max_shift, 1, ebwd_bound_det, outfile);
+  saveMat(max_shift, 1, ebwd_bound_hoeff, outfile);
+  saveMat(max_shift, 1, ebwd_bound_bern, outfile);
+  outfile.close();
+
+  filename = "thomas_ebwd_bound_fp16.txt";
+  outfile.open(filename);
+  if (!outfile) {
+    std::cerr << "Error opening file: " << filename << std::endl;
+    return;
+  }
+  outfile << "Description: Backward Error Bound Thomas (FP16)" << std::endl;
+  outfile << "Rows: Deterministic, Hoeffding, Bersnstein" << std::endl;
+  outfile << std::setw(width_int) << "N: ";
+  N = N_lower;
+  for (int ii = 0; ii < max_shift; ii++) {
+    outfile << std::setw(width_double) << N;
+    if (ii < max_shift - 1) outfile << ", ";
+    N = N << bit_shift;
+  }
+  outfile << std::endl;
+  saveMat(max_shift, 1, ebwd_bound_det + max_shift, outfile);
+  saveMat(max_shift, 1, ebwd_bound_hoeff + max_shift, outfile);
+  saveMat(max_shift, 1, ebwd_bound_bern + max_shift, outfile);
+  outfile.close();
+
+  // Forward Error Bound QoI (FP32)
+  filename = "qoi_efwd_bound_deterministic_fp32.txt";
+  outfile.open(filename);
+  if (!outfile) {
+    std::cerr << "Error opening file: " << filename << std::endl;
+    return;
+  }
+  outfile << "Description: Forward Error Deterministic Bound QoI (FP32)"
+          << std::endl;
+  outfile << std::setw(width_int) << "N: ";
+  N = N_lower;
+  for (int ii = 0; ii < max_shift; ii++) {
+    outfile << std::setw(width_double) << N;
+    if (ii < max_shift - 1) outfile << ", ";
+    N = N << bit_shift;
+  }
+  outfile << std::endl;
+  saveMat(max_shift, num_exps, efwd_qoi_bound_det, outfile);
+  outfile.close();
+
+  filename = "qoi_efwd_bound_hoeffding_fp32.txt";
+  outfile.open(filename);
+  if (!outfile) {
+    std::cerr << "Error opening file: " << filename << std::endl;
+    return;
+  }
+  outfile << "Description: Forward Error Hoeffding Bound QoI (FP32)"
+          << std::endl;
+  outfile << std::setw(width_int) << "N: ";
+  N = N_lower;
+  for (int ii = 0; ii < max_shift; ii++) {
+    outfile << std::setw(width_double) << N;
+    if (ii < max_shift - 1) outfile << ", ";
+    N = N << bit_shift;
+  }
+  outfile << std::endl;
+  saveMat(max_shift, num_exps, efwd_qoi_bound_hoeff, outfile);
+  outfile.close();
+
+  filename = "qoi_efwd_bound_bernstein_fp32.txt";
+  outfile.open(filename);
+  if (!outfile) {
+    std::cerr << "Error opening file: " << filename << std::endl;
+    return;
+  }
+  outfile << "Description: Forward Error Bernstein Bound QoI (FP32)"
+          << std::endl;
+  outfile << std::setw(width_int) << "N: ";
+  N = N_lower;
+  for (int ii = 0; ii < max_shift; ii++) {
+    outfile << std::setw(width_double) << N;
+    if (ii < max_shift - 1) outfile << ", ";
+    N = N << bit_shift;
+  }
+  outfile << std::endl;
+  saveMat(max_shift, num_exps, efwd_qoi_bound_bern, outfile);
+  outfile.close();
+
+  // Forward Error Bound QoI (FP16)
+  filename = "qoi_efwd_bound_deterministic_fp16.txt";
+  outfile.open(filename);
+  if (!outfile) {
+    std::cerr << "Error opening file: " << filename << std::endl;
+    return;
+  }
+  outfile << "Description: Forward Error Deterministic Bound QoI (FP16)"
+          << std::endl;
+  outfile << std::setw(width_int) << "N: ";
+  N = N_lower;
+  for (int ii = 0; ii < max_shift; ii++) {
+    outfile << std::setw(width_double) << N;
+    if (ii < max_shift - 1) outfile << ", ";
+    N = N << bit_shift;
+  }
+  outfile << std::endl;
+  saveMat(max_shift, num_exps, efwd_qoi_bound_det + max_shift * num_exps,
+          outfile);
+  outfile.close();
+
+  filename = "qoi_efwd_bound_hoeffding_fp16.txt";
+  outfile.open(filename);
+  if (!outfile) {
+    std::cerr << "Error opening file: " << filename << std::endl;
+    return;
+  }
+  outfile << "Description: Forward Error Hoeffding Bound QoI (FP16)"
+          << std::endl;
+  outfile << std::setw(width_int) << "N: ";
+  N = N_lower;
+  for (int ii = 0; ii < max_shift; ii++) {
+    outfile << std::setw(width_double) << N;
+    if (ii < max_shift - 1) outfile << ", ";
+    N = N << bit_shift;
+  }
+  outfile << std::endl;
+  saveMat(max_shift, num_exps, efwd_qoi_bound_hoeff + max_shift * num_exps,
+          outfile);
+  outfile.close();
+
+  filename = "qoi_efwd_bound_bernstein_fp16.txt";
+  outfile.open(filename);
+  if (!outfile) {
+    std::cerr << "Error opening file: " << filename << std::endl;
+    return;
+  }
+  outfile << "Description: Forward Error Bernstein Bound QoI (FP16)"
+          << std::endl;
+  outfile << std::setw(width_int) << "N: ";
+  N = N_lower;
+  for (int ii = 0; ii < max_shift; ii++) {
+    outfile << std::setw(width_double) << N;
+    if (ii < max_shift - 1) outfile << ", ";
+    N = N << bit_shift;
+  }
+  outfile << std::endl;
+  saveMat(max_shift, num_exps, efwd_qoi_bound_bern + max_shift * num_exps,
+          outfile);
+  outfile.close();
 
   // Free memory
   free(ebwd_thomas);
