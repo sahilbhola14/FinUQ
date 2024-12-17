@@ -131,6 +131,13 @@ template void computeForwardErrorThomas(int, double *, double *, double *,
 template void computeForwardErrorThomas(int, double *, double *, double *,
                                         double *, half *, half *, half *,
                                         double *, double *, double *);
+
+template void computeForwardErrorThomas(int, double *, double *, double *,
+                                        double *, double *, double *, double *,
+                                        double *, double *, double *);
+
+template void computeForwardErrorQoi(int, double *, double *, double *,
+                                     BoundType, Precision, double);
 template void computeForwardErrorQoi(int, float *, double *, double *,
                                      BoundType, Precision, double);
 template void computeForwardErrorQoi(int, half *, double *, double *, BoundType,

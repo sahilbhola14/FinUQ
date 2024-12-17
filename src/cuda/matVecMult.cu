@@ -172,13 +172,13 @@ void launchRecursiveMatVecMult(const int N, double *ebwd_float,
   // Compute the Backward Error
   computeBackwardErrorMatVecMult(N, result_double, result_float,
                                  result_double_abs, ebwd_float);
-  computeBackwardErrorMatVecMult(N, result_float_model, result_float,
-                                 result_float_model_abs, ebwd_float_model);
+  computeBackwardErrorMatVecMult(N, result_double, result_float_model,
+                                 result_double_abs, ebwd_float_model);
 
   computeBackwardErrorMatVecMult(N, result_double, result_half,
                                  result_double_abs, ebwd_half);
-  computeBackwardErrorMatVecMult(N, result_half_model, result_half,
-                                 result_half_model_abs, ebwd_half_model);
+  computeBackwardErrorMatVecMult(N, result_double, result_half_model,
+                                 result_double_abs, ebwd_half_model);
 
   /* std::cout << *ebwd_float << ", " <<  *ebwd_half << ", " */
   /*     << *ebwd_float_model << ", " << *ebwd_half_model << std::endl; */

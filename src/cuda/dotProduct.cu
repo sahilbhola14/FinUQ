@@ -222,10 +222,10 @@ void launchRecursiveDotProduct(const int N, double *ebwd_float,
   computeBackwardErrorDotProduct(result_double, result_half, result_double_abs,
                                  ebwd_half);
 
-  computeBackwardErrorDotProduct(result_float_model, result_float,
-                                 result_float_model_abs, ebwd_float_model);
-  computeBackwardErrorDotProduct(result_half_model, result_half,
-                                 result_half_model_abs, ebwd_half_model);
+  computeBackwardErrorDotProduct(result_double, result_float_model,
+                                 result_double_abs, ebwd_float_model);
+  computeBackwardErrorDotProduct(result_double, result_half_model,
+                                 result_double_abs, ebwd_half_model);
 
   // Free memory
   cudaFree(x_double);
@@ -426,6 +426,7 @@ void launchDotProductExperiment(int N_lower, int bit_shift, int max_shift,
 
     // Carry experiment of dot products
     for (int jj = 0; jj < num_exps; jj++) {
+      if (jj % 100 == 0) printf("Experiment : %d\n", jj);
       // Experiment seed
       unsigned long long base_seed =
           static_cast<unsigned long long>(std::time(nullptr));

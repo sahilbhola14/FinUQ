@@ -94,16 +94,23 @@ void computeBackwardErrorThomas(int N, double *sub_diag, double *main_diag,
 }
 
 // Template compilation
+template void computeBackwardErrorDotProduct(double *, double *, double *,
+                                             double *);
 template void computeBackwardErrorDotProduct(double *, float *, double *,
                                              double *);
 template void computeBackwardErrorDotProduct(double *, half *, double *,
                                              double *);
 
+template void computeBackwardErrorMatVecMult(int, double *, double *, double *,
+                                             double *);
 template void computeBackwardErrorMatVecMult(int, double *, float *, double *,
                                              double *);
 template void computeBackwardErrorMatVecMult(int, double *, half *, double *,
                                              double *);
 
+template void computeBackwardErrorThomas(int, double *, double *, double *,
+                                         double *, double *, double *, double *,
+                                         double *);
 template void computeBackwardErrorThomas(int, double *, double *, double *,
                                          double *, float *, float *, float *,
                                          double *);
