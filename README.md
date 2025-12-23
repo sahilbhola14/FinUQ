@@ -1,4 +1,4 @@
-<h1 align="center">FLORAL 🌸</h1>
+<h1 align="center">FinUQ</h1>
 <h3 align="center">A Variance-Informed Probabilistic Framework for Quantifying Computational Uncertainty Due to Finite-Precision Arithmetic</h3>
 <p align="center">
   <a href="https://arxiv.org/abs/2404.12556">📄 arXiv</a> |
@@ -8,6 +8,7 @@
   <a href="#Repository Structure">Repository Structure</a> |
 </p>
 ---
+
 ## Overview
 
 Modern computer hardware increasingly supports low- and mixed-precision arithmetic to improve computational efficiency.
