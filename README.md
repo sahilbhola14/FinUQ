@@ -5,8 +5,9 @@
   <a href="#Overview">Overview</a> |
   <a href="#Contributions">Contributions</a> |
   <a href="#Experiments">Experiments</a> |
-  <a href="#Repository Structure">Repository Structure</a> |
+  <a href="#Repository-Structure">Repository Structure</a> |
 </p>
+
 ---
 
 ## Overview
