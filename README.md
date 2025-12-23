@@ -19,14 +19,14 @@ Building on this idea, we model rounding errors as **bounded, independent, and i
 
 ## Key Contributions
 
-- **Variance-informed probabilistic rounding error analysis
+- **Variance-informed probabilistic rounding error analysis**
   - Introduces a new problem-size-dependent constant that depends on statistical properties of rounding errors.
 
 - **Rigorous scaling results**
   - We prove that
-  ```
-    \hat{\gamma}_n \propto \sqrt{n},
-  ```
+   \[
+    \hat{\gamma}_n \propto \sqrt{n}.
+    \]
     using statistical arguments without ad-hoc assumptions.
 
 - **Substantial improvement over deterministic bounds**
