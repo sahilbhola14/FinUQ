@@ -1,5 +1,13 @@
-# A Variance-Informed Probabilistic Framework for Quantifying Computational Uncertainty Due to Finite-Precision Arithmetic
-
+<h1 align="center">FLORAL 🌸</h1>
+<h3 align="center">A Variance-Informed Probabilistic Framework for Quantifying Computational Uncertainty Due to Finite-Precision Arithmetic</h3>
+<p align="center">
+  <a href="https://arxiv.org/abs/2404.12556">📄 arXiv</a> |
+  <a href="#Overview">Overview</a> |
+  <a href="#Contributions">Contributions</a> |
+  <a href="#Experiments">Experiments</a> |
+  <a href="#Repository Structure">Repository Structure</a> |
+</p>
+---
 ## Overview
 
 Modern computer hardware increasingly supports low- and mixed-precision arithmetic to improve computational efficiency.
@@ -7,9 +15,7 @@ While these approaches offer substantial performance benefits, the introduce sig
 This project develops a variance-informed probabilistic rounding error analysis for quantifying the uncertainty due to finite-precision arithmetic.
 The framework complements traditional sources of uncertainties and numerical errors, such as sampling uncertainty, parameteric uncertainty, and numerical discretization error, to enalbe reliable and efficient predictive modeling.
 
----
-
-## Motivation
+### Motivation
 
 Classical deterministic rounding error analysis often yields overly conservative error bounds that scale poorly with problem size.
 In contrast, probabilistic approaches exploit statistical structure in rounding errors to obtain tighter and more realistic estimates.
@@ -17,7 +23,7 @@ Building on this idea, we model rounding errors as **bounded, independent, and i
 
 ---
 
-## Key Contributions
+## Contributions
 
 - **Variance-informed probabilistic rounding error analysis**
   - Introduces a new problem-size-dependent constant that depends on statistical properties of rounding errors.
@@ -38,7 +44,7 @@ Building on this idea, we model rounding errors as **bounded, independent, and i
 
 ---
 
-## Numerical Experiments
+## Experiments
 
 The framework is validated on the following problems:
 
