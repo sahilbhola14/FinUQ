@@ -1,24 +1,16 @@
 #include <iostream>
 
-#include "dotProduct.cuh"
 #include "gamma.hpp"
-#include "matVecMult.cuh"
-#include "ode.cuh"
 
-int main() {
-  // Compare Gamma [Figure 1]
-  /* compareGamma(2, Float, "gamma_zeta_0.9_fp32.txt", 2, 13, 0.9); */
-  /* compareGamma(2, Float, "gamma_zeta_0.99_fp32.txt", 2, 13, 0.99); */
-  /* compareGamma(2, Half, "gamma_zeta_0.9_fp16.txt", 2, 13, 0.9); */
-  /* compareGamma(2, Half, "gamma_zeta_0.99_fp16.txt", 2, 13, 0.99); */
+int main(int argc, char **argv) {
+  std::string experiment = "compare_gamma";
+  if (argc > 1) {
+    experiment = argv[1];
+  }
 
-  // Dot Product [Figure 2]
-  /* launchDotProductExperiment(2<<5, 1, 15); */
-  /* launchDotProductExperiment(2<<10, 1, 1); */
-  // Matrix-Vector Product
-  /* launchMatVecMultExperiment(2<<5, 1, 9); */
-  /* launchMatVecMultExperiment(2<<10, 1, 1); */
-  // Stochastic ODE
-  launchStochasticODEExperiment(2 << 1, 1, 1);
+  // Experiments
+  if (experiment == "compare_gamma") {
+    compare_gamma();
+  }
   return 0;
 }

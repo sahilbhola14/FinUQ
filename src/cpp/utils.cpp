@@ -4,18 +4,18 @@
 #include <cmath>
 #include <iostream>
 
-int getGridSize(int blockSize, int N) {
+int get_grid_size(int blockSize, int N) {
   int gridSize = (N + blockSize - 1) / blockSize;
   return gridSize;
 }
 
-double computeUnitRoundOff(Precision prec) {
+double compute_unit_roundoff(Precision prec) {
   double base, precision;
   double urd = 0.0;
   if (prec == Half) {
     base = 2.0;
     precision = 11.0;
-  } else if (prec == Float) {
+  } else if (prec == Single) {
     base = 2.0;
     precision = 24.0;
   } else if (prec == Double) {

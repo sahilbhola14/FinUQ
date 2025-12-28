@@ -555,8 +555,8 @@ class beta_log_model:
 if __name__ == "__main__":
     seed_everything()
     # uniform model (delta is uniform distribution)
-    # uniform_model(model="half")
+    # uniform_model(model="single")
     # uniform log model (log(1+delta) is uniform distribution)
     # uniform_log_model(model="half")
     # # beta model (log(1 + delta) is beta distribution)
-    beta_log_model(model="half", alpha=4.0, beta=2.0)
+    beta_log_model(model="single", alpha=4.0, beta=2.0)
