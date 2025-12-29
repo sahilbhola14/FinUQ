@@ -91,6 +91,25 @@ std::string make_gamma_filename(const gamma_config &cfg) {
   return ss.str();
 }
 
+/* get gamma value */
+gamma_result get_gamma(const int n, const gamma_config &cfg) {
+  /* initialization */
+  double gamma_det, gamma_mprea, gamma_vprea;
+  gamma_result result;
+  /* number of arithmetic operators */
+  result.n = n;
+  /* determinisitic gamma */
+  result.gamma_det = compute_determinsitic_gamma(n, cfg.prec);
+  /* probabilistic gamma (mean informed model) */
+  result.gamma_mprea = compute_hoeffding_gamma(n, cfg.prec, cfg.confidence);
+  /* probabilistic gamma (variance-informed) */
+  result.gamma_vprea =
+      compute_bernstein_gamma(n, cfg.prec, cfg.confidence, cfg.bound_model,
+                              cfg.beta_dist_alpha, cfg.beta_dist_beta);
+  return result;
+}
+
+/* compare gamma */
 void compare_gamma(const gamma_config &cfg, bool verbose) {
   /* initialization */
   double gamma_det, gamma_mprea, gamma_vprea;
