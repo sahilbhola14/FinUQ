@@ -1,6 +1,7 @@
 #include "prob_model.hpp"
 
 #include <cmath>
+#include <iostream>
 #include <stdexcept>
 
 #include "utils.hpp"
@@ -65,15 +66,56 @@ log1pdeltastats compute_beta_model_stats(Precision prec,
   return stats;
 }
 
-// get the statistics of log(1+delta) random varianble
+/* check the sign of mean of delta, given parameters of beta distribution */
+void check_mean_rounding_error_sign(Precision prec, BoundModel bound_model,
+                                    double beta_dist_alpha,
+                                    double beta_dist_beta) {
+  /* compute the unit roundoff */
+  double urd = compute_unit_roundoff(prec);
+  /* utils */
+  double L = std::log((1.0 + urd) / (1.0 - urd));
+  double p = beta_dist_alpha / (beta_dist_alpha + beta_dist_beta);
+  double logm = std::log(1.0 - urd);
+  double c = -logm / L;
+  /* conditon */
+  double condition = c * beta_dist_beta / (1.0 - c);
+
+  if (bound_model == Uniform) {
+    std::cout << "Rounding error random variable mean is zero" << std::endl;
+  } else if (bound_model == Beta) {
+    if (beta_dist_alpha > condition) {
+      std::cout << "Rounding error random variable mean is strictly positive"
+                << std::endl;
+    } else if (std::pow(beta_dist_alpha - condition, 2.0) < 1e-15) {
+      std::cout << "Rounding error random variable mean is zero" << std::endl;
+    } else {
+      std::cout << "Rounding error random variable mean is strictly negative"
+                << std::endl;
+    }
+  } else {
+    throw std::invalid_argument("bound_model must be Uniform or Beta");
+  }
+}
+
+// get the statistics of log(1+delta) random variable
 log1pdeltastats get_log1pdelta_stats(Precision prec, BoundModel bound_model,
                                      double beta_dist_alpha,
-                                     double beta_dist_beta) {
+                                     double beta_dist_beta, bool verbose) {
   log1pdeltastats stats;
+  std::string print_string;
+
   if (bound_model == Uniform) {
+    print_string = "uniform distribution model";
     stats = compute_uniform_model_stats(prec);
   } else if (bound_model == Beta) {
+    print_string = "beta distribution model";
     stats = compute_beta_model_stats(prec, beta_dist_alpha, beta_dist_beta);
+  }
+
+  if (verbose == true) {
+    std::cout << "[" << print_string << "] "
+              << "Mean: " << stats.mean << ", Variance: " << stats.var
+              << ", Bound: " << stats.bound << "\n";
   }
 
   return stats;

@@ -1,14 +1,19 @@
+
 #include "utils.hpp"
 
 #include <cassert>
 #include <cmath>
+#include <fstream>
+#include <iomanip>
 #include <iostream>
 
+/* grid size for cuda kernels */
 int get_grid_size(int blockSize, int N) {
   int gridSize = (N + blockSize - 1) / blockSize;
   return gridSize;
 }
 
+/* compute the unit roundoff */
 double compute_unit_roundoff(Precision prec) {
   double base, precision;
   double urd = 0.0;
@@ -29,12 +34,30 @@ double compute_unit_roundoff(Precision prec) {
   return urd;
 }
 
-void linspace(double start, double end, int N, double *x) {
-  if (N < 2) {
-    std::invalid_argument("Points must atleast be 2");
+/* write gamma results to csv */
+void write_gamma_results_csv(const std::vector<gamma_result> &results,
+                             std::string filename, bool verbose) {
+  /* open the file */
+  std::ofstream file(filename);
+  /* check */
+  if (!file.is_open()) {
+    std::cerr << "Error: could not open file " << filename << "\n";
+    return;
   }
-  double step = (end - start) / (N - 1.0);
-  for (int i = 0; i < N; i++) {
-    x[i] = start + step * i;
+  /* header */
+  file << "n,gamma_det,gamma_mprea,gamma_vprea\n";
+  /* numerical font */
+  file << std::scientific << std::setprecision(10);
+  /* write the results */
+  for (const auto &r : results) {
+    file << std::left << std::setw(12) << r.n << std::setw(18) << r.gamma_det
+         << std::setw(18) << r.gamma_mprea << std::setw(18) << r.gamma_vprea
+         << "\n";
+  }
+  /* close the file */
+  file.close();
+  /* print */
+  if (verbose == true) {
+    std::cout << "gamma results saved to " << filename << std::endl;
   }
 }
