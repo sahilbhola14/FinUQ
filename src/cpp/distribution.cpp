@@ -1,5 +1,7 @@
 #include "distribution.hpp"
 
+#include <cuda_fp16.h>
+
 #include <iostream>
 #include <random>
 #include <stdexcept>
@@ -68,3 +70,5 @@ template void sample_random_vector<double>(std::vector<double> &, Precision,
                                            Distribution, const int, const int);
 template void sample_random_vector<float>(std::vector<float> &, Precision,
                                           Distribution, const int, const int);
+template void sample_random_vector<half>(std::vector<half> &, Precision,
+                                         Distribution, const int, const int);

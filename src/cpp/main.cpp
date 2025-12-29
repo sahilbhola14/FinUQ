@@ -1,12 +1,11 @@
 #include <iostream>
 #include <vector>
 
+#include "dot_product.hpp"
 #include "gamma.hpp"
-/* #include "definition.hpp" */
-#include "distribution.hpp"
 
 int main(int argc, char **argv) {
-  std::string experiment = "compare_gamma";
+  std::string experiment = "single_dot_product";
   if (argc > 1) {
     experiment = argv[1];
   }
@@ -15,8 +14,7 @@ int main(int argc, char **argv) {
   if (experiment == "compare_gamma") {
     compare_gamma();
   } else if (experiment == "single_dot_product") {
-    std::vector<double> vector(5);
-    sample_random_vector(vector, Single, Ones);
+    run_dot_product_experiment(Single, Ones);
   }
   return 0;
 }

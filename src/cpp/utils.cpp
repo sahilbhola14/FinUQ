@@ -5,13 +5,6 @@
 #include <cmath>
 #include <fstream>
 #include <iomanip>
-#include <iostream>
-
-/* grid size for cuda kernels */
-int get_grid_size(int blockSize, int N) {
-  int gridSize = (N + blockSize - 1) / blockSize;
-  return gridSize;
-}
 
 /* compute the unit roundoff */
 double compute_unit_roundoff(Precision prec) {

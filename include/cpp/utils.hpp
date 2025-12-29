@@ -2,6 +2,7 @@
 #define UTILS_HPP
 
 #include <vector>
+#include <iostream>
 #include <string>
 #include "definition.hpp"
 #include "gamma.hpp"
@@ -24,9 +25,6 @@ inline std::string to_string(BoundModel bound_model){
         default: return "unknown";
     }
 }
-
-/* cuda grid size */
-int get_grid_size(int blockSize, int N);
 /* unit roundoff */
 double compute_unit_roundoff(Precision prec);
 /* save */
