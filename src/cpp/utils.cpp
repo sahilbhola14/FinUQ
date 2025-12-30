@@ -80,8 +80,8 @@ void convert_vector_to_float(const std::vector<T> &source,
 
 /* convert to half */
 template <typename T>
-void convert_vector_to_float(const std::vector<T> &source,
-                             std::vector<half> &target) {
+void convert_vector_to_half(const std::vector<T> &source,
+                            std::vector<half> &target) {
   target.clear();
   target.reserve(source.size());
 

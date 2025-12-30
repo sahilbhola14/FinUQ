@@ -32,13 +32,13 @@ double compute_unit_roundoff(Precision prec);
 void write_gamma_results_csv(const std::vector<gamma_result> &results, const std::string filename, bool verbose=false);
 /* vector utils */
 template <typename T>
-void convert_vector_to_double(const std::vector<T>, &source, const::vector<double> &target);
+void convert_vector_to_double(const std::vector<T> &source, std::vector<double> &target);
 template <typename T>
-void convert_vector_to_float(const std::vector<T>, &source, const::vector<float> &target);
+void convert_vector_to_float(const std::vector<T> &source, std::vector<float> &target);
 template <typename T>
-void convert_vector_to_half(const std::vector<T>, &source, const::vector<half> &target);
+void convert_vector_to_half(const std::vector<T> &source, std::vector<half> &target);
 /* absolute value*/
 template <typename T>
-void absolute_vector(const std::vector<T> &source, std::vector<T> &target)
+void absolute_vector(const std::vector<T> &source, std::vector<T> &target);
 
 #endif
