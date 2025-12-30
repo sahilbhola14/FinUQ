@@ -37,7 +37,7 @@ template <typename T>
 void convert_vector_to_float(const std::vector<T> &source, std::vector<float> &target);
 template <typename T>
 void convert_vector_to_half(const std::vector<T> &source, std::vector<half> &target);
-/* absolute value*/
+/* absolute value */
 template <typename T>
 void absolute_vector(const std::vector<T> &source, std::vector<T> &target);
 

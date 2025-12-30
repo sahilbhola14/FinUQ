@@ -100,3 +100,11 @@ void absolute_vector(const std::vector<T> &source, std::vector<T> &target) {
     target.push_back(std::abs(x));
   }
 }
+
+/* initialize templates */
+template void convert_vector_to_double<double>(const std::vector<double> &,
+                                               std::vector<double> &);
+template void convert_vector_to_double<float>(const std::vector<float> &,
+                                              std::vector<double> &);
+template void convert_vector_to_double<half>(const std::vector<half> &,
+                                             std::vector<double> &);
