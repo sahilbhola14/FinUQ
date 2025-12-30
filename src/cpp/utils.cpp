@@ -1,4 +1,3 @@
-
 #include "utils.hpp"
 
 #include <cassert>
@@ -52,5 +51,52 @@ void write_gamma_results_csv(const std::vector<gamma_result> &results,
   /* print */
   if (verbose == true) {
     std::cout << "gamma results saved to " << filename << std::endl;
+  }
+}
+
+/* convert to double */
+template <typename T>
+void convert_vector_to_double(const std::vector<T> &source,
+                              std::vector<double> &target) {
+  target.clear();
+  target.reserve(source.size());
+
+  for (const T &x : source) {
+    target.push_back(static_cast<double>(x));
+  }
+}
+
+/* convert to float */
+template <typename T>
+void convert_vector_to_float(const std::vector<T> &source,
+                             std::vector<float> &target) {
+  target.clear();
+  target.reserve(source.size());
+
+  for (const T &x : source) {
+    target.push_back(static_cast<float>(x));
+  }
+}
+
+/* convert to half */
+template <typename T>
+void convert_vector_to_float(const std::vector<T> &source,
+                             std::vector<half> &target) {
+  target.clear();
+  target.reserve(source.size());
+
+  for (const T &x : source) {
+    target.push_back(static_cast<half>(x));
+  }
+}
+
+/* absolute value*/
+template <typename T>
+void absolute_vector(const std::vector<T> &source, std::vector<T> &target) {
+  target.clear();
+  target.reserve(source.size());
+
+  for (const T &x : source) {
+    target.push_back(std::abs(x));
   }
 }

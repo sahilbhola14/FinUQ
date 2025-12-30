@@ -6,6 +6,7 @@
 #include "dot_product_cuda.cuh"
 #include "utils_cuda.cuh"
 
+/* sequential dot product kernel */
 template <typename T>
 __global__ void sequential_dot_product_kernel(const int n, T *a, T *b,
                                               T *result, Precision prec) {
@@ -30,6 +31,7 @@ __global__ void sequential_dot_product_kernel(const int n, T *a, T *b,
   *result = sum;
 }
 
+/* sequential dot product kernel launcher */
 template <typename T>
 void launch_sequential_dot_product_kernel(const int n,
                                           const std::vector<T> &h_a,

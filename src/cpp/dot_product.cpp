@@ -19,7 +19,7 @@ void run_dot_product_experiment_fixed_size(const int n, Precision prec,
                                            const int num_experiments = 100) {
   /* initialize */
   std::vector<T> h_a(n), h_b(n);
-  T h_result;
+  T h_result, h_result_true;
 
   /* run the experiment */
   for (int i = 0; i < num_experiments; i++) {
@@ -28,6 +28,8 @@ void run_dot_product_experiment_fixed_size(const int n, Precision prec,
     sample_random_vector(h_b, prec, dist);
     /* run the dot product */
     launch_sequential_dot_product_kernel<T>(n, h_a, h_b, &h_result, prec);
+    /* launch_sequential_dot_product_kernel<double>(n, h_a, h_b, &h_result,
+     * prec); */
   }
 }
 
