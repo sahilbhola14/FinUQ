@@ -1,33 +1,72 @@
 #include <cuda_fp16.h>
 
-#include <vector>
+#include <iostream>
 
+#include "definition.hpp"
 #include "dot_product_cuda.cuh"
+#include "utils_cuda.cuh"
 
 template <typename T>
-__global__ void dot_product_kernel(const int n, T *a, T *b, T result,
-                                   Precision prec) {
-  const int tid = threadIdx.x;
-  const int gid = tid + blockIdx.x * blockDim.x;
-
-  /* initialize the dot product result */
-  result = static_cast<T>(0.0);
-  /* /1* compute the dot product *1/ */
-  /* for (int i = 0; i < n; i++){ */
-  /*     if (prec == Double){ */
-  /*         result = __dadd_rn(result, __dmul_rn(a[i], b[i])); */
-  /*     } else if (prec == Single){ */
-  /*         result = __fadd_rn(result, __fmul_rn(a[i], b[i])); */
-  /*     } else if (prec == Half){ */
-  /*         half a_half = static_cast<half>(a[i]); */
-  /*         half b_half = static_cast<half>(b[i]); */
-  /*         result = __hadd_rn(result, __hmul_rn(a_half, b_half)); */
-  /*     } else { */
-  /*         printf("<CUDA Error>: Invalid precision\n"); */
-  /*     } */
-  /* } */
+__global__ void sequential_dot_product_kernel(const int n, T *a, T *b,
+                                              T *result, Precision prec) {
+  int tid = threadIdx.x;
+  int gid = threadIdx.x + blockIdx.x * blockDim.x;
+  /* compute */
+  T sum = static_cast<T>(0.0);
+  for (int i = 0; i < n; i++) {
+    if (prec == Double) {
+      sum = __dadd_rn(sum, __dmul_rn(a[i], b[i]));
+    } else if (prec == Single) {
+      sum = __fadd_rn(sum, __fmul_rn(a[i], b[i]));
+    } else if (prec == Half) {
+      sum = __hadd_rn(
+          sum, __hmul_rn(static_cast<half>(a[i]), static_cast<half>(b[i])));
+    } else {
+      printf("<Cuda Error>: Invalid precision\n");
+      return;
+    }
+  }
+  /* copy */
+  *result = sum;
 }
 
 template <typename T>
-void launch_dot_product_kernel(const int n, std::vector<T> h_a, T *h_b,
-                               Precision prec) {}
+void launch_sequential_dot_product_kernel(const int n,
+                                          const std::vector<T> &h_a,
+                                          const std::vector<T> &h_b,
+                                          T *h_result, Precision prec) {
+  /* kernel parameters */
+  dim3 blockDim = 1;
+  dim3 gridDim = 1;
+  /* initilaize */
+  T *d_a, *d_b, *d_result;
+  int size = n * sizeof(T);
+  /* allocate memeory */
+  cudaCheck(cudaMalloc((void **)&d_a, size));
+  cudaCheck(cudaMalloc((void **)&d_b, size));
+  cudaCheck(cudaMalloc((void **)&d_result, sizeof(T)));
+  /* host to device */
+  cudaCheck(cudaMemcpy(d_a, h_a.data(), size, cudaMemcpyHostToDevice));
+  cudaCheck(cudaMemcpy(d_b, h_b.data(), size, cudaMemcpyHostToDevice));
+  /* launch kernel */
+  sequential_dot_product_kernel<<<gridDim, blockDim>>>(n, d_a, d_b, d_result,
+                                                       prec);
+  cudaCheck(cudaGetLastError());
+  /* device to host */
+  cudaCheck(cudaMemcpy(h_result, d_result, sizeof(T), cudaMemcpyDeviceToHost));
+  /* free */
+  cudaFree(d_a);
+  cudaFree(d_b);
+  cudaFree(d_result);
+}
+
+/* initialize template */
+template void launch_sequential_dot_product_kernel<double>(
+    const int, const std::vector<double> &, const std::vector<double> &,
+    double *, Precision);
+template void launch_sequential_dot_product_kernel<float>(
+    const int, const std::vector<float> &, const std::vector<float> &, float *,
+    Precision);
+template void launch_sequential_dot_product_kernel<half>(
+    const int, const std::vector<half> &, const std::vector<half> &, half *,
+    Precision);
