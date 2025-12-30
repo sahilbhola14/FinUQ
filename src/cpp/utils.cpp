@@ -101,6 +101,18 @@ void absolute_vector(const std::vector<T> &source, std::vector<T> &target) {
   }
 }
 
+/* take absolute and convert to double */
+template <typename T>
+void convert_vector_to_absolute_double(const std::vector<T> &source,
+                                       std::vector<double> &target) {
+  target.clear();
+  target.reserve(source.size());
+
+  for (const T &x : source) {
+    target.push_back(std::abs(static_cast<double>(x)));
+  }
+}
+
 /* initialize templates */
 template void convert_vector_to_double<double>(const std::vector<double> &,
                                                std::vector<double> &);
@@ -108,3 +120,9 @@ template void convert_vector_to_double<float>(const std::vector<float> &,
                                               std::vector<double> &);
 template void convert_vector_to_double<half>(const std::vector<half> &,
                                              std::vector<double> &);
+template void convert_vector_to_absolute_double<double>(
+    const std::vector<double> &, std::vector<double> &);
+template void convert_vector_to_absolute_double<float>(
+    const std::vector<float> &, std::vector<double> &);
+template void convert_vector_to_absolute_double<half>(const std::vector<half> &,
+                                                      std::vector<double> &);
