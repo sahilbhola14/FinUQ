@@ -12,6 +12,7 @@
 #include "backward_error.hpp"
 #include "distribution.hpp"
 #include "dot_product_cuda.cuh"
+#include "forward_error.hpp"
 #include "utils.hpp"
 #include "utils_cuda.cuh"
 
@@ -31,8 +32,8 @@ void print_dot_product_config(const dot_product_config &dot_product_cfg) {
     std::cout << "Beta bound model beta value: "
               << dot_product_cfg.gamma_cfg.beta_dist_beta << std::endl;
   }
-  std::cout << "Bound confidence: " << dot_product_cfg.gamma_cfg.confidence
-            << std::endl;
+  std::cout << "Bound confidence: " << std::setprecision(4)
+            << dot_product_cfg.gamma_cfg.confidence << std::endl;
 }
 
 /* dot product filename */
@@ -40,7 +41,7 @@ std::string make_dot_product_filename(const dot_product_config &cfg) {
   std::ostringstream ss;
   ss << "dot_product_" << to_string(cfg.prec) << "_prec"
      << "_distribution_" << to_string(cfg.dist) << "_bound_confidence_"
-     << std::fixed << std::setprecision(3) << cfg.gamma_cfg.confidence
+     << std::fixed << std::setprecision(5) << cfg.gamma_cfg.confidence
      << "_bound_model_" << to_string(cfg.gamma_cfg.bound_model);
 
   if (cfg.gamma_cfg.bound_model == Beta) {
@@ -57,7 +58,7 @@ std::string make_dot_product_filename(const dot_product_config &cfg) {
  * run dot product backward error experiment for fixed size
  */
 template <typename T>
-void run_dot_product_experiment_fixed_size(
+void run_dot_product_backward_error_experiment_fixed_size(
     const int n, const dot_product_config &dot_product_cfg,
     backward_error_result &result) {
   /* initialize */
@@ -90,7 +91,8 @@ void run_dot_product_experiment_fixed_size(
                                                  &h_result_true_abs, Double);
     /* compute the backward error */
     compute_sequential_dot_product_backward_error(
-        h_result, h_result_true, h_result_true_abs, &backward_error[i]);
+        static_cast<double>(h_result), h_result_true, h_result_true_abs,
+        &backward_error[i]);
   }
 
   /* compute the backward error statistics */
@@ -108,20 +110,68 @@ void run_dot_product_experiment_fixed_size(
   result.backward_error_bound = backward_error_bound;
 }
 
+/*
+ * run dot product forward error experiment for fixed size
+ */
+template <typename T>
+void run_dot_product_forward_error_experiment_fixed_size(
+    const int n, const dot_product_config &dot_product_cfg,
+    forward_error_result &result) {
+  /* initialize */
+  std::vector<T> h_a(n), h_b(n);
+  std::vector<double> h_a_true(n), h_b_true(n);
+  std::vector<double> h_a_true_abs(n), h_b_true_abs(n);
+  T h_result;
+  double h_result_true, h_result_true_abs, h_result_model;
+  gamma_result forward_error_bound;
+
+  /* run the experiment */
+  for (int i = 0; i < dot_product_cfg.num_experiments; i++) {
+    /* sample the vector */
+    sample_random_vector(h_a, dot_product_cfg.prec, dot_product_cfg.dist, 0,
+                         i * 2 + 4);  // a vector
+    sample_random_vector(h_b, dot_product_cfg.prec, dot_product_cfg.dist, 0,
+                         i * 2 + 3);                       // b vector
+    convert_vector_to_double(h_a, h_a_true);               // a true vector
+    convert_vector_to_double(h_b, h_b_true);               // b true vector
+    convert_vector_to_absolute_double(h_a, h_a_true_abs);  // |a| true vector
+    convert_vector_to_absolute_double(h_b, h_b_true_abs);  // |b| true vector
+    /* run the dot product(s) */
+    launch_sequential_dot_product_kernel<T>(n, h_a, h_b, &h_result,
+                                            dot_product_cfg.prec);
+    launch_sequential_dot_product_kernel<double>(n, h_a_true, h_b_true,
+                                                 &h_result_true, Double);
+    launch_sequential_dot_product_kernel<double>(n, h_a_true_abs, h_b_true_abs,
+                                                 &h_result_true_abs, Double);
+    /* launch_sequential_dot_product_model_kernel<double>(n, h_a_true, h_b_true,
+     */
+    /*                                              &h_result_model, Double); */
+    /* compute the forward error */
+    compute_sequential_dot_product_forward_error(
+        static_cast<double>(h_result), h_result_true, &result.forward_error[i]);
+    /* compute the forward error bound */
+    result.forward_error_bound.push_back(
+        compute_sequential_dot_product_forward_error_bound(
+            n, h_result_true, h_result_true_abs, dot_product_cfg.gamma_cfg));
+  }
+}
+
 /* run dot product backward error experiment */
-void run_dot_product_experiment(const dot_product_config &dot_product_cfg) {
+void run_dot_product_backward_error_experiment(
+    const dot_product_config &dot_product_cfg) {
   /* intialization */
-  /* std::vector<int> n_values = {10, 100, 1000, 10000, 100000, 1000000}; */
-  std::vector<int> n_values = {10, 100};
-  std::vector<backward_error_result> results(n_values.size());
+  std::vector<int> vector_sizes = {10,     100,    1000,   10000,
+                                   100000, 500000, 1000000};
+  std::vector<backward_error_result> results(vector_sizes.size());
 
   /* print header */
   std::cout << std::string(50, '=') << std::endl;
-  std::cout << std::string(10, '-') << " Dot product Config "
+  std::cout << std::string(10, '-')
+            << " Dot product backward error analysis config "
             << std::string(10, '-') << std::endl;
   print_dot_product_config(dot_product_cfg);
-  std::cout << "Vector size: ";
-  for (const auto &v : n_values) std::cout << v << ", ";
+  std::cout << "Vector sizes: ";
+  for (const auto &v : vector_sizes) std::cout << v << ", ";
   std::cout << std::endl;
   std::cout << std::string(50, '=') << std::endl;
 
@@ -130,19 +180,19 @@ void run_dot_product_experiment(const dot_product_config &dot_product_cfg) {
          "Bound precision and compute precision must be the same");
 
   /* run experiment for fixed vector size */
-  for (size_t i = 0; i < n_values.size(); i++) {
+  for (size_t i = 0; i < vector_sizes.size(); i++) {
     switch (dot_product_cfg.prec) {
       case Double:
-        run_dot_product_experiment_fixed_size<double>(
-            n_values[i], dot_product_cfg, results[i]);
+        run_dot_product_backward_error_experiment_fixed_size<double>(
+            vector_sizes[i], dot_product_cfg, results[i]);
         break;
       case Single:
-        run_dot_product_experiment_fixed_size<float>(
-            n_values[i], dot_product_cfg, results[i]);
+        run_dot_product_backward_error_experiment_fixed_size<float>(
+            vector_sizes[i], dot_product_cfg, results[i]);
         break;
       case Half:
-        run_dot_product_experiment_fixed_size<half>(
-            n_values[i], dot_product_cfg, results[i]);
+        run_dot_product_backward_error_experiment_fixed_size<half>(
+            vector_sizes[i], dot_product_cfg, results[i]);
         break;
       default:
         throw std::invalid_argument("invalid precision");
@@ -152,4 +202,52 @@ void run_dot_product_experiment(const dot_product_config &dot_product_cfg) {
   /* save */
   std::string filename = make_dot_product_filename(dot_product_cfg);
   write_backward_error_results_csv(results, filename);
+}
+
+/* run dot product forward error experiment */
+void run_dot_product_forward_error_experiment(
+    const int vector_size, const dot_product_config &dot_product_cfg) {
+  /* initialization */
+  forward_error_result results;
+  results.n = vector_size;
+  results.forward_error.resize(dot_product_cfg.num_experiments);
+  results.forward_error_model.resize(dot_product_cfg.num_experiments);
+  results.forward_error_bound.reserve(dot_product_cfg.num_experiments);
+
+  /* print header */
+  std::cout << std::string(50, '=') << std::endl;
+  std::cout << std::string(10, '-')
+            << " Dot product forward error analysis config "
+            << std::string(10, '-') << std::endl;
+  print_dot_product_config(dot_product_cfg);
+  std::cout << "Vector size: " << vector_size << std::endl;
+  std::cout << std::string(50, '=') << std::endl;
+
+  /* assert statements */
+  assert(dot_product_cfg.prec == dot_product_cfg.gamma_cfg.prec &&
+         "Bound precision and compute precision must be the same");
+
+  switch (dot_product_cfg.prec) {
+    case Double:
+      run_dot_product_forward_error_experiment_fixed_size<double>(
+          vector_size, dot_product_cfg, results);
+      break;
+    case Single:
+      run_dot_product_forward_error_experiment_fixed_size<float>(
+          vector_size, dot_product_cfg, results);
+      break;
+    case Half:
+      run_dot_product_forward_error_experiment_fixed_size<half>(
+          vector_size, dot_product_cfg, results);
+      break;
+    default:
+      throw std::invalid_argument("invalid precision");
+  }
+
+  /* print test */
+  /* for (auto &r:results.forward_error_bound){ */
+  /*   std::cout << r.gamma_det << std::endl; */
+  /*   std::cout << r.gamma_mprea << std::endl; */
+  /*   std::cout << r.gamma_vprea << std::endl; */
+  /* } */
 }

@@ -13,6 +13,7 @@ struct dot_product_config {
 };
 
 /* dot product experiment */
-void run_dot_product_experiment(const dot_product_config &dot_product_cfg);
+void run_dot_product_backward_error_experiment(const dot_product_config &dot_product_cfg);
+void run_dot_product_forward_error_experiment(const int vector_size, const dot_product_config &dot_product_cfg);
 
 #endif
