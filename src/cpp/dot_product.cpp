@@ -22,19 +22,19 @@ void run_dot_product_experiment_fixed_size(
   std::vector<T> h_a(n), h_b(n);
   std::vector<double> h_a_true(n), h_b_true(n);
   std::vector<double> h_a_true_abs(n), h_b_true_abs(n);
-  std::vector<double> backward_error;
-  backward_error.reserve(dot_product_cfg.num_experiments);
+  std::vector<double> backward_error(dot_product_cfg.num_experiments);
   T h_result;
   double h_result_true, h_result_true_abs;
-  double backward_error_bound;
+  gamma_result backward_error_bound;
+  vector_stats backward_error_stats;
 
   /* run the experiment */
   for (int i = 0; i < dot_product_cfg.num_experiments; i++) {
     /* sample the vector */
-    sample_random_vector(h_a, dot_product_cfg.prec,
-                         dot_product_cfg.dist);  // a vector
-    sample_random_vector(h_b, dot_product_cfg.prec,
-                         dot_product_cfg.dist);            // b vector
+    sample_random_vector(h_a, dot_product_cfg.prec, dot_product_cfg.dist, 0,
+                         i * 2 + 4);  // a vector
+    sample_random_vector(h_b, dot_product_cfg.prec, dot_product_cfg.dist, 0,
+                         i * 2 + 3);                       // b vector
     convert_vector_to_double(h_a, h_a_true);               // a true vector
     convert_vector_to_double(h_b, h_b_true);               // b true vector
     convert_vector_to_absolute_double(h_a, h_a_true_abs);  // |a| true vector
@@ -51,10 +51,12 @@ void run_dot_product_experiment_fixed_size(
         h_result, h_result_true, h_result_true_abs, &backward_error[i]);
   }
 
+  /* compute the backward error statistics */
+  backward_error_stats = get_vector_stats(backward_error, true);
+
   /* compute the backward error bound */
-  gamma_result backward_error_bound =
-      compute_sequential_dot_product_backward_error_bound(
-          n, dot_product_cfg.gamma_cfg, true);
+  backward_error_bound = compute_sequential_dot_product_backward_error_bound(
+      n, dot_product_cfg.gamma_cfg, true);
 }
 
 /* print dot product config */

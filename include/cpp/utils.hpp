@@ -8,6 +8,13 @@
 #include "definition.hpp"
 #include "gamma.hpp"
 
+/* vector statistics */
+struct vector_stats {
+  double min; // minimum value of the vector
+  double max; // max value of the vector
+  double mean; // mean value of the vector
+};
+
 /* convert precison to string for printing*/
 inline std::string to_string(Precision prec){
     switch(prec){
@@ -51,8 +58,9 @@ template <typename T>
 void convert_vector_to_half(const std::vector<T> &source, std::vector<half> &target);
 template <typename T>
 void convert_vector_to_absolute_double(const std::vector<T> &source, std::vector<double> &target);
-/* absolute value */
 template <typename T>
 void absolute_vector(const std::vector<T> &source, std::vector<T> &target);
+vector_stats get_vector_stats(const std::vector<double>& v, bool verbose=false);
+
 
 #endif

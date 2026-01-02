@@ -1,9 +1,11 @@
 #include "utils.hpp"
 
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <fstream>
 #include <iomanip>
+#include <numeric>
 
 /* compute the unit roundoff */
 double compute_unit_roundoff(Precision prec) {
@@ -111,6 +113,29 @@ void convert_vector_to_absolute_double(const std::vector<T> &source,
   for (const T &x : source) {
     target.push_back(std::abs(static_cast<double>(x)));
   }
+}
+
+/* compute vector statistics */
+vector_stats get_vector_stats(const std::vector<double> &v, bool verbose) {
+  vector_stats stats;
+
+  if (v.empty()) throw std::runtime_error("get_vector_stats: vector is empty");
+
+  auto minmax = std::minmax_element(v.begin(), v.end());
+
+  double sum = std::accumulate(v.begin(), v.end(), 0.0);
+  double mean = sum / static_cast<double>(v.size());
+
+  stats.min = static_cast<double>(*minmax.first);
+  stats.max = static_cast<double>(*minmax.second);
+  stats.mean = mean;
+  /* verbose */
+  if (verbose == true) {
+    std::cout << "vector min: " << stats.min << std::endl;
+    std::cout << "vector max: " << stats.max << std::endl;
+    std::cout << "vector mean: " << stats.mean << std::endl;
+  }
+  return stats;
 }
 
 /* initialize templates */
