@@ -105,7 +105,7 @@ void run_dot_product_experiment_fixed_size(
   result.backward_error_min = backward_error_stats.min;
   result.backward_error_max = backward_error_stats.max;
   result.backward_error_mean = backward_error_stats.mean;
-  result.gamma = backward_error_bound;
+  result.backward_error_bound = backward_error_bound;
 }
 
 /* run dot product backward error experiment */

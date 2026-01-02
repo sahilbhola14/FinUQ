@@ -16,9 +16,9 @@ int main(int argc, char **argv) {
     compare_gamma();
   } else if (experiment == "single_dot_product") {
     dot_product_config dot_product_cfg;
-    dot_product_cfg.prec = Single;         // sampling precision
-    dot_product_cfg.num_experiments = 10;  // sampling precision
-    /* dot_product_cfg.gamma_cfg.prec = Half; // bound precision */
+    dot_product_cfg.prec = Half;            // sampling precision
+    dot_product_cfg.num_experiments = 10;   // sampling precision
+    dot_product_cfg.gamma_cfg.prec = Half;  // bound precision
     run_dot_product_experiment(dot_product_cfg);
   }
   return 0;

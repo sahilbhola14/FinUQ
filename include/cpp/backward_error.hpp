@@ -9,7 +9,7 @@ struct backward_error_result {
     double backward_error_min; // mean backward error
     double backward_error_max; // max backward error
     double backward_error_mean; // mean backward error
-    gamma_result gamma;       // bounds
+    gamma_result backward_error_bound;       // bounds
 };
 
 /* dot product backward error */

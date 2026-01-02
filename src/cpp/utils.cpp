@@ -77,8 +77,9 @@ void write_backward_error_results_csv(
     file << std::left << std::setw(12) << r.n << std::setw(18)
          << r.backward_error_min << std::setw(18) << r.backward_error_max
          << std::setw(18) << r.backward_error_mean << std::setw(18)
-         << r.gamma.gamma_det << std::setw(18) << r.gamma.gamma_mprea
-         << std::setw(18) << r.gamma.gamma_vprea << "\n";
+         << r.backward_error_bound.gamma_det << std::setw(18)
+         << r.backward_error_bound.gamma_mprea << std::setw(18)
+         << r.backward_error_bound.gamma_vprea << "\n";
   }
   /* close the file */
   file.close();
