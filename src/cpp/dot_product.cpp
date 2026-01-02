@@ -17,7 +17,8 @@
 /* run dot product experiment for fixed size */
 template <typename T>
 void run_dot_product_experiment_fixed_size(
-    const int n, const dot_product_config &dot_product_cfg) {
+    const int n, const dot_product_config &dot_product_cfg,
+    backward_error_result &result) {
   /* initialize */
   std::vector<T> h_a(n), h_b(n);
   std::vector<double> h_a_true(n), h_b_true(n);
@@ -52,11 +53,17 @@ void run_dot_product_experiment_fixed_size(
   }
 
   /* compute the backward error statistics */
-  backward_error_stats = get_vector_stats(backward_error, true);
+  backward_error_stats = get_vector_stats(backward_error);
 
   /* compute the backward error bound */
   backward_error_bound = compute_sequential_dot_product_backward_error_bound(
-      n, dot_product_cfg.gamma_cfg, true);
+      n, dot_product_cfg.gamma_cfg);
+
+  /* update result */
+  result.n = n;
+  result.backward_error_min = backward_error_stats.min;
+  result.backward_error_max = backward_error_stats.max;
+  result.gamma = backward_error_bound;
 }
 
 /* print dot product config */
@@ -81,9 +88,9 @@ void print_dot_product_config(const dot_product_config &dot_product_cfg) {
 
 void run_dot_product_experiment(const dot_product_config &dot_product_cfg) {
   /* intialization */
-  std::vector<int> n_values = {10, 100, 1000, 10000, 100000, 1000000};
-  std::vector<dot_product_result> results;
-  results.reserve(n_values.size());
+  /* std::vector<int> n_values = {10, 100, 1000, 10000, 100000, 1000000}; */
+  std::vector<int> n_values = {10, 100};
+  std::vector<backward_error_result> results(n_values.size());
 
   /* print header */
   std::cout << std::string(50, '=') << std::endl;
@@ -100,21 +107,22 @@ void run_dot_product_experiment(const dot_product_config &dot_product_cfg) {
          "Bound precision and compute precision must be the same");
 
   /* run experiment for fixed vector size */
-  int run_n = 1;
-  switch (dot_product_cfg.prec) {
-    case Double:
-      run_dot_product_experiment_fixed_size<double>(n_values[run_n],
-                                                    dot_product_cfg);
-      break;
-    case Single:
-      run_dot_product_experiment_fixed_size<float>(n_values[run_n],
-                                                   dot_product_cfg);
-      break;
-    case Half:
-      run_dot_product_experiment_fixed_size<half>(n_values[run_n],
-                                                  dot_product_cfg);
-      break;
-    default:
-      throw std::invalid_argument("invalid precision");
+  for (size_t i = 0; i < n_values.size(); i++) {
+    switch (dot_product_cfg.prec) {
+      case Double:
+        run_dot_product_experiment_fixed_size<double>(
+            n_values[i], dot_product_cfg, results[i]);
+        break;
+      case Single:
+        run_dot_product_experiment_fixed_size<float>(
+            n_values[i], dot_product_cfg, results[i]);
+        break;
+      case Half:
+        run_dot_product_experiment_fixed_size<half>(
+            n_values[i], dot_product_cfg, results[i]);
+        break;
+      default:
+        throw std::invalid_argument("invalid precision");
+    }
   }
 }

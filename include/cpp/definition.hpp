@@ -1,6 +1,8 @@
 #ifndef DEFINITIONS_HPP
 #define DEFINITIONS_HPP
 
+/* #include "gamma.hpp" */
+
 #define COMMENT_BLOCK(text) /* text */
 
 /* type of distribution */
