@@ -7,6 +7,7 @@
 #include <cuda_fp16.h>
 #include "definition.hpp"
 #include "gamma.hpp"
+#include "backward_error.hpp"
 
 /* vector statistics */
 struct vector_stats {
@@ -49,7 +50,7 @@ inline std::string to_string(Distribution dist){
 double compute_unit_roundoff(Precision prec);
 /* save */
 void write_gamma_results_csv(const std::vector<gamma_result> &results, const std::string filename, bool verbose=false);
-/* void write_backward_error_results_csv(const std::vector<backward_error_result> &results, const std::string filename, bool verbose=false); */
+void write_backward_error_results_csv(const std::vector<backward_error_result> &results, const std::string filename, bool verbose=false);
 /* vector utils */
 template <typename T>
 void convert_vector_to_double(const std::vector<T> &source, std::vector<double> &target);

@@ -4,6 +4,7 @@
 #include <cuda_fp16.h>
 
 #include <cassert>
+#include <iomanip>
 #include <iostream>
 #include <stdexcept>
 #include <vector>
@@ -14,7 +15,47 @@
 #include "utils.hpp"
 #include "utils_cuda.cuh"
 
-/* run dot product experiment for fixed size */
+/* print dot product config */
+void print_dot_product_config(const dot_product_config &dot_product_cfg) {
+  std::cout << "Compute precision: " << to_string(dot_product_cfg.prec)
+            << std::endl;
+  std::cout << "Random distribution: " << to_string(dot_product_cfg.dist)
+            << std::endl;
+  std::cout << "Number of experiments: " << dot_product_cfg.num_experiments
+            << std::endl;
+  std::cout << "Bound model: "
+            << to_string(dot_product_cfg.gamma_cfg.bound_model) << std::endl;
+  if (dot_product_cfg.gamma_cfg.bound_model == Beta) {
+    std::cout << "Beta bound model alpha value: "
+              << dot_product_cfg.gamma_cfg.beta_dist_alpha << std::endl;
+    std::cout << "Beta bound model beta value: "
+              << dot_product_cfg.gamma_cfg.beta_dist_beta << std::endl;
+  }
+  std::cout << "Bound confidence: " << dot_product_cfg.gamma_cfg.confidence
+            << std::endl;
+}
+
+/* dot product filename */
+std::string make_dot_product_filename(const dot_product_config &cfg) {
+  std::ostringstream ss;
+  ss << "dot_product_" << to_string(cfg.prec) << "_prec"
+     << "_distribution_" << to_string(cfg.dist) << "_bound_confidence_"
+     << std::fixed << std::setprecision(3) << cfg.gamma_cfg.confidence
+     << "_bound_model_" << to_string(cfg.gamma_cfg.bound_model);
+
+  if (cfg.gamma_cfg.bound_model == Beta) {
+    ss << "_a_" << cfg.gamma_cfg.beta_dist_alpha << "_b_"
+       << cfg.gamma_cfg.beta_dist_beta;
+  }
+
+  ss << ".csv";
+
+  return ss.str();
+}
+
+/*
+ * run dot product backward error experiment for fixed size
+ */
 template <typename T>
 void run_dot_product_experiment_fixed_size(
     const int n, const dot_product_config &dot_product_cfg,
@@ -63,29 +104,11 @@ void run_dot_product_experiment_fixed_size(
   result.n = n;
   result.backward_error_min = backward_error_stats.min;
   result.backward_error_max = backward_error_stats.max;
+  result.backward_error_mean = backward_error_stats.mean;
   result.gamma = backward_error_bound;
 }
 
-/* print dot product config */
-void print_dot_product_config(const dot_product_config &dot_product_cfg) {
-  std::cout << "Compute precision: " << to_string(dot_product_cfg.prec)
-            << std::endl;
-  std::cout << "Random distribution: " << to_string(dot_product_cfg.dist)
-            << std::endl;
-  std::cout << "Number of experiments: " << dot_product_cfg.num_experiments
-            << std::endl;
-  std::cout << "Bound model: "
-            << to_string(dot_product_cfg.gamma_cfg.bound_model) << std::endl;
-  if (dot_product_cfg.gamma_cfg.bound_model == Beta) {
-    std::cout << "Beta bound model alpha value: "
-              << dot_product_cfg.gamma_cfg.beta_dist_alpha << std::endl;
-    std::cout << "Beta bound model beta value: "
-              << dot_product_cfg.gamma_cfg.beta_dist_beta << std::endl;
-  }
-  std::cout << "Bound confidence: " << dot_product_cfg.gamma_cfg.confidence
-            << std::endl;
-}
-
+/* run dot product backward error experiment */
 void run_dot_product_experiment(const dot_product_config &dot_product_cfg) {
   /* intialization */
   /* std::vector<int> n_values = {10, 100, 1000, 10000, 100000, 1000000}; */
@@ -125,4 +148,8 @@ void run_dot_product_experiment(const dot_product_config &dot_product_cfg) {
         throw std::invalid_argument("invalid precision");
     }
   }
+
+  /* save */
+  std::string filename = make_dot_product_filename(dot_product_cfg);
+  write_backward_error_results_csv(results, filename);
 }

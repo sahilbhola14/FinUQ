@@ -8,6 +8,7 @@ struct backward_error_result {
     int n; //  characteristic dimension
     double backward_error_min; // mean backward error
     double backward_error_max; // max backward error
+    double backward_error_mean; // mean backward error
     gamma_result gamma;       // bounds
 };
 

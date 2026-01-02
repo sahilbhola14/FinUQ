@@ -56,6 +56,38 @@ void write_gamma_results_csv(const std::vector<gamma_result> &results,
   }
 }
 
+/* write backward error results to csv */
+void write_backward_error_results_csv(
+    const std::vector<backward_error_result> &results, std::string filename,
+    bool verbose) {
+  /* open the file */
+  std::ofstream file(filename);
+  /* check */
+  if (!file.is_open()) {
+    std::cerr << "Error: could not open file " << filename << "\n";
+    return;
+  }
+  /* header */
+  file << "n,backward_error_min,backward_error_max,backward_mean,gamma_det,"
+          "gamma_mprea,gamma_vprea\n";
+  /* numerical font */
+  file << std::scientific << std::setprecision(10);
+  /* write the results */
+  for (const auto &r : results) {
+    file << std::left << std::setw(12) << r.n << std::setw(18)
+         << r.backward_error_min << std::setw(18) << r.backward_error_max
+         << std::setw(18) << r.backward_error_mean << std::setw(18)
+         << r.gamma.gamma_det << std::setw(18) << r.gamma.gamma_mprea
+         << std::setw(18) << r.gamma.gamma_vprea << "\n";
+  }
+  /* close the file */
+  file.close();
+  /* print */
+  if (verbose == true) {
+    std::cout << "backward error results saved to " << filename << std::endl;
+  }
+}
+
 /* convert to double */
 template <typename T>
 void convert_vector_to_double(const std::vector<T> &source,
