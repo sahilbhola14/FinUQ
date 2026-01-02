@@ -120,3 +120,16 @@ log1pdeltastats get_log1pdelta_stats(Precision prec, BoundModel bound_model,
 
   return stats;
 }
+
+/*
+ * get individual bound confidence value (zeta)
+ * @ param: arithmetic_operations   number of arithmetic operations (n)
+ * @ param: total_confidence        Q value of the bounds
+ * Returns:
+ * zeta in Q(n,zeta) = 1 - n(1 - zeta)
+ * */
+double compute_individual_bound_zeta_confidence(const int arithmetic_operations,
+                                                double total_confidence) {
+  return 1.0 - ((1.0 - total_confidence) /
+                static_cast<double>(arithmetic_operations));
+}

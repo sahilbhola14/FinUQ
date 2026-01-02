@@ -4,6 +4,7 @@
 
 #include "definition.hpp"
 #include "dot_product_cuda.cuh"
+#include "utils.hpp"
 #include "utils_cuda.cuh"
 
 /* sequential dot product kernel */
@@ -36,7 +37,8 @@ template <typename T>
 void launch_sequential_dot_product_kernel(const int n,
                                           const std::vector<T> &h_a,
                                           const std::vector<T> &h_b,
-                                          T *h_result, Precision prec) {
+                                          T *h_result, Precision prec,
+                                          bool verbose) {
   /* kernel parameters */
   dim3 blockDim = 1;
   dim3 gridDim = 1;
@@ -51,6 +53,9 @@ void launch_sequential_dot_product_kernel(const int n,
   cudaCheck(cudaMemcpy(d_a, h_a.data(), size, cudaMemcpyHostToDevice));
   cudaCheck(cudaMemcpy(d_b, h_b.data(), size, cudaMemcpyHostToDevice));
   /* launch kernel */
+  if (verbose == true)
+    std::cout << "launching kernel for sequential dot product in "
+              << to_string(prec) << " precision" << std::endl;
   sequential_dot_product_kernel<<<gridDim, blockDim>>>(n, d_a, d_b, d_result,
                                                        prec);
   cudaCheck(cudaGetLastError());
@@ -65,10 +70,10 @@ void launch_sequential_dot_product_kernel(const int n,
 /* initialize template */
 template void launch_sequential_dot_product_kernel<double>(
     const int, const std::vector<double> &, const std::vector<double> &,
-    double *, Precision);
+    double *, Precision, bool);
 template void launch_sequential_dot_product_kernel<float>(
     const int, const std::vector<float> &, const std::vector<float> &, float *,
-    Precision);
+    Precision, bool);
 template void launch_sequential_dot_product_kernel<half>(
     const int, const std::vector<half> &, const std::vector<half> &, half *,
-    Precision);
+    Precision, bool);

@@ -15,5 +15,7 @@ log1pdeltastats get_log1pdelta_stats(Precision prec, BoundModel bound_model, dou
 /* sign of rounding error random variable */
 void check_mean_rounding_error_sign(Precision prec, BoundModel bound_model, double beta_dist_alpha, double beta_dist_beta);
 
+/* individual bound confidence */
+double compute_individual_bound_zeta_confidence(const int arithmetic_operations, double total_confidence);
 
 #endif

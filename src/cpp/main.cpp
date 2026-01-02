@@ -3,6 +3,7 @@
 
 #include "dot_product.hpp"
 #include "gamma.hpp"
+#include "utils.hpp"
 
 int main(int argc, char **argv) {
   std::string experiment = "single_dot_product";
@@ -14,7 +15,10 @@ int main(int argc, char **argv) {
   if (experiment == "compare_gamma") {
     compare_gamma();
   } else if (experiment == "single_dot_product") {
-    run_dot_product_experiment(Single, Ones);
+    dot_product_config dot_product_cfg;
+    dot_product_cfg.prec = Single;  // sampling precision
+    /* dot_product_cfg.gamma_cfg.prec = Half; // bound precision */
+    run_dot_product_experiment(dot_product_cfg);
   }
   return 0;
 }

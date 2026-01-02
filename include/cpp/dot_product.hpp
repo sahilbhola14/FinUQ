@@ -2,12 +2,15 @@
 #define DOT_PRODUCT_HPP
 
 #include "definition.hpp"
+#include "gamma.hpp"
 
 /* configuration for dot productcs*/
-/* struct dot_product_config { */
-/*     int num_runs = 1000; // number of runs for a fixed vector size */
-/*     Distribution dist=Normal; */
-/* }; */
+struct dot_product_config {
+  Precision prec = Single; // precision for sampling random vectors
+  Distribution dist=Normal; // distribution for the random vectors
+  int num_experiments = 100; // number of experiments
+  gamma_config gamma_cfg; // bounds config
+};
 
 /* dot product results */
 struct dot_product_result {
@@ -21,6 +24,6 @@ struct dot_product_result {
 };
 
 /* dot product experiment */
-void run_dot_product_experiment(Precision prec, Distribution dist, const int num_experiments=1);
+void run_dot_product_experiment(const dot_product_config &dot_product_cfg);
 
 #endif

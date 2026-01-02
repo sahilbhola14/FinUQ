@@ -26,6 +26,18 @@ inline std::string to_string(BoundModel bound_model){
         default: return "unknown";
     }
 }
+/* convert distribution to string for printing */
+inline std::string to_string(Distribution dist){
+    switch(dist){
+        case Normal: return "N(0,1)";
+        case ZeroOne: return "U(0,1)";
+        case MinusOnePlusOne: return "U(-1,1)";
+        case PowTwo: return "U(1,2)";
+        case Ones: return "All ones";
+        default: return "unknown";
+    }
+}
+
 /* unit roundoff */
 double compute_unit_roundoff(Precision prec);
 /* save */
