@@ -38,9 +38,10 @@ void print_dot_product_config(const dot_product_config &dot_product_cfg) {
 }
 
 /* dot product filename */
-std::string make_dot_product_filename(const dot_product_config &cfg) {
+std::string make_dot_product_filename(const std::string prefix,
+                                      const dot_product_config &cfg) {
   std::ostringstream ss;
-  ss << "dot_product_" << to_string(cfg.prec) << "_prec"
+  ss << prefix << "_dot_product_" << to_string(cfg.prec) << "_prec"
      << "_distribution_" << to_string(cfg.dist) << "_bound_confidence_"
      << std::fixed << std::setprecision(5) << cfg.gamma_cfg.confidence
      << "_bound_model_" << to_string(cfg.gamma_cfg.bound_model);
@@ -150,16 +151,18 @@ void run_dot_product_forward_error_experiment_fixed_size(
                                                  &h_result_true_abs, Double);
     launch_sequential_dot_product_model_kernel(
         n, h_a_true, h_b_true, &h_result_model, dot_product_cfg.prec,
-        dot_product_cfg.gamma_cfg.bound_model);
-    /* compute the forward error */
-    compute_sequential_dot_product_forward_error(
-        static_cast<double>(h_result), h_result_true, &result.forward_error[i]);
-    compute_sequential_dot_product_forward_error(
-        h_result_model, h_result_true, &result.forward_error_model[i]);
-    /* compute the forward error bound */
-    result.forward_error_bound.push_back(
-        compute_sequential_dot_product_forward_error_bound(
-            n, h_result_true, h_result_true_abs, dot_product_cfg.gamma_cfg));
+        dot_product_cfg.gamma_cfg);
+    /* /1* compute the forward error *1/ */
+    /* compute_sequential_dot_product_forward_error( */
+    /*     static_cast<double>(h_result), h_result_true,
+     * &result.forward_error[i]); */
+    /* compute_sequential_dot_product_forward_error( */
+    /*     h_result_model, h_result_true, &result.forward_error_model[i]); */
+    /* /1* compute the forward error bound *1/ */
+    /* result.forward_error_bound.push_back( */
+    /*     compute_sequential_dot_product_forward_error_bound( */
+    /*         n, h_result_true, h_result_true_abs, dot_product_cfg.gamma_cfg));
+     */
   }
 }
 
@@ -207,7 +210,8 @@ void run_dot_product_backward_error_experiment(
   }
 
   /* save */
-  std::string filename = make_dot_product_filename(dot_product_cfg);
+  std::string filename =
+      make_dot_product_filename("backward_error_result", dot_product_cfg);
   write_backward_error_results_csv(results, filename);
 }
 
@@ -250,4 +254,9 @@ void run_dot_product_forward_error_experiment(
     default:
       throw std::invalid_argument("invalid precision");
   }
+
+  /* save */
+  std::string filename =
+      make_dot_product_filename("forward_error_result", dot_product_cfg);
+  write_forward_error_results_csv(results, filename);
 }
