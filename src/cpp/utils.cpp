@@ -68,6 +68,38 @@ void write_backward_error_results_csv(
   }
 }
 
+/* write forward error results to csv */
+void write_forward_error_results_csv(const forward_error_result &results,
+                                     std::string filename, bool verbose) {
+  /* open the file */
+  std::ofstream file(filename);
+  /* check */
+  if (!file.is_open()) {
+    std::cerr << "Error: could not open file " << filename << "\n";
+    return;
+  }
+  /* header */
+  file << "n,forward_error,forward_error_model,gamma_det,"
+          "gamma_mprea,gamma_vprea\n";
+  /* numerical font */
+  file << std::scientific << std::setprecision(10);
+  /* write the results */
+  for (int i = 0; i < results.forward_error.size(); i++) {
+    file << std::left << std::setw(12) << results.n << std::setw(18)
+         << results.forward_error[i] << std::setw(18)
+         << results.forward_error_model[i] << std::setw(18)
+         << results.forward_error_bound[i].gamma_det << std::setw(18)
+         << results.forward_error_bound[i].gamma_mprea << std::setw(18)
+         << results.forward_error_bound[i].gamma_vprea << "\n";
+  }
+  /* close the file */
+  file.close();
+  /* print */
+  if (verbose == true) {
+    std::cout << "forward error results saved to " << filename << std::endl;
+  }
+}
+
 /* convert to double */
 template <typename T>
 void convert_vector_to_double(const std::vector<T> &source,
