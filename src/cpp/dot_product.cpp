@@ -152,17 +152,15 @@ void run_dot_product_forward_error_experiment_fixed_size(
     launch_sequential_dot_product_model_kernel(
         n, h_a_true, h_b_true, &h_result_model, dot_product_cfg.prec,
         dot_product_cfg.gamma_cfg);
-    /* /1* compute the forward error *1/ */
-    /* compute_sequential_dot_product_forward_error( */
-    /*     static_cast<double>(h_result), h_result_true,
-     * &result.forward_error[i]); */
-    /* compute_sequential_dot_product_forward_error( */
-    /*     h_result_model, h_result_true, &result.forward_error_model[i]); */
-    /* /1* compute the forward error bound *1/ */
-    /* result.forward_error_bound.push_back( */
-    /*     compute_sequential_dot_product_forward_error_bound( */
-    /*         n, h_result_true, h_result_true_abs, dot_product_cfg.gamma_cfg));
-     */
+    /* compute the forward error */
+    compute_sequential_dot_product_forward_error(
+        static_cast<double>(h_result), h_result_true, &result.forward_error[i]);
+    compute_sequential_dot_product_forward_error(
+        h_result_model, h_result_true, &result.forward_error_model[i]);
+    /* compute the forward error bound */
+    result.forward_error_bound.push_back(
+        compute_sequential_dot_product_forward_error_bound(
+            n, h_result_true, h_result_true_abs, dot_product_cfg.gamma_cfg));
   }
 }
 

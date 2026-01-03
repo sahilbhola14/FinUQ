@@ -36,7 +36,8 @@ __global__ void sequential_dot_product_kernel(const int n, T *a, T *b,
 
 __global__ void sequential_dot_product_model_kernel(
     const int n, double *a, double *b, double *result, Precision prec,
-    BoundModel bound_model, unsigned long long seed = 1234ULL) {
+    BoundModel bound_model, const double beta_dist_alpha,
+    const double beta_dist_beta, unsigned long long seed = 1234ULL) {
   int tid = threadIdx.x;
   int gid = threadIdx.x + blockIdx.x * blockDim.x;
   /* compute */
@@ -49,7 +50,7 @@ __global__ void sequential_dot_product_model_kernel(
   for (int i = 0; i < n; i++) {
     /* sample rounding error delta */
     sample_rounding_error_distribution(2, rounding_error, prec, bound_model,
-                                       &state);
+                                       beta_dist_alpha, beta_dist_beta, &state);
     /* get perturbation */
     rounding_error[0] = 1.0 + rounding_error[0];
     rounding_error[1] = 1.0 + rounding_error[1];
@@ -99,13 +100,17 @@ void launch_sequential_dot_product_kernel(const int n,
 
 void launch_sequential_dot_product_model_kernel(
     const int n, const std::vector<double> &h_a, const std::vector<double> &h_b,
-    double *h_result, Precision prec, BoundModel bound_model, bool verbose) {
+    double *h_result, Precision prec, const gamma_config &gamma_cfg,
+    bool verbose) {
   /* kernel parameters */
   dim3 blockDim = 1;
   dim3 gridDim = 1;
   /* initilaize */
   double *d_a, *d_b, *d_result;
   int size = n * sizeof(double);
+  BoundModel bound_model = gamma_cfg.bound_model;
+  const double beta_dist_alpha = gamma_cfg.beta_dist_alpha;
+  const double beta_dist_beta = gamma_cfg.beta_dist_beta;
   /* allocate memeory */
   cudaCheck(cudaMalloc((void **)&d_a, size));
   cudaCheck(cudaMalloc((void **)&d_b, size));
@@ -118,7 +123,8 @@ void launch_sequential_dot_product_model_kernel(
     std::cout << "launching kernel for sequential dot product model in "
               << to_string(Double) << " precision" << std::endl;
   sequential_dot_product_model_kernel<<<gridDim, blockDim>>>(
-      n, d_a, d_b, d_result, prec, bound_model);
+      n, d_a, d_b, d_result, prec, bound_model, beta_dist_alpha,
+      beta_dist_beta);
   cudaCheck(cudaGetLastError());
   /* device to host */
   cudaCheck(

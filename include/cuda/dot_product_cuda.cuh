@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "definition.hpp"
+#include "gamma.hpp"
 
 /* dot product kernel */
 template <typename T>
@@ -14,7 +15,7 @@ void launch_sequential_dot_product_kernel(const int n,
                                           bool verbose = false);
 void launch_sequential_dot_product_model_kernel(
     const int n, const std::vector<double> &h_a, const std::vector<double> &h_b,
-    double *h_result, Precision prec, BoundModel bound_model,
+    double *h_result, Precision prec, const gamma_config &gamma_cfg,
     bool verbose = false);
 
 #endif
