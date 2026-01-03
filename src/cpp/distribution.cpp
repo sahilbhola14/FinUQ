@@ -4,7 +4,6 @@
 
 #include <cassert>
 #include <iostream>
-#include <random>
 #include <stdexcept>
 
 /* sample from N(0,1) */
@@ -59,8 +58,8 @@ void constant_initialization(std::vector<T> &vector, const double constant) {
 /* sample random vector */
 template <typename T>
 void sample_random_vector(std::vector<T> &vector, Precision prec,
-                          Distribution dist, const int pow2k, const int seed) {
-  std::mt19937 gen(seed);
+                          Distribution dist, std::mt19937 &gen,
+                          const int pow2k) {
   if (dist == Normal) {
     sample_normal_vector(vector, gen);
   } else if (dist == ZeroOne) {
@@ -79,8 +78,11 @@ void sample_random_vector(std::vector<T> &vector, Precision prec,
 
 /* instantiate the templates */
 template void sample_random_vector<double>(std::vector<double> &, Precision,
-                                           Distribution, const int, const int);
+                                           Distribution, std::mt19937 &,
+                                           const int);
 template void sample_random_vector<float>(std::vector<float> &, Precision,
-                                          Distribution, const int, const int);
+                                          Distribution, std::mt19937 &,
+                                          const int);
 template void sample_random_vector<half>(std::vector<half> &, Precision,
-                                         Distribution, const int, const int);
+                                         Distribution, std::mt19937 &,
+                                         const int);

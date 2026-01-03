@@ -1,3 +1,5 @@
+#include <curand_kernel.h>
+
 #include "utils_cuda.cuh"
 
 /* grid size */

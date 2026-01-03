@@ -11,7 +11,7 @@ void run_all_dot_product_experimens(Precision prec) {
   /* configuration */
   dot_product_config dot_product_cfg;
   dot_product_cfg.prec = prec;            // sampling precision
-  dot_product_cfg.num_experiments = 10;   // sampling precision
+  dot_product_cfg.num_experiments = 5;    // sampling precision
   dot_product_cfg.gamma_cfg.prec = prec;  // bound precision
 
   /* Data distribution: U(0,1) */
@@ -19,8 +19,7 @@ void run_all_dot_product_experimens(Precision prec) {
 
   // uniform bound model
   dot_product_cfg.gamma_cfg.bound_model = Uniform;
-  /* run_dot_product_backward_error_experiment(dot_product_cfg); // backward
-   * error experiment */
+  /* run_dot_product_backward_error_experiment(dot_product_cfg); */
   run_dot_product_forward_error_experiment(1000, dot_product_cfg);
 
   /* // beta bound model */

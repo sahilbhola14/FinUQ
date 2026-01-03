@@ -7,27 +7,6 @@
 #include <iomanip>
 #include <numeric>
 
-/* compute the unit roundoff */
-double compute_unit_roundoff(Precision prec) {
-  double base, precision;
-  double urd = 0.0;
-  if (prec == Half) {
-    base = 2.0;
-    precision = 11.0;
-  } else if (prec == Single) {
-    base = 2.0;
-    precision = 24.0;
-  } else if (prec == Double) {
-    base = 2.0;
-    precision = 53.0;
-  } else {
-    printf("Error: Invalid precision");
-    assert(false);
-  }
-  urd = pow(base, -(precision - 1.0)) / 2.0;
-  return urd;
-}
-
 /* write gamma results to csv */
 void write_gamma_results_csv(const std::vector<gamma_result> &results,
                              std::string filename, bool verbose) {

@@ -4,6 +4,7 @@
 #include <iostream>
 #include <stdexcept>
 
+#include "rounding_error_model.cuh"
 #include "utils.hpp"
 
 // compute the statistics of log(1+delta) when delta is U(-urd, urd)

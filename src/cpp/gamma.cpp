@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "prob_model.hpp"
+#include "rounding_error_model.cuh"
 #include "utils.hpp"
 
 double compute_determinsitic_gamma(int n, Precision prec) {

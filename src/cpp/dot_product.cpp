@@ -6,6 +6,7 @@
 #include <cassert>
 #include <iomanip>
 #include <iostream>
+#include <random>
 #include <stdexcept>
 #include <vector>
 
@@ -60,7 +61,7 @@ std::string make_dot_product_filename(const dot_product_config &cfg) {
 template <typename T>
 void run_dot_product_backward_error_experiment_fixed_size(
     const int n, const dot_product_config &dot_product_cfg,
-    backward_error_result &result) {
+    backward_error_result &result, const int seed = 42) {
   /* initialize */
   std::vector<T> h_a(n), h_b(n);
   std::vector<double> h_a_true(n), h_b_true(n);
@@ -70,14 +71,16 @@ void run_dot_product_backward_error_experiment_fixed_size(
   double h_result_true, h_result_true_abs;
   gamma_result backward_error_bound;
   vector_stats backward_error_stats;
+  /* random state */
+  std::mt19937 gen(seed);
 
   /* run the experiment */
   for (int i = 0; i < dot_product_cfg.num_experiments; i++) {
     /* sample the vector */
-    sample_random_vector(h_a, dot_product_cfg.prec, dot_product_cfg.dist, 0,
-                         i * 2 + 4);  // a vector
-    sample_random_vector(h_b, dot_product_cfg.prec, dot_product_cfg.dist, 0,
-                         i * 2 + 3);                       // b vector
+    sample_random_vector(h_a, dot_product_cfg.prec, dot_product_cfg.dist,
+                         gen);  // a vector
+    sample_random_vector(h_b, dot_product_cfg.prec, dot_product_cfg.dist,
+                         gen);                             // b vector
     convert_vector_to_double(h_a, h_a_true);               // a true vector
     convert_vector_to_double(h_b, h_b_true);               // b true vector
     convert_vector_to_absolute_double(h_a, h_a_true_abs);  // |a| true vector
@@ -116,7 +119,7 @@ void run_dot_product_backward_error_experiment_fixed_size(
 template <typename T>
 void run_dot_product_forward_error_experiment_fixed_size(
     const int n, const dot_product_config &dot_product_cfg,
-    forward_error_result &result) {
+    forward_error_result &result, const int seed = 42) {
   /* initialize */
   std::vector<T> h_a(n), h_b(n);
   std::vector<double> h_a_true(n), h_b_true(n);
@@ -124,14 +127,16 @@ void run_dot_product_forward_error_experiment_fixed_size(
   T h_result;
   double h_result_true, h_result_true_abs, h_result_model;
   gamma_result forward_error_bound;
+  /* random state */
+  std::mt19937 gen(seed);
 
   /* run the experiment */
   for (int i = 0; i < dot_product_cfg.num_experiments; i++) {
     /* sample the vector */
-    sample_random_vector(h_a, dot_product_cfg.prec, dot_product_cfg.dist, 0,
-                         i * 2 + 4);  // a vector
-    sample_random_vector(h_b, dot_product_cfg.prec, dot_product_cfg.dist, 0,
-                         i * 2 + 3);                       // b vector
+    sample_random_vector(h_a, dot_product_cfg.prec, dot_product_cfg.dist,
+                         gen);  // a vector
+    sample_random_vector(h_b, dot_product_cfg.prec, dot_product_cfg.dist,
+                         gen);                             // b vector
     convert_vector_to_double(h_a, h_a_true);               // a true vector
     convert_vector_to_double(h_b, h_b_true);               // b true vector
     convert_vector_to_absolute_double(h_a, h_a_true_abs);  // |a| true vector
@@ -143,12 +148,14 @@ void run_dot_product_forward_error_experiment_fixed_size(
                                                  &h_result_true, Double);
     launch_sequential_dot_product_kernel<double>(n, h_a_true_abs, h_b_true_abs,
                                                  &h_result_true_abs, Double);
-    /* launch_sequential_dot_product_model_kernel<double>(n, h_a_true, h_b_true,
-     */
-    /*                                              &h_result_model, Double); */
+    launch_sequential_dot_product_model_kernel(
+        n, h_a_true, h_b_true, &h_result_model, dot_product_cfg.prec,
+        dot_product_cfg.gamma_cfg.bound_model);
     /* compute the forward error */
     compute_sequential_dot_product_forward_error(
         static_cast<double>(h_result), h_result_true, &result.forward_error[i]);
+    compute_sequential_dot_product_forward_error(
+        h_result_model, h_result_true, &result.forward_error_model[i]);
     /* compute the forward error bound */
     result.forward_error_bound.push_back(
         compute_sequential_dot_product_forward_error_bound(
@@ -243,11 +250,4 @@ void run_dot_product_forward_error_experiment(
     default:
       throw std::invalid_argument("invalid precision");
   }
-
-  /* print test */
-  /* for (auto &r:results.forward_error_bound){ */
-  /*   std::cout << r.gamma_det << std::endl; */
-  /*   std::cout << r.gamma_mprea << std::endl; */
-  /*   std::cout << r.gamma_vprea << std::endl; */
-  /* } */
 }
