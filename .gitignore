@@ -130,3 +130,7 @@ dmypy.json
 
 # Undo directories
 undodir/
+
+# data
+*.csv
+*.png
