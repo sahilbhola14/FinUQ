@@ -17,17 +17,17 @@ void run_all_dot_product_experimens(Precision prec) {
   dot_product_cfg.num_experiments = 5;  // number of experiments
 
   /* Data distribution: U(0,1) */
-  dot_product_cfg.dist = MinusOnePlusOne;  // data distribution
-
+  dot_product_cfg.dist = ZeroOne;  // data distribution
   // uniform bound model
   dot_product_cfg.gamma_cfg.bound_model = Uniform;
-  run_dot_product_backward_error_experiment(dot_product_cfg);
-  run_dot_product_forward_error_experiment(1000, dot_product_cfg);
-
+  /* run_dot_product_backward_error_experiment(dot_product_cfg); */
+  run_dot_product_forward_error_experiment(10000, dot_product_cfg);
   /* // beta bound model */
   dot_product_cfg.gamma_cfg.bound_model = Beta;
-  run_dot_product_backward_error_experiment(dot_product_cfg);
-  run_dot_product_forward_error_experiment(1000, dot_product_cfg);
+  dot_product_cfg.gamma_cfg.beta_dist_alpha = 2.001;
+  dot_product_cfg.gamma_cfg.beta_dist_beta = 2.0;
+  /* run_dot_product_backward_error_experiment(dot_product_cfg); */
+  run_dot_product_forward_error_experiment(10000, dot_product_cfg);
 }
 
 int main(int argc, char **argv) {

@@ -13,7 +13,7 @@ axes.grid.which: both
 axes.labelsize: 15
 axes.titlesize: 12
 axes.linewidth: 1.0
-axes.labelpad: 2.5  # spacing between label and axis
+axes.labelpad: 10  # spacing between label and axis
 
 # Ticks
 xtick.labelsize: 18

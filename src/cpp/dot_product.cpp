@@ -254,7 +254,8 @@ void run_dot_product_forward_error_experiment(
   }
 
   /* save */
-  std::string filename =
-      make_dot_product_filename("forward_error_result", dot_product_cfg);
+  std::ostringstream ss;
+  ss << "forward_error_result_vector_size_" << vector_size;
+  std::string filename = make_dot_product_filename(ss.str(), dot_product_cfg);
   write_forward_error_results_csv(results, filename);
 }
