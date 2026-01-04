@@ -97,7 +97,7 @@ def plot_backward_error_vs_n():
     fig, ax = plt.subplots(1, 1, figsize=(5, 4), layout="compressed")
     ax.plot(
         df_uniform["n"],
-        df_uniform["backward_mean"],
+        df_uniform["backward_error_mean"],
         label=r"$e_{bwd}^{mean}$",
         color="k",
         linestyle="-",
