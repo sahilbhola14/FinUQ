@@ -47,17 +47,19 @@ void write_backward_error_results_csv(
     return;
   }
   /* header */
-  file << "n,backward_error_min,backward_error_max,backward_mean,gamma_det,"
+  file << "n,backward_error_min,backward_error_max,backward_error_mean,gamma_"
+          "det,"
           "gamma_mprea,gamma_vprea\n";
   /* numerical font */
   file << std::scientific << std::setprecision(10);
   /* write the results */
   for (const auto &r : results) {
-    file << std::left << std::setw(12) << r.n << std::setw(18)
-         << r.backward_error_min << std::setw(18) << r.backward_error_max
-         << std::setw(18) << r.backward_error_mean << std::setw(18)
-         << r.backward_error_bound.gamma_det << std::setw(18)
-         << r.backward_error_bound.gamma_mprea << std::setw(18)
+    file << std::left << std::setw(12) << r.n << ", " << std::setw(18)
+         << r.backward_error_min << ", " << std::setw(18)
+         << r.backward_error_max << ", " << std::setw(18)
+         << r.backward_error_mean << ", " << std::setw(18)
+         << r.backward_error_bound.gamma_det << ", " << std::setw(18)
+         << r.backward_error_bound.gamma_mprea << ", " << std::setw(18)
          << r.backward_error_bound.gamma_vprea << "\n";
   }
   /* close the file */
@@ -85,11 +87,11 @@ void write_forward_error_results_csv(const forward_error_result &results,
   file << std::scientific << std::setprecision(10);
   /* write the results */
   for (int i = 0; i < results.forward_error.size(); i++) {
-    file << std::left << std::setw(12) << results.n << std::setw(18)
-         << results.forward_error[i] << std::setw(18)
-         << results.forward_error_model[i] << std::setw(18)
-         << results.forward_error_bound[i].gamma_det << std::setw(18)
-         << results.forward_error_bound[i].gamma_mprea << std::setw(18)
+    file << std::left << std::setw(12) << results.n << ", " << std::setw(18)
+         << results.forward_error[i] << ", " << std::setw(18)
+         << results.forward_error_model[i] << ", " << std::setw(18)
+         << results.forward_error_bound[i].gamma_det << ", " << std::setw(18)
+         << results.forward_error_bound[i].gamma_mprea << ", " << std::setw(18)
          << results.forward_error_bound[i].gamma_vprea << "\n";
   }
   /* close the file */
