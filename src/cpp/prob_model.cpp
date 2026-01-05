@@ -85,11 +85,13 @@ void check_mean_rounding_error_sign(Precision prec, BoundModel bound_model,
     std::cout << "Rounding error random variable mean is zero" << std::endl;
   } else if (bound_model == Beta) {
     if (beta_dist_alpha > condition) {
-      std::cout << "Rounding error random variable mean is strictly positive"
+      std::cout << "Rounding error random variable mean is strictly positive. "
+                   "E[delta] > 0"
                 << std::endl;
     } else if (std::pow(beta_dist_alpha - condition, 2.0) < 1e-15) {
-      std::cout << "Rounding error random variable mean is non-negative"
-                << std::endl;
+      std::cout
+          << "Rounding error random variable mean is non-negative. E[delta] >=0"
+          << std::endl;
     } else {
       std::cout << "Rounding error random variable mean can be negative"
                 << std::endl;
