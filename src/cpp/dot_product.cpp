@@ -14,6 +14,7 @@
 #include "distribution.hpp"
 #include "dot_product_cuda.cuh"
 #include "forward_error.hpp"
+#include "prob_model.hpp"
 #include "utils.hpp"
 #include "utils_cuda.cuh"
 
@@ -32,6 +33,10 @@ void print_dot_product_config(const dot_product_config &dot_product_cfg) {
               << dot_product_cfg.gamma_cfg.beta_dist_alpha << std::endl;
     std::cout << "Beta bound model beta value: "
               << dot_product_cfg.gamma_cfg.beta_dist_beta << std::endl;
+    check_mean_rounding_error_sign(dot_product_cfg.prec,
+                                   dot_product_cfg.gamma_cfg.bound_model,
+                                   dot_product_cfg.gamma_cfg.beta_dist_alpha,
+                                   dot_product_cfg.gamma_cfg.beta_dist_beta);
   }
   std::cout << "Bound confidence: " << std::setprecision(4)
             << dot_product_cfg.gamma_cfg.confidence << std::endl;
