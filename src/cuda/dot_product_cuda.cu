@@ -37,20 +37,22 @@ __global__ void sequential_dot_product_kernel(const int n, T *a, T *b,
 __global__ void sequential_dot_product_model_kernel(
     const int n, double *a, double *b, double *result, Precision prec,
     BoundModel bound_model, const double beta_dist_alpha,
-    const double beta_dist_beta, unsigned long long seed = 1234ULL) {
+    const double beta_dist_beta, const int experiment_id,
+    unsigned long long seed = 1234ULL) {
   int tid = threadIdx.x;
   int gid = threadIdx.x + blockIdx.x * blockDim.x;
   /* compute */
   double rounding_error[2];
   /* random state */
   curandState state;
-  curand_init(seed, gid, 0, &state);
+  curand_init(seed, experiment_id * gridDim.x * blockDim.x + gid, 0, &state);
   /* compute */
   double sum = 0.0;
   for (int i = 0; i < n; i++) {
     /* sample rounding error delta */
     sample_rounding_error_distribution(2, rounding_error, prec, bound_model,
                                        beta_dist_alpha, beta_dist_beta, &state);
+    /* printf("%.5e , %.5e\n", rounding_error[0], rounding_error[1]); */
     /* get perturbation */
     rounding_error[0] = 1.0 + rounding_error[0];
     rounding_error[1] = 1.0 + rounding_error[1];
@@ -101,7 +103,7 @@ void launch_sequential_dot_product_kernel(const int n,
 void launch_sequential_dot_product_model_kernel(
     const int n, const std::vector<double> &h_a, const std::vector<double> &h_b,
     double *h_result, Precision prec, const gamma_config &gamma_cfg,
-    bool verbose) {
+    const int experiment_id, bool verbose) {
   /* kernel parameters */
   dim3 blockDim = 1;
   dim3 gridDim = 1;
@@ -123,8 +125,8 @@ void launch_sequential_dot_product_model_kernel(
     std::cout << "launching kernel for sequential dot product model in "
               << to_string(Double) << " precision" << std::endl;
   sequential_dot_product_model_kernel<<<gridDim, blockDim>>>(
-      n, d_a, d_b, d_result, prec, bound_model, beta_dist_alpha,
-      beta_dist_beta);
+      n, d_a, d_b, d_result, prec, bound_model, beta_dist_alpha, beta_dist_beta,
+      experiment_id);
   cudaCheck(cudaGetLastError());
   /* device to host */
   cudaCheck(

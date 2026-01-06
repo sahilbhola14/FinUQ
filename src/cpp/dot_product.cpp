@@ -98,6 +98,8 @@ void run_dot_product_backward_error_experiment_fixed_size(
                                                  &h_result_true, Double);
     launch_sequential_dot_product_kernel<double>(n, h_a_true_abs, h_b_true_abs,
                                                  &h_result_true_abs, Double);
+    /* std::cout << static_cast<double>(h_result) << ", " << h_result_true  <<
+     * ", " << h_result_true_abs << std::endl; */
     /* compute the backward error */
     compute_sequential_dot_product_backward_error(
         static_cast<double>(h_result), h_result_true, h_result_true_abs,
@@ -156,7 +158,8 @@ void run_dot_product_forward_error_experiment_fixed_size(
                                                  &h_result_true_abs, Double);
     launch_sequential_dot_product_model_kernel(
         n, h_a_true, h_b_true, &h_result_model, dot_product_cfg.prec,
-        dot_product_cfg.gamma_cfg);
+        dot_product_cfg.gamma_cfg, i);
+    /* std::cout << std::string(50, '-') << std::endl; */
     /* compute the forward error */
     compute_sequential_dot_product_forward_error(
         static_cast<double>(h_result), h_result_true, &result.forward_error[i]);
@@ -173,8 +176,8 @@ void run_dot_product_forward_error_experiment_fixed_size(
 void run_dot_product_backward_error_experiment(
     const dot_product_config &dot_product_cfg) {
   /* intialization */
-  std::vector<int> vector_sizes = {10,     100,    1000,   10000,
-                                   100000, 500000, 1000000};
+  std::vector<int> vector_sizes = {10,     100,    1000,    10000,
+                                   100000, 500000, 1000000, 2000000};
   std::vector<backward_error_result> results(vector_sizes.size());
 
   /* print header */

@@ -16,6 +16,6 @@ void launch_sequential_dot_product_kernel(const int n,
 void launch_sequential_dot_product_model_kernel(
     const int n, const std::vector<double> &h_a, const std::vector<double> &h_b,
     double *h_result, Precision prec, const gamma_config &gamma_cfg,
-    bool verbose = false);
+    const int experiment_id, bool verbose = false);
 
 #endif
