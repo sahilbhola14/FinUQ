@@ -82,6 +82,9 @@ void run_dot_product_backward_error_experiment_fixed_size(
 
   /* run the experiment */
   for (int i = 0; i < dot_product_cfg.num_experiments; i++) {
+    if (i % 10 == 0)
+      printf("Running backward error experiment : %d/%d\n", i + 1,
+             dot_product_cfg.num_experiments);
     /* sample the vector */
     sample_random_vector(h_a, dot_product_cfg.prec, dot_product_cfg.dist,
                          gen);  // a vector
@@ -140,6 +143,9 @@ void run_dot_product_forward_error_experiment_fixed_size(
 
   /* run the experiment */
   for (int i = 0; i < dot_product_cfg.num_experiments; i++) {
+    if (i % 10 == 0)
+      printf("Running forward error experiment : %d/%d\n", i + 1,
+             dot_product_cfg.num_experiments);
     /* sample the vector */
     sample_random_vector(h_a, dot_product_cfg.prec, dot_product_cfg.dist,
                          gen);  // a vector
