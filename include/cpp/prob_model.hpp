@@ -4,9 +4,9 @@
 #include "definition.hpp"
 
 struct log1pdeltastats {
-    double mean=0.0;
-    double var=0.0;
-    double bound=0.0;
+    long double mean=0.0;
+    long double var=0.0;
+    long double bound=0.0;
 };
 
 /* log1pdeltastats */
@@ -16,6 +16,6 @@ log1pdeltastats get_log1pdelta_stats(Precision prec, BoundModel bound_model, dou
 void check_mean_rounding_error_sign(Precision prec, BoundModel bound_model, double beta_dist_alpha, double beta_dist_beta);
 
 /* individual bound confidence */
-double compute_individual_bound_zeta_confidence(const int arithmetic_operations, double total_confidence);
+long double compute_individual_bound_one_minus_zeta(const int number_of_bounds, double total_confidence);
 
 #endif

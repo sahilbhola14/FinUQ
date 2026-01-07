@@ -16,16 +16,16 @@ struct gamma_config {
 /* gamma results */
 struct gamma_result {
     int n; // vector size
-    double gamma_det; // gamma deterministic
-    double gamma_mprea; // mean-informed probabilitic gamma
-    double gamma_vprea; // variance-informed probabilitic gamma
+    long double gamma_det; // gamma deterministic
+    long double gamma_mprea; // mean-informed probabilitic gamma
+    long double gamma_vprea; // variance-informed probabilitic gamma
 };
 
 
 /* compare gamma values */
-void compare_gamma(const gamma_config &cfg = gamma_config(), bool verbose = true);
+void compare_gamma(const gamma_config &gamma_cfg = gamma_config(), bool verbose = true);
 
 /* get gamma */
-gamma_result get_gamma(const int n, const gamma_config &cfg);
+gamma_result get_gamma(const int n, const gamma_config &gamma_cfg, const long double one_minus_zeta);
 
 #endif

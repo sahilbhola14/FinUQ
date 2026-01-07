@@ -35,14 +35,12 @@ void compute_sequential_dot_product_backward_error(double result,
  */
 gamma_result compute_sequential_dot_product_backward_error_bound(
     const int vector_size, const gamma_config &gamma_cfg, bool verbose) {
-  /* compute individual bound confidence */
-  double zeta = compute_individual_bound_zeta_confidence(vector_size,
-                                                         gamma_cfg.confidence);
-  /* copy the gamma config */
-  gamma_config cfg = gamma_cfg;
-  cfg.confidence = zeta;
-  /* compute the bounds */
-  gamma_result result = get_gamma(vector_size, cfg);
+  /* compute individual bound confidence when number_of_bounds to be satisfied
+   * is vector_size*/
+  long double one_minus_zeta = compute_individual_bound_one_minus_zeta(
+      vector_size, gamma_cfg.confidence);
+  /* compute the bounds \gamma_{vector_size}*/
+  gamma_result result = get_gamma(vector_size, gamma_cfg, one_minus_zeta);
   /* verbose */
   if (verbose == true) {
     std::cout << std::string(10, '-')

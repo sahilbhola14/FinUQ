@@ -24,53 +24,66 @@ double compute_determinsitic_gamma(int n, Precision prec) {
   }
 }
 
-double compute_hoeffding_gamma(int n, Precision prec, float confidence) {
+long double compute_hoeffding_gamma(int n, Precision prec,
+                                    const long double one_minus_zeta) {
+  /* initialization */
+  long double nL = static_cast<long double>(n);
+  /* assert statements */
+  assert((one_minus_zeta < 1.0L) && "one minus zeta must be < 1.0");
   /* compute the unit roundoff */
   double urd = compute_unit_roundoff(prec);
-  /* compute the lambda parameter */
-  double lambda =
-      (1.0 / (1.0 - urd)) * std::sqrt(2.0 * std::log(2.0 / (1.0 - confidence)));
-  /* compute the bound */
-  double bound = urd / (1.0 - urd);
-  /* compute the positive root of the quadratic */
-  double t_plus = bound * std::sqrt(2 * n * std::log(2.0 / (1.0 - confidence)));
-  /* compute the gamma value */
-  double gamma = std::exp(t_plus + (n * std::pow(urd, 2) / (1.0 - urd))) - 1.0;
+  long double urdL = static_cast<long double>(urd);
 
-  if (gamma > 1.0) {
-    return 1.0;
+  /* compute the lambda parameter */
+  long double lambda =
+      (1.0L / (1.0L - urdL)) *
+      std::sqrt(2.0L * (std::log(2.0L) - std::log(one_minus_zeta)));
+
+  /* compute the bound */
+  long double bound = urdL / (1.0L - urdL);
+  /* compute the positive root of the quadratic */
+  long double t_plus =
+      bound *
+      std::sqrt(2.0L * nL * (std::log(2.0L) - std::log(one_minus_zeta)));
+  /* compute the gamma value */
+  long double gamma =
+      std::exp(t_plus + (nL * std::pow(urdL, 2.0L) / (1.0L - urdL))) - 1.0L;
+
+  if (gamma > 1.0L) {
+    return 1.0L;
   } else {
     return gamma;
   }
 }
 
-double compute_bernstein_gamma(int n, Precision prec, float confidence,
+double compute_bernstein_gamma(int n, Precision prec,
+                               const long double one_minus_zeta,
                                BoundModel bound_model = Uniform,
                                double beta_dist_alpha = 4.0,
                                double beta_dist_beta = 2.0) {
+  /* initialization */
+  long double nL = static_cast<long double>(n);
   /* assert statements */
-  assert((confidence < 1.0) && "confidence must be < 1.0");
+  assert((one_minus_zeta < 1.0L) && "one minus zeta must be < 1.0");
 
   /* utils */
   log1pdeltastats stats;
-  double logc = std::log((1.0 - confidence) / 2.0);
+  long double logc = std::log(one_minus_zeta) - std::log(2.0L);
 
-  /* compute the unit roundoff */
-  double urd = compute_unit_roundoff(prec);
   /* compute the statistics of log(1+delta) distribution; */
   stats =
       get_log1pdelta_stats(prec, bound_model, beta_dist_alpha, beta_dist_beta);
   /* compute the positive root of the quadratic */
-  double a_coeff = 1.0;
-  double b_coeff = (2.0 / 3.0) * stats.bound * logc;
-  double c_coeff = 2.0 * n * stats.var * logc;
-  double t_plus =
-      (-b_coeff + std::sqrt(std::pow(b_coeff, 2.0) - 4.0 * a_coeff * c_coeff)) /
-      (2.0 * a_coeff);
+  long double a_coeff = 1.0L;
+  long double b_coeff = (2.0L / 3.0L) * stats.bound * logc;
+  long double c_coeff = 2.0L * nL * stats.var * logc;
+  long double t_plus = (-b_coeff + std::sqrt(std::pow(b_coeff, 2.0L) -
+                                             4.0L * a_coeff * c_coeff)) /
+                       (2.0L * a_coeff);
   /* compute the gamma value */
-  double gamma = std::exp(t_plus + (n * std::abs(stats.mean))) - 1.0;
-  if (gamma > 1.0) {
-    return 1.0;
+  long double gamma = std::exp(t_plus + (nL * std::abs(stats.mean))) - 1.0L;
+  if (gamma > 1.0L) {
+    return 1.0L;
   } else {
     return gamma;
   }
@@ -93,25 +106,30 @@ std::string make_gamma_filename(const gamma_config &cfg) {
 }
 
 /* get gamma value */
-gamma_result get_gamma(const int n, const gamma_config &cfg) {
+gamma_result get_gamma(const int n, const gamma_config &gamma_cfg,
+                       const long double one_minus_zeta) {
   /* initialization */
   double gamma_det, gamma_mprea, gamma_vprea;
   gamma_result result;
+  /* assert statements */
+  assert(one_minus_zeta > 0.0L &&
+         "Invalid one minus zeta must be strictly positive.\n");
   /* number of arithmetic operators */
   result.n = n;
   /* determinisitic gamma */
-  result.gamma_det = compute_determinsitic_gamma(n, cfg.prec);
+  result.gamma_det = compute_determinsitic_gamma(n, gamma_cfg.prec);
   /* probabilistic gamma (mean informed model) */
-  result.gamma_mprea = compute_hoeffding_gamma(n, cfg.prec, cfg.confidence);
+  result.gamma_mprea =
+      compute_hoeffding_gamma(n, gamma_cfg.prec, one_minus_zeta);
   /* probabilistic gamma (variance-informed) */
-  result.gamma_vprea =
-      compute_bernstein_gamma(n, cfg.prec, cfg.confidence, cfg.bound_model,
-                              cfg.beta_dist_alpha, cfg.beta_dist_beta);
+  result.gamma_vprea = compute_bernstein_gamma(
+      n, gamma_cfg.prec, one_minus_zeta, gamma_cfg.bound_model,
+      gamma_cfg.beta_dist_alpha, gamma_cfg.beta_dist_beta);
   return result;
 }
 
 /* compare gamma */
-void compare_gamma(const gamma_config &cfg, bool verbose) {
+void compare_gamma(const gamma_config &gamma_cfg, bool verbose) {
   /* initialization */
   double gamma_det, gamma_mprea, gamma_vprea;
   std::vector<int> n_values = {10,     100,     1000,     10000,
@@ -119,22 +137,28 @@ void compare_gamma(const gamma_config &cfg, bool verbose) {
   std::vector<gamma_result> results;
   results.reserve(n_values.size());
 
+  /* compute one one_minus_zeta with single bound to be satisfied*/
+  long double one_minus_zeta =
+      compute_individual_bound_one_minus_zeta(1, gamma_cfg.confidence);
+
   /* check the mean sign (for variance-informed model) */
-  check_mean_rounding_error_sign(cfg.prec, cfg.bound_model, cfg.beta_dist_alpha,
-                                 cfg.beta_dist_beta);
+  check_mean_rounding_error_sign(gamma_cfg.prec, gamma_cfg.bound_model,
+                                 gamma_cfg.beta_dist_alpha,
+                                 gamma_cfg.beta_dist_beta);
+
   /* compute */
   for (int n : n_values) {
     gamma_result r;
     /* update vector size */
     r.n = n;
     /* determinisitic gamma */
-    r.gamma_det = compute_determinsitic_gamma(n, cfg.prec);
+    r.gamma_det = compute_determinsitic_gamma(n, gamma_cfg.prec);
     /* probabilistic gamma (mean informed model) */
-    r.gamma_mprea = compute_hoeffding_gamma(n, cfg.prec, cfg.confidence);
+    r.gamma_mprea = compute_hoeffding_gamma(n, gamma_cfg.prec, one_minus_zeta);
     /* probabilistic gamma (variance-informed) */
-    r.gamma_vprea =
-        compute_bernstein_gamma(n, cfg.prec, cfg.confidence, cfg.bound_model,
-                                cfg.beta_dist_alpha, cfg.beta_dist_beta);
+    r.gamma_vprea = compute_bernstein_gamma(
+        n, gamma_cfg.prec, one_minus_zeta, gamma_cfg.bound_model,
+        gamma_cfg.beta_dist_alpha, gamma_cfg.beta_dist_beta);
     /* update the results */
     results.push_back(r);
   }
@@ -157,6 +181,6 @@ void compare_gamma(const gamma_config &cfg, bool verbose) {
   }
 
   /* save */
-  std::string filename = make_gamma_filename(cfg);
+  std::string filename = make_gamma_filename(gamma_cfg);
   write_gamma_results_csv(results, filename, verbose);
 }

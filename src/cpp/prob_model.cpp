@@ -1,6 +1,7 @@
 #include "prob_model.hpp"
 
 #include <cmath>
+#include <iomanip>
 #include <iostream>
 #include <stdexcept>
 
@@ -60,9 +61,9 @@ log1pdeltastats compute_beta_model_stats(Precision prec,
   double bound = logp;
 
   /* create the statistics structure */
-  stats.mean = mean;
-  stats.var = var;
-  stats.bound = bound;
+  stats.mean = static_cast<long double>(mean);
+  stats.var = static_cast<long double>(var);
+  stats.bound = static_cast<long double>(bound);
 
   return stats;
 }
@@ -131,9 +132,16 @@ log1pdeltastats get_log1pdelta_stats(Precision prec, BoundModel bound_model,
  * @ param: total_confidence        Q value of the bounds
  * Returns:
  * zeta in Q(n,zeta) = 1 - n(1 - zeta)
+ * 1 - zeta = (1 - Q) / n
+ * zeta = 1 - ((1 - Q) / n)
  * */
-double compute_individual_bound_zeta_confidence(const int arithmetic_operations,
-                                                double total_confidence) {
-  return 1.0 - ((1.0 - total_confidence) /
-                static_cast<double>(arithmetic_operations));
+long double compute_individual_bound_one_minus_zeta(const int number_of_bounds,
+                                                    double total_confidence) {
+  /* initialize */
+  long double Q = total_confidence;
+  long double n_bounds = number_of_bounds;
+  /* compute 1 - zeta */
+  long double one_minus_zeta = (1.0L - Q) / n_bounds;
+  long double zeta = 1.0L - one_minus_zeta;
+  return one_minus_zeta;
 }

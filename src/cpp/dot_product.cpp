@@ -83,8 +83,8 @@ void run_dot_product_backward_error_experiment_fixed_size(
   /* run the experiment */
   for (int i = 0; i < dot_product_cfg.num_experiments; i++) {
     if (i % 10 == 0)
-      printf("Running backward error experiment : %d/%d\n", i + 1,
-             dot_product_cfg.num_experiments);
+      printf("Running backward error experiment : %d/%d for vector size: %d\n",
+             i + 1, dot_product_cfg.num_experiments, n);
     /* sample the vector */
     sample_random_vector(h_a, dot_product_cfg.prec, dot_product_cfg.dist,
                          gen);  // a vector
@@ -144,8 +144,8 @@ void run_dot_product_forward_error_experiment_fixed_size(
   /* run the experiment */
   for (int i = 0; i < dot_product_cfg.num_experiments; i++) {
     if (i % 10 == 0)
-      printf("Running forward error experiment : %d/%d\n", i + 1,
-             dot_product_cfg.num_experiments);
+      printf("Running forward error experiment : %d/%d for vector size: %d\n",
+             i + 1, dot_product_cfg.num_experiments, n);
     /* sample the vector */
     sample_random_vector(h_a, dot_product_cfg.prec, dot_product_cfg.dist,
                          gen);  // a vector
@@ -182,8 +182,10 @@ void run_dot_product_forward_error_experiment_fixed_size(
 void run_dot_product_backward_error_experiment(
     const dot_product_config &dot_product_cfg) {
   /* intialization */
-  std::vector<int> vector_sizes = {10,     100,    1000,    10000,
-                                   100000, 500000, 1000000, 2000000};
+  std::vector<int> vector_sizes = {10,     100,     1000,     10000,
+                                   100000, 1000000, 10000000, 50000000};
+  /* std::vector<int> vector_sizes = {10,     100,    1000,    10000, 100000,
+   * 500000, 1000000}; */
   std::vector<backward_error_result> results(vector_sizes.size());
 
   /* print header */
