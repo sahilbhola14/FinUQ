@@ -12,8 +12,11 @@ struct dot_product_config {
   gamma_config gamma_cfg; // bounds config
 };
 
-/* dot product experiment */
-void run_dot_product_backward_error_experiment(const dot_product_config &dot_product_cfg);
-void run_dot_product_forward_error_experiment(const int vector_size, const dot_product_config &dot_product_cfg);
+/* /1* dot product experiment *1/ */
+/* void run_dot_product_backward_error_experiment(const dot_product_config &dot_product_cfg, const int n_min=10, const int n_max=100000); */
+/* void run_dot_product_forward_error_experiment(const int vector_size, const dot_product_config &dot_product_cfg); */
+
+/* experiments */
+void run_all_dot_product_experiments(Precision prec);
 
 #endif

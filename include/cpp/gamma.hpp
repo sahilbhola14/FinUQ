@@ -28,4 +28,7 @@ void compare_gamma(const gamma_config &gamma_cfg = gamma_config(), bool verbose 
 /* get gamma */
 gamma_result get_gamma(const int n, const gamma_config &gamma_cfg, const long double one_minus_zeta);
 
+/* experiments */
+void run_all_compare_gamma_experiments(Precision prec);
+
 #endif

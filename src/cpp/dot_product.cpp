@@ -82,7 +82,7 @@ void run_dot_product_backward_error_experiment_fixed_size(
 
   /* run the experiment */
   for (int i = 0; i < dot_product_cfg.num_experiments; i++) {
-    if (i % 10 == 0)
+    if (i % 100 == 0)
       printf("Running backward error experiment : %d/%d for vector size: %d\n",
              i + 1, dot_product_cfg.num_experiments, n);
     /* sample the vector */
@@ -180,10 +180,10 @@ void run_dot_product_forward_error_experiment_fixed_size(
 
 /* run dot product backward error experiment */
 void run_dot_product_backward_error_experiment(
-    const dot_product_config &dot_product_cfg) {
+    const dot_product_config &dot_product_cfg, const int n_min, const int n_max,
+    const int n_evals = 10) {
   /* intialization */
-  std::vector<int> vector_sizes = {10,     100,     1000,     10000,
-                                   100000, 1000000, 10000000, 50000000};
+  std::vector<int> vector_sizes = make_logspace(n_min, n_max, n_evals);
   /* std::vector<int> vector_sizes = {10,     100,    1000,    10000, 100000,
    * 500000, 1000000}; */
   std::vector<backward_error_result> results(vector_sizes.size());
@@ -274,4 +274,62 @@ void run_dot_product_forward_error_experiment(
   ss << "forward_error_result_vector_size_" << vector_size;
   std::string filename = make_dot_product_filename(ss.str(), dot_product_cfg);
   write_forward_error_results_csv(results, filename);
+}
+
+/* run all backward experiments */
+void run_all_backward_error_experiments(Precision prec,
+                                        const int num_experiments = 100) {
+  /* configuration */
+  dot_product_config dot_product_cfg;
+  dot_product_cfg.prec = prec;                        // sampling precision
+  dot_product_cfg.gamma_cfg.prec = prec;              // bound precision
+  dot_product_cfg.num_experiments = num_experiments;  // number of experiments
+  dot_product_cfg.gamma_cfg.confidence = 0.99;        // overall confidence
+  dot_product_cfg.gamma_cfg.beta_dist_beta =
+      2.0;  // beta distribution shape param. beta
+  std::vector<double> beta_dist_alpha_vals = {2.1, 2.2, 2.3,
+                                              2.4};  // shape param. alpha
+
+  const int n_min = 10;    // minimum vector size
+  const int n_evals = 10;  // number of evaluations
+  int n_max;               // maximum vector size
+  if (prec == Single) {
+    n_max = 20000000;
+  } else if (prec == Half) {
+    n_max = 100000;
+  }
+
+  /* data: U(0,1) */
+  dot_product_cfg.dist = ZeroOne;
+
+  dot_product_cfg.gamma_cfg.bound_model = Uniform;
+  run_dot_product_backward_error_experiment(dot_product_cfg, n_min, n_max,
+                                            n_evals);
+
+  dot_product_cfg.gamma_cfg.bound_model = Beta;
+  for (auto &alpha : beta_dist_alpha_vals) {
+    dot_product_cfg.gamma_cfg.beta_dist_alpha = alpha;
+    run_dot_product_backward_error_experiment(dot_product_cfg, n_min, n_max,
+                                              n_evals);
+  }
+
+  /* data: U(-1,1) */
+  dot_product_cfg.dist = MinusOnePlusOne;
+
+  dot_product_cfg.gamma_cfg.bound_model = Uniform;
+  run_dot_product_backward_error_experiment(dot_product_cfg, n_min, n_max,
+                                            n_evals);
+
+  dot_product_cfg.gamma_cfg.bound_model = Beta;
+  for (auto &alpha : beta_dist_alpha_vals) {
+    dot_product_cfg.gamma_cfg.beta_dist_alpha = alpha;
+    run_dot_product_backward_error_experiment(dot_product_cfg, n_min, n_max,
+                                              n_evals);
+  }
+}
+
+/* run all experiments */
+void run_all_dot_product_experiments(Precision prec) {
+  /* run all backward error experiments */
+  run_all_backward_error_experiments(prec);
 }
