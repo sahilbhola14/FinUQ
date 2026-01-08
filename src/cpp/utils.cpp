@@ -23,9 +23,9 @@ void write_gamma_results_csv(const std::vector<gamma_result> &results,
   file << std::scientific << std::setprecision(10);
   /* write the results */
   for (const auto &r : results) {
-    file << std::left << std::setw(12) << r.n << std::setw(18) << r.gamma_det
-         << std::setw(18) << r.gamma_mprea << std::setw(18) << r.gamma_vprea
-         << "\n";
+    file << std::left << std::setw(12) << r.n << ", " << std::setw(18)
+         << r.gamma_det << ", " << std::setw(18) << r.gamma_mprea << ", "
+         << std::setw(18) << r.gamma_vprea << "\n";
   }
   /* close the file */
   file.close();

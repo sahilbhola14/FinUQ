@@ -6,8 +6,53 @@
 #include "gamma.hpp"
 #include "utils.hpp"
 
+/* gamma experiments */
+void run_all_compare_gamma_experiments(Precision prec) {
+  /* configuration */
+  gamma_config gamma_cfg;
+  gamma_cfg.prec = prec;
+  /* vary confidence for uniform model*/
+  gamma_cfg.bound_model = Uniform;
+  gamma_cfg.confidence = 0.9;
+  compare_gamma(gamma_cfg);
+  gamma_cfg.confidence = 0.95;
+  compare_gamma(gamma_cfg);
+  gamma_cfg.confidence = 0.99;
+  compare_gamma(gamma_cfg);
+  /* vary confidence for beta model (alpha = 2.01, beta=2.0)*/
+  gamma_cfg.bound_model = Beta;
+  gamma_cfg.beta_dist_alpha = 2.001;
+  gamma_cfg.beta_dist_beta = 2.00;
+  gamma_cfg.confidence = 0.9;
+  compare_gamma(gamma_cfg);
+  gamma_cfg.confidence = 0.95;
+  compare_gamma(gamma_cfg);
+  gamma_cfg.confidence = 0.99;
+  compare_gamma(gamma_cfg);
+  /* vary confidence for beta model (alpha = 2.01, beta=2.0)*/
+  gamma_cfg.bound_model = Beta;
+  gamma_cfg.beta_dist_alpha = 2.01;
+  gamma_cfg.beta_dist_beta = 2.00;
+  gamma_cfg.confidence = 0.9;
+  compare_gamma(gamma_cfg);
+  gamma_cfg.confidence = 0.95;
+  compare_gamma(gamma_cfg);
+  gamma_cfg.confidence = 0.99;
+  compare_gamma(gamma_cfg);
+  /* vary confidence for beta model (alpha = 2.2, beta=2.0)*/
+  gamma_cfg.bound_model = Beta;
+  gamma_cfg.beta_dist_alpha = 2.1;
+  gamma_cfg.beta_dist_beta = 2.00;
+  gamma_cfg.confidence = 0.9;
+  compare_gamma(gamma_cfg);
+  gamma_cfg.confidence = 0.95;
+  compare_gamma(gamma_cfg);
+  gamma_cfg.confidence = 0.99;
+  compare_gamma(gamma_cfg);
+}
+
 /* dot product experiments */
-void run_all_dot_product_experimens(Precision prec) {
+void run_all_dot_product_experiments(Precision prec) {
   /* configuration */
   dot_product_config dot_product_cfg;
 
@@ -40,9 +85,12 @@ int main(int argc, char **argv) {
 
   // Experiments
   if (experiment == "compare_gamma") {
-    compare_gamma();
+    /* single precision */
+    run_all_compare_gamma_experiments(Single);
+    /* /1* single precision *1/ */
+    /* run_all_compare_gamma_experiments(Half); */
   } else if (experiment == "single_dot_product") {
-    run_all_dot_product_experimens(Single);
+    run_all_dot_product_experiments(Single);
   }
   return 0;
 }
