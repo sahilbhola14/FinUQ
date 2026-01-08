@@ -37,7 +37,7 @@ ytick.major.pad: 8
 
 # Lines and markers
 lines.linewidth: 2.5
-lines.markersize: 5
+lines.markersize: 10
 
 # Legend
 legend.fontsize: 15

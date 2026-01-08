@@ -13,12 +13,20 @@ parser = argparse.ArgumentParser(description="dot product plotting config")
 
 dist_options = ["Normal", "ZeroOne", "MinusOnePlusOne", "PowTwo", "Ones"]
 prec_options = ["Double", "Single", "Half"]
+COLORS = {
+    "DREA": "#1B6F6A",
+    "MPREA": "red",
+    "VPREA_U": "blue",
+    "VPREA_beta": "goldenrod",
+}
+LINESTYLES = ["solid", "dashed", "dotted", "dashdot"]
+
 
 parser.add_argument(
     "--dist",
-    type=str,
+    type=list,
     choices=dist_options,
-    default="MinusOnePlusOne",
+    default=["ZeroOne", "MinusOnePlusOne"],
     help="Plotting distribution",
 )
 parser.add_argument(
@@ -32,16 +40,21 @@ parser.add_argument(
     "--vector_size", type=int, default=1000, help="Vector size for forward error"
 )
 parser.add_argument(
-    "--alpha", type=float, default=2.01, help="Beta bound model alpha value"
+    "--alpha",
+    type=list,
+    default=[2.1, 2.2, 2.3],
+    help="Beta bound model alpha value for each confidence",
 )
 parser.add_argument(
     "--beta", type=float, default=2.0, help="Beta bound model beta value"
 )
-parser.add_argument("--confidence", type=float, default=0.97, help="Bound confidence")
+parser.add_argument("--confidence", type=float, default=0.99, help="Bound confidence")
 args = parser.parse_args()
 
 
-def get_filename(experiment="backward", model="uniform"):
+def get_filename(
+    experiment="backward", model="uniform", dist="ZeroOne", alpha=None, beta=None
+):
     assert model.lower() in ["uniform", "beta"]
     # prefix
     if experiment == "backward":
@@ -53,13 +66,13 @@ def get_filename(experiment="backward", model="uniform"):
     base = (
         f"{prefix}_dot_product_"
         f"{args.prec.lower()}_prec_"
-        f"distribution_{pretty_dist(args.dist)}_"
+        f"distribution_{pretty_dist(dist)}_"
         f"bound_confidence_{args.confidence:0.5f}_"
         f"bound_model_{model.lower()}"
     )
 
     if model.lower() == "beta":
-        base += f"_a_{args.alpha:0.5f}_b_{args.beta:0.5f}"
+        base += f"_a_{alpha:0.5f}_b_{beta:0.5f}"
 
     return base + ".csv"
 
@@ -75,19 +88,18 @@ def get_savefig_name(experiment="backward"):
     base = (
         f"{prefix}_result_dot_product_"
         f"{args.prec.lower()}_prec_"
-        f"distribution_{pretty_dist(args.dist)}_"
         f"bound_confidence_{args.confidence:0.5f}_"
         f"beta_dist_params"
     )
 
-    base += f"_a_{args.alpha:0.5f}_b_{args.beta:0.5f}"
+    base += f"_b_{args.beta:0.5f}"
 
     return base + ".png"
 
 
-def get_backward_error_data(model="uniform"):
+def get_backward_error_data(model, dist, alpha=None, beta=None):
     # get filename
-    filename = get_filename("backward", model)
+    filename = get_filename("backward", model, dist, alpha, beta)
     # load dataframe
     df = pd.read_csv(filename)
     return df
@@ -129,54 +141,6 @@ def empirical_cdf(samples):
     )
 
     return cdf_func, x_sorted, cdf_values
-
-
-def plot_backward_error_vs_n():
-    # uniform data
-    df_uniform = get_backward_error_data(model="uniform")
-    # beta model
-    df_beta = get_backward_error_data(model="beta")
-    # plot
-    fig, ax = plt.subplots(1, 1, figsize=(6, 4), layout="compressed")
-    ax.plot(
-        df_uniform["n"],
-        df_uniform["backward_error_mean"],
-        label=r"$e_{bwd}^{mean}$",
-        color="k",
-        linestyle="-",
-        marker="^",
-    )
-    ax.plot(
-        df_uniform["n"],
-        df_uniform["backward_error_max"],
-        label=r"$e_{bwd}^{max}$",
-        color="k",
-        linestyle="--",
-        marker="v",
-    )
-    ax.plot(df_uniform["n"], df_uniform["gamma_det"], label=r"DREA", color="green")
-    ax.plot(df_uniform["n"], df_uniform["gamma_mprea"], label=r"MPREA", color="red")
-    ax.plot(
-        df_uniform["n"],
-        df_uniform["gamma_vprea"],
-        label=r"VPREA ($\mathcal{U}$-model)",
-        color="blue",
-    )
-    ax.plot(
-        df_uniform["n"],
-        df_beta["gamma_vprea"],
-        label=r"VPREA ($\beta$-model)",
-        color="blue",
-        linestyle="--",
-    )
-    ax.set_xlabel("Vector size, $n$")
-    ax.set_ylabel(r"$e_{bwd}$")
-    ax.set_xscale("log")
-    ax.set_yscale("log")
-    ax.legend()
-    savefig_name = get_savefig_name("backward")
-    plt.savefig(savefig_name)
-    print(f"backward error figure saved to: {savefig_name}")
 
 
 def plot_forward_error_cdf():
@@ -246,7 +210,7 @@ def plot_forward_error_cdf():
 
     savefig_name = get_savefig_name("forward")
     # plt.savefig(savefig_name)
-    plt.savefig("test.png")
+    plt.savefig("forward_test.png")
     print(f"forward error figure saved to: {savefig_name}")
 
 
@@ -263,6 +227,80 @@ def pretty_dist(dist):
         return dist
 
 
+def plot_backward_error_given_data_distribution(dist, ax):
+    # uniform data
+    df_uniform = get_backward_error_data(model="uniform", dist=dist)
+    n = df_uniform["n"]
+    backward_error_mean = df_uniform["backward_error_mean"]
+    backward_error_max = df_uniform["backward_error_max"]
+    gamma_det = df_uniform["gamma_det"]
+    gamma_mprea = df_uniform["gamma_mprea"]
+    gamma_vprea_u = df_uniform["gamma_vprea"]
+
+    ax.plot(
+        n,
+        backward_error_mean,
+        label=r"$e_{bwd}^{mean}$",
+        color="k",
+        linestyle="-",
+        marker="X",
+    )
+    ax.plot(
+        n,
+        backward_error_max,
+        label=r"$e_{bwd}^{max}$",
+        color="k",
+        linestyle="--",
+        marker="s",
+    )
+    ax.plot(n, gamma_det, label=r"DREA", color=COLORS["DREA"])
+    ax.plot(n, gamma_mprea, label=r"MPREA", color=COLORS["MPREA"])
+    ax.plot(
+        n, gamma_vprea_u, label=r"VPREA ($\mathcal{U}$-model)", color=COLORS["VPREA_U"]
+    )
+    for ii, alpha in enumerate(args.alpha):
+        df_beta = get_backward_error_data(
+            model="beta", dist=dist, alpha=alpha, beta=args.beta
+        )
+        gamma_vprea_beta = df_beta["gamma_vprea"]
+        ax.plot(
+            n,
+            gamma_vprea_beta,
+            label=rf"VPREA ($\beta$-model; $\alpha$={alpha:.1f})",
+            color=COLORS["VPREA_beta"],
+            linestyle=LINESTYLES[ii],
+        )
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel(r"Vector size, $n$")
+    ax.set_ylabel(r"$e_{bwd}$")
+    if args.prec.lower() == "single":
+        # ax.set_xlim(left=10, right=10**6)
+        ax.set_xlim(left=10)
+    elif args.prec.lower() == "half":
+        ax.set_xlim(left=10, right=10**5)
+    return ax
+
+
+def plot_backward_error():
+    fig, axs = plt.subplots(
+        1,
+        len(args.dist),
+        figsize=(6 * len(args.dist), 5),
+        sharex=True,
+        sharey=True,
+        layout="compressed",
+    )
+    for ii, ax in enumerate(axs):
+        plot_backward_error_given_data_distribution(args.dist[ii], ax=ax)
+        ax.label_outer()
+        if ii == 0:
+            ax.legend(ncol=2)
+
+    savename = get_savefig_name(experiment="backward")
+    plt.savefig(savename)
+
+
 if __name__ == "__main__":
-    plot_backward_error_vs_n()
+    plot_backward_error()
     # plot_forward_error_cdf()
