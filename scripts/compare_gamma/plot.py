@@ -36,14 +36,14 @@ def get_filename(model, confidence, alpha, beta):
     base = (
         f"gamma_"
         f"{args.prec.lower()}_prec_"
-        f"confidence_{confidence:0.3f}_"
+        f"confidence_{confidence: 0.3f}_"
         f"{model.lower()}"
     )
 
     if model.lower() == "beta":
         assert alpha is not None, "alpha must not be none"
         assert beta is not None, "beta must not be none"
-        base += f"_a_{alpha:0.3f}_b_{beta:0.3f}"
+        base += f"_a_{alpha: 0.3f}_b_{beta: 0.3f}"
 
     return base + ".csv"
 
@@ -55,7 +55,7 @@ def get_data(model, confidence, alpha=None, beta=None):
 
 
 def plot_gamma_vs_n():
-    fig, ax = plt.subplots(1, 1, figsize=(6, 4), layout="compressed")
+    fig, ax = plt.subplots(1, 1, figsize=(6.5, 4.5), layout="compressed")
     linestyles = ["solid", "dashed", "dashdot"]
     cc, aa = np.meshgrid(args.confidence, args.alpha)
     cc = cc.ravel("F")
@@ -86,14 +86,14 @@ def plot_gamma_vs_n():
                 df_uniform["n"],
                 df_uniform["gamma_mprea"],
                 color="r",
-                label=rf"MPREA ($\zeta$={confidence:.3f})",
+                label=rf"MPREA ($\zeta$={confidence: .3f})",
                 linestyle=linestyles[ii],
             )
             ax.plot(
                 df_uniform["n"],
                 df_uniform["gamma_vprea"],
                 color="b",
-                label=rf"VPREA ($\mathcal{{U}}$-model; $\zeta$={confidence:.3f})",
+                label=rf"VPREA ($\mathcal{{U}}$-model; $\zeta$={confidence: .3f})",
                 linestyle=linestyles[ii],
             )
 
@@ -106,7 +106,7 @@ def plot_gamma_vs_n():
                     df_beta["n"],
                     df_beta["gamma_vprea"],
                     color="g",
-                    label=rf"VPREA ($\beta$-model; $\alpha$={alpha:.3f})",
+                    label=rf"VPREA ($\beta$-model; $\alpha$={alpha: .3f})",
                     linestyle=linestyles[jj],
                 )
             else:
@@ -116,17 +116,18 @@ def plot_gamma_vs_n():
                     color="g",
                     label=(
                         rf"VPREA ($\beta$-model; "
-                        rf"$\alpha$={alpha:.3f}, "
-                        rf"$\zeta$={confidence:.3f})"
+                        rf"$\alpha$={alpha: .3f}, "
+                        rf"$\zeta$={confidence: .3f})"
                     ),
                     linestyle=linestyles[jj],
                 )
-
+    ax.axhline(1.0, color="grey", alpha=0.5, linewidth=3.0)
     ax.legend()
     ax.set_xscale("log")
     ax.set_yscale("log")
     ax.set_xlabel(r"$n$")
     ax.set_ylabel(r"$\gamma_n$")
+    ax.set_ylim(top=1e1)
     if len(args.confidence) == 1:
         plt.savefig(f"gamma_vs_n_confidence_{args.confidence[0]}_beta_{args.beta}.png")
     else:
