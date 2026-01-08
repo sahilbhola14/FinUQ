@@ -184,6 +184,23 @@ vector_stats get_vector_stats(const std::vector<double> &v, bool verbose) {
   return stats;
 }
 
+/* make logspace */
+std::vector<int> make_logspace(int n_min, int n_max, int num_points) {
+  std::vector<int> vals;
+  vals.reserve(num_points);
+
+  double log_min = std::log10(n_min);
+  double log_max = std::log10(n_max);
+
+  for (int i = 0; i < num_points; ++i) {
+    double t = static_cast<double>(i) / (num_points - 1);
+    int v = static_cast<int>(
+        std::round(std::pow(10.0, log_min + t * (log_max - log_min))));
+    if (vals.empty() || v != vals.back()) vals.push_back(v);
+  }
+  return vals;
+}
+
 /* initialize templates */
 template void convert_vector_to_double<double>(const std::vector<double> &,
                                                std::vector<double> &);

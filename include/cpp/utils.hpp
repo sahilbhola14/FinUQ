@@ -63,6 +63,6 @@ void convert_vector_to_absolute_double(const std::vector<T> &source, std::vector
 template <typename T>
 void absolute_vector(const std::vector<T> &source, std::vector<T> &target);
 vector_stats get_vector_stats(const std::vector<double>& v, bool verbose=false);
-
+std::vector<int> make_logspace(int n_min, int n_max, int num_points);
 
 #endif

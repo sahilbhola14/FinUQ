@@ -78,7 +78,7 @@ void run_all_dot_product_experiments(Precision prec) {
 }
 
 int main(int argc, char **argv) {
-  std::string experiment = "single_dot_product";
+  std::string experiment = "compare_gamma";
   if (argc > 1) {
     experiment = argv[1];
   }
@@ -87,8 +87,8 @@ int main(int argc, char **argv) {
   if (experiment == "compare_gamma") {
     /* single precision */
     run_all_compare_gamma_experiments(Single);
-    /* /1* single precision *1/ */
-    /* run_all_compare_gamma_experiments(Half); */
+    /* half precision */
+    run_all_compare_gamma_experiments(Half);
   } else if (experiment == "single_dot_product") {
     run_all_dot_product_experiments(Single);
   }

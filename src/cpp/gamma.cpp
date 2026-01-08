@@ -132,8 +132,10 @@ gamma_result get_gamma(const int n, const gamma_config &gamma_cfg,
 void compare_gamma(const gamma_config &gamma_cfg, bool verbose) {
   /* initialization */
   double gamma_det, gamma_mprea, gamma_vprea;
-  std::vector<int> n_values = {10,     100,     1000,     10000,
-                               100000, 1000000, 10000000, 100000000};
+  /* std::vector<int> n_values = {1, 5, 10,     100,     1000,     10000, */
+  /*                              100000, 1000000, 10000000, 50000000,
+   * 100000000}; */
+  std::vector<int> n_values = make_logspace(1, 100000000, 100);
   std::vector<gamma_result> results;
   results.reserve(n_values.size());
 
