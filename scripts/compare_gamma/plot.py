@@ -52,12 +52,20 @@ def plot_gamma_vs_n(prec, ax=None):
     if ax is None:
         fig, ax = plt.subplots(1, 1, figsize=(6.5, 4.5), layout="compressed")
 
-    linestyles = ["solid", "dashed", "dashdot"]
+    linestyles = ["solid", "dashed", "dotted"]
+    colors = {
+        "DREA": "#000000",
+        "MPREA": "red",
+        "VPREA_U": "blue",
+        "VPREA_beta": "goldenrod",
+    }
     cc, aa = np.meshgrid(args.confidence, args.alpha)
     cc = cc.ravel("F")
     aa = aa.ravel("F")
     df_uniform = get_data(model="uniform", confidence=args.confidence[0], prec=prec)
-    ax.plot(df_uniform["n"], df_uniform["gamma_det"], color="k", label="DREA")
+    ax.plot(
+        df_uniform["n"], df_uniform["gamma_det"], color=colors["DREA"], label="DREA"
+    )
     for ii, confidence in enumerate(args.confidence):
         # get data
         df_uniform = get_data(model="uniform", confidence=confidence, prec=prec)
@@ -66,14 +74,14 @@ def plot_gamma_vs_n(prec, ax=None):
             ax.plot(
                 df_uniform["n"],
                 df_uniform["gamma_mprea"],
-                color="r",
+                color=colors["MPREA"],
                 label=r"MPREA",
                 linestyle=linestyles[ii],
             )
             ax.plot(
                 df_uniform["n"],
                 df_uniform["gamma_vprea"],
-                color="b",
+                color=colors["VPREA_U"],
                 label=r"VPREA ($\mathcal{{U}}$-model)",
                 linestyle=linestyles[ii],
             )
@@ -81,14 +89,14 @@ def plot_gamma_vs_n(prec, ax=None):
             ax.plot(
                 df_uniform["n"],
                 df_uniform["gamma_mprea"],
-                color="r",
+                color=colors["MPREA"],
                 label=rf"MPREA ($\zeta$={confidence: .3f})",
                 linestyle=linestyles[ii],
             )
             ax.plot(
                 df_uniform["n"],
                 df_uniform["gamma_vprea"],
-                color="b",
+                color=colors["VPREA_U"],
                 label=rf"VPREA ($\mathcal{{U}}$-model; $\zeta$={confidence: .3f})",
                 linestyle=linestyles[ii],
             )
@@ -105,7 +113,7 @@ def plot_gamma_vs_n(prec, ax=None):
                 ax.plot(
                     df_beta["n"],
                     df_beta["gamma_vprea"],
-                    color="g",
+                    color=colors["VPREA_beta"],
                     label=rf"VPREA ($\beta$-model; $\alpha$={alpha: .3f})",
                     linestyle=linestyles[jj],
                 )
@@ -113,7 +121,7 @@ def plot_gamma_vs_n(prec, ax=None):
                 ax.plot(
                     df_beta["n"],
                     df_beta["gamma_vprea"],
-                    color="g",
+                    color=colors["VPREA_beta"],
                     label=(
                         rf"VPREA ($\beta$-model; "
                         rf"$\alpha$={alpha: .3f}, "
@@ -121,54 +129,106 @@ def plot_gamma_vs_n(prec, ax=None):
                     ),
                     linestyle=linestyles[jj],
                 )
-    ax.axhline(1.0, color="grey", alpha=0.5, linewidth=3.0, linestyle="--")
-    ax.axvline(10, color="grey", alpha=0.5, linewidth=3.0, linestyle="--")
+    ax.axhline(1.0, color="0.7", alpha=0.5, linewidth=2.0, linestyle="-")
+    # ax.axvline(10, color="0.7", alpha=0.5, linewidth=3.0, linestyle="--")
+    # ax.axvline(5, color="0.7", alpha=0.5, linewidth=3.0, linestyle=":")
+    ax.set_xlabel(r"$n$")
+    ax.set_ylabel(r"Bound for $|\theta_n|$")
+    ax.minorticks_off()
+    ax.legend(loc="lower right")
+
+    # n-range matching your plot
+    n_ref = np.array(df_uniform["n"])
+
+    # choose reference constants (pick something visually sensible)
+    if prec == "Single":
+        C_lin = 1e-6
+        C_sqrt = 3e-8
+    elif prec == "Half":
+        C_lin = 1e-2
+        C_sqrt = 3e-4
+    else:
+        C_lin = 1e-3
+        C_sqrt = 1e-3
+
+    ax.plot(
+        n_ref,
+        C_lin * n_ref,
+        color="0.7",
+        linestyle="--",
+        linewidth=2,
+        alpha=0.5,
+        label=r"$\mathcal{O}(n)$",
+    )
+
+    ax.plot(
+        n_ref,
+        C_sqrt * np.sqrt(n_ref),
+        color="0.7",
+        linestyle=":",
+        linewidth=2,
+        alpha=0.5,
+        label=r"$\mathcal{O}(\sqrt{n})$",
+    )
+
     ax.set_xscale("log")
     ax.set_yscale("log")
-    ax.set_xlabel(r"$n$")
-    ax.set_ylabel(r"$\gamma_n$")
-    ax.legend(loc="lower right")
-    # if len(args.confidence) == 1:
-    #     plt.savefig(f"gamma_vs_n_confidence_{args.confidence[0]}_beta_{args.beta}.png")
-    # else:
-    #     plt.savefig(f"gamma_vs_n_vary_confidence_beta_{args.beta}.png")
-
     return ax
 
 
 def compare_gamma():
-    fig, ax = plt.subplots(
-        1, 2, figsize=(10, 5), layout="compressed", sharex=True, sharey=True
-    )
+    fig, ax = plt.subplots(1, 2, figsize=(11, 5.5), layout="compressed", sharex=True)
     # single precision
     plot_gamma_vs_n("Single", ax=ax[0])
     plot_gamma_vs_n("Half", ax=ax[1])
+
     ax[0].get_legend().remove()
     ax[0].text(
-        ax[0].get_xlim()[1] * 5e-6,  # near right edge
+        5e1,
         1.5,
-        r"$\gamma_n = 1$",
+        r"$|\theta_n| \leq 1$",
         color="grey",
-        fontsize=14,
+        fontsize=15,
         ha="right",
         va="bottom",
     )
     ax[0].text(
-        16,
-        ax[0].get_ylim()[1] * 1e-1,  # near top
-        r"$n = 10$",
+        100,
+        3e-3,
+        r"$\mathcal{O}(n)$",
         color="grey",
-        fontsize=14,
+        fontsize=15,
         ha="left",
         va="top",
-        rotation=90,
     )
-    ax[0].set_title(r"Single precison, $\mathrm{fp}32$")
-    ax[1].set_title(r"Half precison, $\mathrm{fp}16$")
+    ax[0].text(
+        1e6,
+        2e-5,
+        r"$\mathcal{O}(\sqrt{n})$",
+        color="grey",
+        fontsize=15,
+        ha="left",
+        va="top",
+    )
+
+    # ax[0].text(
+    #     1.5,
+    #     1e1 * 6e-2,  # near top
+    #     r"$n = 5$",
+    #     color="grey",
+    #     fontsize=15,
+    #     ha="left",
+    #     va="top",
+    #     rotation=90,
+    # )
+
+    ax[0].set_title(r"Single-precison, $\mathrm{fp}32$")
+    ax[1].set_title(r"Half-precison, $\mathrm{fp}16$")
+    ax[0].set_ylim(bottom=1e-7, top=1e1)
+    ax[1].set_ylim(bottom=1e-4, top=1e1)
+    ax[1].set_ylabel("")
     for _ax in ax:
         _ax.set_xlim(left=1, right=1e8)
-        _ax.set_ylim(bottom=1e-7, top=1e1)
-        _ax.label_outer()
     if len(args.confidence) == 1:
         plt.savefig(f"gamma_vs_n_confidence_{args.confidence[0]}_beta_{args.beta}.png")
     else:

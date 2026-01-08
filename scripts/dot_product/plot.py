@@ -264,5 +264,5 @@ def pretty_dist(dist):
 
 
 if __name__ == "__main__":
-    # plot_backward_error_vs_n()
-    plot_forward_error_cdf()
+    plot_backward_error_vs_n()
+    # plot_forward_error_cdf()

@@ -10,8 +10,8 @@ text.latex.preamble: \usepackage{amsmath}
 # Axes
 axes.grid: True
 axes.grid.which: both
-axes.labelsize: 15
-axes.titlesize: 12
+axes.labelsize: 20
+axes.titlesize: 15
 axes.linewidth: 1.0
 axes.labelpad: 10  # spacing between label and axis
 
@@ -36,7 +36,7 @@ xtick.major.pad: 8
 ytick.major.pad: 8
 
 # Lines and markers
-lines.linewidth: 2
+lines.linewidth: 2.5
 lines.markersize: 5
 
 # Legend
@@ -65,3 +65,14 @@ image.cmap: jet  # or 'plasma', 'inferno', 'magma', 'jet', etc
 
 # Colors (optional: grayscale or colorblind-friendly palettes)
 # axes.prop_cycle: cycler('color', ['#000000', '#444444', '#888888', '#BBBBBB'])
+# axes.prop_cycle: cycler(
+#     color=[
+#         '#000000',  # black
+#         '#D55E00',  # vermillion
+#         '#6A51A3',  # indigo
+#         '#009E73',  # bluish-green
+#         '#56B4E9',  # sky blue
+#         '#E69F00',  # orange
+#         '#CC79A7'   # reddish purple
+#     ]
+# )
