@@ -82,7 +82,7 @@ void run_dot_product_backward_error_experiment_fixed_size(
 
   /* run the experiment */
   for (int i = 0; i < dot_product_cfg.num_experiments; i++) {
-    if (i % 100 == 0)
+    if (i % 10 == 0)
       printf("Running backward error experiment : %d/%d for vector size: %d\n",
              i + 1, dot_product_cfg.num_experiments, n);
     /* sample the vector */
