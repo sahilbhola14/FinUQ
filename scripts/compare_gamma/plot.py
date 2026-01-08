@@ -10,13 +10,6 @@ import argparse
 plt.style.use("../journal.mplstyle")
 parser = argparse.ArgumentParser(description="compare plotting config")
 parser.add_argument(
-    "--prec",
-    type=str,
-    choices=["Double", "Single", "Half"],
-    default="Single",
-    help="Plotting precision",
-)
-parser.add_argument(
     "--confidence", type=list, default=[0.99], help="confidence to plot"
 )
 parser.add_argument(
@@ -31,40 +24,43 @@ parser.add_argument(
 args = parser.parse_args()
 
 
-def get_filename(model, confidence, alpha, beta):
+def get_filename(model, confidence, prec, alpha, beta):
     assert model.lower() in ["uniform", "beta"]
+    assert prec.lower() in ["double", "single", "half"]
     base = (
         f"gamma_"
-        f"{args.prec.lower()}_prec_"
-        f"confidence_{confidence: 0.3f}_"
+        f"{prec.lower()}_prec_"
+        f"confidence_{confidence:0.3f}_"
         f"{model.lower()}"
     )
 
     if model.lower() == "beta":
         assert alpha is not None, "alpha must not be none"
         assert beta is not None, "beta must not be none"
-        base += f"_a_{alpha: 0.3f}_b_{beta: 0.3f}"
+        base += f"_a_{alpha:0.3f}_b_{beta:0.3f}"
 
     return base + ".csv"
 
 
-def get_data(model, confidence, alpha=None, beta=None):
-    filename = get_filename(model, confidence, alpha, beta)
+def get_data(model, confidence, prec, alpha=None, beta=None):
+    filename = get_filename(model, confidence, prec, alpha, beta)
     df = pd.read_csv(filename)
     return df
 
 
-def plot_gamma_vs_n():
-    fig, ax = plt.subplots(1, 1, figsize=(6.5, 4.5), layout="compressed")
+def plot_gamma_vs_n(prec, ax=None):
+    if ax is None:
+        fig, ax = plt.subplots(1, 1, figsize=(6.5, 4.5), layout="compressed")
+
     linestyles = ["solid", "dashed", "dashdot"]
     cc, aa = np.meshgrid(args.confidence, args.alpha)
     cc = cc.ravel("F")
     aa = aa.ravel("F")
-    df_uniform = get_data(model="uniform", confidence=args.confidence[0])
+    df_uniform = get_data(model="uniform", confidence=args.confidence[0], prec=prec)
     ax.plot(df_uniform["n"], df_uniform["gamma_det"], color="k", label="DREA")
     for ii, confidence in enumerate(args.confidence):
         # get data
-        df_uniform = get_data(model="uniform", confidence=confidence)
+        df_uniform = get_data(model="uniform", confidence=confidence, prec=prec)
 
         if len(args.confidence) == 1:
             ax.plot(
@@ -99,7 +95,11 @@ def plot_gamma_vs_n():
 
         for jj, alpha in enumerate(args.alpha):
             df_beta = get_data(
-                model="beta", confidence=confidence, alpha=alpha, beta=args.beta
+                model="beta",
+                confidence=confidence,
+                prec=prec,
+                alpha=alpha,
+                beta=args.beta,
             )
             if len(args.confidence) == 1:
                 ax.plot(
@@ -121,13 +121,54 @@ def plot_gamma_vs_n():
                     ),
                     linestyle=linestyles[jj],
                 )
-    ax.axhline(1.0, color="grey", alpha=0.5, linewidth=3.0)
-    ax.legend()
+    ax.axhline(1.0, color="grey", alpha=0.5, linewidth=3.0, linestyle="--")
+    ax.axvline(10, color="grey", alpha=0.5, linewidth=3.0, linestyle="--")
     ax.set_xscale("log")
     ax.set_yscale("log")
     ax.set_xlabel(r"$n$")
     ax.set_ylabel(r"$\gamma_n$")
-    ax.set_ylim(top=1e1)
+    ax.legend(loc="lower right")
+    # if len(args.confidence) == 1:
+    #     plt.savefig(f"gamma_vs_n_confidence_{args.confidence[0]}_beta_{args.beta}.png")
+    # else:
+    #     plt.savefig(f"gamma_vs_n_vary_confidence_beta_{args.beta}.png")
+
+    return ax
+
+
+def compare_gamma():
+    fig, ax = plt.subplots(
+        1, 2, figsize=(10, 5), layout="compressed", sharex=True, sharey=True
+    )
+    # single precision
+    plot_gamma_vs_n("Single", ax=ax[0])
+    plot_gamma_vs_n("Half", ax=ax[1])
+    ax[0].get_legend().remove()
+    ax[0].text(
+        ax[0].get_xlim()[1] * 5e-6,  # near right edge
+        1.5,
+        r"$\gamma_n = 1$",
+        color="grey",
+        fontsize=14,
+        ha="right",
+        va="bottom",
+    )
+    ax[0].text(
+        16,
+        ax[0].get_ylim()[1] * 1e-1,  # near top
+        r"$n = 10$",
+        color="grey",
+        fontsize=14,
+        ha="left",
+        va="top",
+        rotation=90,
+    )
+    ax[0].set_title(r"Single precison, $\mathrm{fp}32$")
+    ax[1].set_title(r"Half precison, $\mathrm{fp}16$")
+    for _ax in ax:
+        _ax.set_xlim(left=1, right=1e8)
+        _ax.set_ylim(bottom=1e-7, top=1e1)
+        _ax.label_outer()
     if len(args.confidence) == 1:
         plt.savefig(f"gamma_vs_n_confidence_{args.confidence[0]}_beta_{args.beta}.png")
     else:
@@ -135,4 +176,4 @@ def plot_gamma_vs_n():
 
 
 if __name__ == "__main__":
-    plot_gamma_vs_n()
+    compare_gamma()
