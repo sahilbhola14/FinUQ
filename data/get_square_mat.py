@@ -3,6 +3,7 @@ import scipy.io as sio
 import numpy as np
 import tarfile
 import os
+import json
 
 
 def extract_mtx_file(tar_gz_path):
@@ -44,14 +45,36 @@ def load_matrix(filepath):
         return np.array(A)
 
 
-def save_matrix_csv(A, matrix_id, matrix_name):
-    """Save matrix as CSV file."""
-    filename = f"matrix_{matrix_id}_{matrix_name}.csv"
-    np.savetxt(filename, A, delimiter=",", fmt="%.16e")
-    return filename
+def save_matrices_binary(matrices_list, output_file="matrices.npy"):
+    """Save list of matrices as numpy binary file."""
+    # Pad matrices to same size or store as object array
+    np.save(output_file, np.array(matrices_list, dtype=object), allow_pickle=True)
+    return output_file
 
 
-def download_square_matrices(n_max=10):
+def save_matrices_json(matrices_list, output_file="matrices.json"):
+    """Save matrices as JSON for easy parsing in C++."""
+
+    data = {"num_matrices": len(matrices_list), "matrices": []}
+
+    for i, (A, matrix_id, matrix_name) in enumerate(matrices_list):
+        data["matrices"].append(
+            {
+                "id": int(matrix_id),
+                "name": matrix_name,
+                "rows": int(A.shape[0]),
+                "cols": int(A.shape[1]),
+                "data": A.flatten().tolist(),  # Flattened 1D array
+            }
+        )
+
+    with open(output_file, "w") as f:
+        json.dump(data, f)
+
+    return output_file
+
+
+def download_square_matrices(n_max=10, output_format="json"):
     """Download n_max square matrices with real values."""
     print(f"Searching for {n_max} square matrices...\n")
 
@@ -70,6 +93,7 @@ def download_square_matrices(n_max=10):
     print(f"Found {len(square_matrices)} square matrices\n")
 
     # Download and process each matrix
+    real_matrices = []
     for i, matrix in enumerate(square_matrices, 1):
         assert matrix.rows == matrix.cols
         print(f"Processing Matrix {i}/{len(square_matrices)}: {matrix.name}")
@@ -91,14 +115,24 @@ def download_square_matrices(n_max=10):
                 print("  Skipping: Matrix is complex-valued")
                 continue
 
-            # Save as CSV (only real matrices)
-            csv_file = save_matrix_csv(A, matrix.id, matrix.name)
-            print(f"  Saved to: {csv_file}")
+            # Store real matrix
+            real_matrices.append((A, matrix.id, matrix.name))
+            print(f"{matrix.name} Stored successfully")
 
         except Exception as e:
             print(f"  Error: {e}")
 
-        print()
+    # Save all matrices in specified format
+    if output_format == "json":
+        output_file = save_matrices_json(
+            real_matrices, output_file="square_matrix_data.json"
+        )
+        print(f"Saved {len(real_matrices)} matrices to: {output_file}")
+    elif output_format == "npy":
+        output_file = save_matrices_binary(
+            real_matrices, output_file="square_matrix_data.npy"
+        )
+        print(f"Saved {len(real_matrices)} matrices to: {output_file}")
 
 
 if __name__ == "__main__":
