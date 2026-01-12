@@ -43,6 +43,7 @@ class BetaModel:
         self.IEEE_model = IEEEModel(dtype)
         self.alpha = alpha
         self.beta = beta
+        self.check_expected_delta_sign()
 
     def sample_log1pdelta(self, n_samples):
         # sample from Beta distribution B(alpha, beta)
@@ -62,11 +63,57 @@ class BetaModel:
 
     def get_log1pstats(self):
         urd = self.IEEE_model.urd
+        # mean and var of Beta distribution
         mean_Z = self.alpha / (self.alpha + self.beta)
-        var_Z = (self.alpha * self.beta) / ((self.alpha + self.beta) ** 2 * (self.alpha + self.beta + 1))
-        mean_Y = np.log(1 - urd) + np.log((1 + urd) / (1 - urd)) * mean_Z
-        var_Y = (np.log((1 + urd) / (1 - urd)))**2 * var_Z
-        stats = {"mean": mean_Y, "var": var_Y}
+        var_Z = (self.alpha * self.beta) / ((self.alpha + self.beta) ** 2 * (self.alpha + self.beta + 1.0))
+
+        # mean of the skewed distribution
+        ell = np.log1p(urd) - np.log1p(-urd)
+        mean_Y = np.log1p(-urd) +  ell * mean_Z
+        var_Y = (ell)**2 * var_Z
+        stats = {"mean": mean_Y, "var": var_Y, "bound": np.log1p(urd)}
+        return stats
+
+    def check_expected_delta_sign(self):
+        urd = self.IEEE_model.urd
+        ell = np.log1p(urd) - np.log1p(-urd)
+        mean_Z = self.alpha / (self.alpha + self.beta)
+        test = -np.log1p(-urd) / ell
+        # negativitiy test
+        if mean_Z < test:
+            print("expected delta < 0 (strictly)")
+
+        # positivity test
+        log1p_stats = self.get_log1pstats()
+        if log1p_stats["mean"] > 0.0:
+            print("expected delta > 0 (strictly)")
+
+class UniformModel:
+    def __init__(self, dtype):
+        self.IEEE_model = IEEEModel(dtype)
+
+    def sample_log1pdelta(self, n_samples):
+        # sample delta
+        delta = self.sample_delta(n_samples)
+        # sample from the skewed distribution
+        return np.log1p(delta)
+
+    def sample_delta(self, n_samples):
+        # sample from uniform distribution
+        urd = self.IEEE_model.urd
+        delta = -urd + 2.0*urd*np.random.rand(n_samples)
+        return delta
+
+    def sample_delta_trajectory(self, n:int, n_traj:int):
+        delta = self.sample_delta(n * n_traj).reshape(n, n_traj)
+        return delta
+
+    def get_log1pstats(self):
+        urd = self.IEEE_model.urd
+        mean = (-2.0*urd + (-1.0 + urd) * np.log1p(-urd) + (1.0 + urd) * np.log1p(urd)) / (2.0*urd)
+        kappa = -1.0 + urd**2
+        var = (4.0*urd**2 + kappa*(np.log1p(-urd)**2 - 2.0*np.log1p(-urd)*np.log1p(urd) + np.log1p(urd)**2)) / (4.0*urd**2)
+        stats = {"mean": mean, "var": var, "bound": np.log1p(urd)}
         return stats
 
 class TrueDotModel:
@@ -91,7 +138,7 @@ class TrueDotModel:
             # sample si
             sn = np.sum(xi, axis=0)
             sn_samples.append(sn)
-        sn_samples = np.array(sn_samples).astype(self.convert[self.dtype])
+        sn_samples = np.array(sn_samples)
         return sn_samples
 
     def sample_sn_continuous(self, n:int, n_samples):
@@ -106,7 +153,6 @@ class TrueDotModel:
         # possible n
         N = np.arange(1, n+1)
         # sample sn
-        # si = self.sample_sn_continuous(N.tolist(), n_samples=n_traj).reshape(n, n_traj).astype(self.convert[self.dtype])
         si = self.sample_sn_continuous(n, n_samples=n_traj).astype(self.convert[self.dtype])
         # sample ai
         rng = np.random.default_rng()
@@ -121,26 +167,43 @@ class TrueDotModel:
         assert delta_traj.shape == (n, n_traj), "invalid shape of delta_traj"
         return delta_traj
 
+class VPREA():
+    def __init__(self, delta_model:BetaModel|UniformModel):
+        self.delta_model = delta_model
 
-class UniformModel:
-    def __init__(self, dtype):
-        self.IEEE_model = IEEEModel(dtype)
+    def get_one_minus_zeta(self, confidence, num_bounds_satisfied:int=1):
+        Q = confidence
+        m = num_bounds_satisfied
 
-    def sample_log1pdelta(self, n_samples):
-        # sample delta
-        delta = self.sample_delta(n_samples)
-        # sample from the skewed distribution
-        return np.log1p(delta)
+        return (1.0 - Q) / m
 
-    def sample_delta(self, n_samples):
-        # sample from uniform distribution
-        urd = self.IEEE_model.urd
-        delta = -urd + 2.0*urd*np.random.rand(n_samples)
-        return delta
+    def get_roots(self, n, one_minus_zeta):
+        # get the log1p stats
+        stats_log1p = self.delta_model.get_log1pstats()
+        c = stats_log1p["bound"]
+        sigma_sq = stats_log1p["var"]
+        # quadratic coefficients
+        a_quad = 1.0
+        b_quad = (2.0/3.0)*c*(np.log(one_minus_zeta) - np.log(2.0))
+        c_quad = 2.0 * n * sigma_sq * (np.log(one_minus_zeta) - np.log(2.0))
 
-    def sample_delta_trajectory(self, n:int, n_traj:int):
-        delta = self.sample_delta(n * n_traj).reshape(n, n_traj)
-        return delta
+        t_plus = (-b_quad + np.sqrt(b_quad**2 - 4.0*a_quad*c_quad)) / (2.0*a_quad)
+        t_minus = (-b_quad - np.sqrt(b_quad**2 - 4.0*a_quad*c_quad)) / (2.0*a_quad)
+
+        return {"t_plus": t_plus, "t_minus": t_minus}
+
+    def get_gamma(self, n, confidence:float):
+        # compute one minus zeta
+        one_minus_zeta = self.get_one_minus_zeta(confidence=0.99, num_bounds_satisfied=1)
+        # compute the roots
+        roots = self.get_roots(n, one_minus_zeta)
+        # gamma
+        mu = self.delta_model.get_log1pstats()["mean"]
+        coeff = roots['t_plus'] + n * np.abs(mu)
+        gamma = np.exp(coeff) - 1.0
+        gamma[gamma>1.0] = 1.0
+        return gamma
+
 
 def compare_distribution_for_addition_and_multiplication():
     dtype = "single"
@@ -170,7 +233,7 @@ def compare_distribution_for_addition_and_multiplication():
     plt.savefig("rounding_error_distribution_addition_multiplication.png")
 
 def compare_distribution_for_small_increments(n_max:int=1000, n_samples:int=10000, n_res:int=10):
-    dtype = "single"
+    dtype = "half"
     model = IEEEModel(dtype)
     true_dp = TrueDotModel(dtype)
     rng = np.random.default_rng()
@@ -189,6 +252,8 @@ def compare_distribution_for_small_increments(n_max:int=1000, n_samples:int=1000
 
     fig, axs = plt.subplots(1, 2, figsize=(10, 4), layout="compressed")
     axs[0].hist(delta.ravel(), color='blue', bins=50, density=True, alpha=0.7)
+    # axs[0].axvline(model.urd, color='r', linestyle='--', label=r'$\mathrm{u}$')
+    # axs[0].axvline(-model.urd, color='r', linestyle='--', label='__nolegend__')
     axs[0].set_xlabel(r"$\delta$")
     axs[0].set_ylabel(r"$f_{\delta}(\delta)$")
     # axs[0].set_title(rf"$\mathbb{{E}}[\delta] = {np.mean(delta.ravel()):.2e}$")
@@ -198,10 +263,10 @@ def compare_distribution_for_small_increments(n_max:int=1000, n_samples:int=1000
     axs[1].set_ylabel(r"$\mathbb{E}[\delta\vert S_{i-1}=s_{i-1}]$")
     axs[1].set_xscale("log")
     axs[1].set_xlim(100, n_max)
-    threshold = 3e7
+    threshold = 3e3
     mantissa, exponent = f"{threshold:.0e}".split("e")
     exponent = int(exponent)
-    axs[1].axvspan(threshold, n_max, color='r', alpha=0.15, label=rf"$n > {mantissa}\times 10^{{{exponent}}}$")
+    axs[1].axvspan(threshold, n_max, color='r', alpha=0.15, label=rf"$n \geq {mantissa}\times 10^{{{exponent}}}$")
     axs[1].set_title(r"$S_{i-1} = \sum_{i=1}^n X_i; \quad X_i ~\sim{U}(0, 1)$")
     axs[1].legend()
     # fig.suptitle(f"Rounding Error Distribution for Adding Small Increments (n_max={n_max:.1e})", x=0.5, ha="center")
@@ -209,43 +274,184 @@ def compare_distribution_for_small_increments(n_max:int=1000, n_samples:int=1000
 
 def compare_the_trajectory_of_delta(n_max:int=1000, n_samples:int=1000):
     """ compare the trajector of delta """
-    dtype = "single"
+    dtype = "half"
     model = IEEEModel(dtype)
-    true_dp = TrueDotModel(dtype)
-    # sample the delta trajectory
-    true_delta_traj = true_dp.sample_delta_trajectory(n=n_max, n_traj=n_samples)
-    # sample the uniform model trajectory
-    u_model = UniformModel(dtype)
-    u_delta_traj = u_model.sample_delta_trajectory(n=n_max, n_traj=n_samples)
-    # sample the beta model trajectory
-    b_model = BetaModel(dtype, alpha=1.999, beta=2.0)
-    b_delta_traj = b_model.sample_delta_trajectory(n=n_max, n_traj=n_samples)
 
-    fig, axs = plt.subplots(1, 2, figsize=(8, 4), layout="compressed")
-    axs[0].plot(true_delta_traj, color='k', alpha=0.3)
-    axs[0].plot(u_delta_traj, color='b', alpha=0.3)
-    axs[0].plot(b_delta_traj, color='goldenrod', alpha=0.3)
+    true_dp = TrueDotModel(dtype)
+    u_model = UniformModel(dtype)
+    b_model = BetaModel(dtype, alpha=1.999, beta=2.0)
+
+    mean_true_delta = np.zeros(n_max)
+    mean_u_delta = np.zeros(n_max)
+    mean_b_delta = np.zeros(n_max)
+
+    # sample the delta trajectory
+    fig, axs = plt.subplots(1, 2, figsize=(10, 4), layout="compressed")
+    for ii in range(n_samples):
+        # sample the true delta trajectory
+        true_delta_traj = true_dp.sample_delta_trajectory(n=n_max, n_traj=1)
+        # sample the uniform model trajectory
+        u_delta_traj = u_model.sample_delta_trajectory(n=n_max, n_traj=1)
+        # sample the beta model trajectory
+        b_delta_traj = b_model.sample_delta_trajectory(n=n_max, n_traj=1)
+
+        if ii == 0:
+            mean_true_delta = true_delta_traj.ravel()
+            mean_u_delta = u_delta_traj.ravel()
+            mean_b_delta = b_delta_traj.ravel()
+        else:
+            mean_true_delta = mean_true_delta + (true_delta_traj.ravel() - mean_true_delta) / (ii + 1)
+            mean_u_delta = mean_u_delta + (u_delta_traj.ravel() - mean_u_delta) / (ii + 1)
+            mean_b_delta = mean_b_delta + (b_delta_traj.ravel() - mean_b_delta) / (ii + 1)
+
+        axs[0].plot(true_delta_traj, color='k', alpha=0.03)
+        axs[0].plot(u_delta_traj, color='b', alpha=0.03)
+        axs[0].plot(b_delta_traj, color='goldenrod', alpha=0.03)
+
+    axs[0].plot(mean_true_delta, color='k', label='True Dot Model')
+    axs[0].plot(mean_u_delta, color='b', label='Uniform Model')
+    axs[0].plot(mean_b_delta, color='goldenrod', label='Beta Model')
     axs[0].set_xlabel(r"$n$")
+    axs[0].set_ylabel(r"$\mathbb{E}[\delta]$")
     axs[0].set_xscale("log")
-    axs[1].hist(true_delta_traj.ravel(), bins=50, density=True, alpha=0.7, color='k', label='True Dot Model')
-    axs[1].hist(u_delta_traj.ravel(), bins=50, density=True, alpha=0.7, color='blue', label='Uniform Model')
-    axs[1].hist(b_delta_traj.ravel(), bins=50, density=True, alpha=0.7, color='goldenrod', label='Beta Model')
+
+    axs[1].hist(true_delta_traj.ravel(), bins=50, density=True, alpha=0.7, color='k', label=r'True $\delta$ distribution')
+    axs[1].hist(u_delta_traj.ravel(), bins=50, density=True, alpha=0.7, color='blue', label=r'$\mathcal{U}$-model')
+    axs[1].hist(b_delta_traj.ravel(), bins=50, density=True, alpha=0.7, color='goldenrod', label=r'$\beta$-model')
     axs[1].axvline(model.urd, color='r', linestyle='--', label=r'$\mathrm{u}$')
     axs[1].axvline(-model.urd, color='r', linestyle='--', label='__nolegend__')
     axs[1].set_xlabel(r"$\delta$")
     axs[1].set_ylabel(r"$f_{\delta}(\delta)$")
-    axs[1].legend(loc="lower right")
+    axs[1].legend(loc="best")
+
     plt.savefig("trajectory_of_delta.png")
+
+def compare_random_walk(n_max:int=1000, n_samples:int=1000):
+    """ compare the random walk of delta """
+    dtype = "half"
+    model = IEEEModel(dtype)
+
+    true_dp = TrueDotModel(dtype)
+    u_model = UniformModel(dtype)
+    b_model = BetaModel(dtype, alpha=1.5, beta=2.0)
+
+    mean_true_rv = np.zeros(n_max)
+    mean_u_rv = np.zeros(n_max)
+    mean_b_rv = np.zeros(n_max)
+
+    mean_true_log_rv = np.zeros(n_max)
+    mean_u_log_rv = np.zeros(n_max)
+    mean_b_log_rv = np.zeros(n_max)
+
+    # sample the delta trajectory
+    fig, axs = plt.subplots(1, 2, figsize=(10, 4), layout="compressed")
+    alpha_samples = 0.03
+    linewidth_samples = 0.7
+    for ii in range(n_samples):
+        # sample the true delta trajectory
+        true_delta_traj = true_dp.sample_delta_trajectory(n=n_max, n_traj=1)
+        true_rv = np.cumprod(1.0 + true_delta_traj, axis=0)
+        true_logrv = np.cumsum(np.log1p(true_delta_traj), axis=0)
+        # sample the uniform model trajectory
+        u_delta_traj = u_model.sample_delta_trajectory(n=n_max, n_traj=1)
+        u_rv = np.cumprod(1.0 + u_delta_traj, axis=0)
+        u_logrv = np.cumsum(u_model.sample_log1pdelta(n_max).reshape(n_max, 1), axis=0)
+        # sample the beta model trajectory
+        b_delta_traj = b_model.sample_delta_trajectory(n=n_max, n_traj=1)
+        b_rv = np.cumprod(1.0 + b_delta_traj, axis=0)
+        b_logrv = np.cumsum(b_model.sample_log1pdelta(n_max).reshape(n_max, 1), axis=0)
+
+        if ii == 0:
+            mean_true_rv = true_rv.ravel()
+            mean_u_rv = u_rv.ravel()
+            mean_b_rv = b_rv.ravel()
+            mean_true_log_rv = true_logrv.ravel()
+            mean_u_log_rv = u_logrv.ravel()
+            mean_b_log_rv = b_logrv.ravel()
+        else:
+            mean_true_rv = mean_true_rv + (true_rv.ravel() - mean_true_rv) / (ii + 1)
+            mean_u_rv = mean_u_rv + (u_rv.ravel() - mean_u_rv) / (ii + 1)
+            mean_b_rv = mean_b_rv + (b_rv.ravel() - mean_b_rv) / (ii + 1)
+            mean_true_log_rv = mean_true_log_rv + (true_logrv.ravel() - mean_true_log_rv) / (ii + 1)
+            mean_u_log_rv = mean_u_log_rv + (u_logrv.ravel() - mean_u_log_rv) / (ii + 1)
+            mean_b_log_rv = mean_b_log_rv + (b_logrv.ravel() - mean_b_log_rv) / (ii + 1)
+        axs[0].plot(true_rv, color='k', alpha=alpha_samples, linewidth=linewidth_samples)
+        axs[0].plot(u_rv, color='b', alpha=alpha_samples, linewidth=linewidth_samples)
+        axs[0].plot(b_rv, color='goldenrod', alpha=alpha_samples, linewidth=linewidth_samples)
+
+        axs[1].plot(true_logrv, color='k', alpha=alpha_samples, linewidth=linewidth_samples)
+        axs[1].plot(u_logrv, color='b', alpha=alpha_samples, linewidth=linewidth_samples)
+        axs[1].plot(b_logrv, color='goldenrod', alpha=alpha_samples, linewidth=linewidth_samples)
+
+    axs[0].plot(mean_true_rv, color='k', label=r'True')
+    axs[0].plot(mean_u_rv, color='b', label=r'$\mathcal{U}$-model')
+    axs[0].plot(mean_b_rv, color='goldenrod', label=r'$\beta$-model')
+
+    axs[0].set_ylabel(r"$\prod_{i=1}^n (1 + \delta_i)$")
+
+    axs[1].plot(mean_true_log_rv, color='k', label='True')
+    axs[1].plot(mean_u_log_rv, color='b', label=r'$\mathcal{U}$-model')
+    axs[1].plot(mean_b_log_rv, color='goldenrod', label=r'$\beta$-model')
+    axs[1].set_ylabel(r"$\sum_{i=1}^n \log(1 + \delta_i)$")
+
+    for ax in axs:
+        ax.set_xlabel(r"$n$")
+        ax.set_xscale("log")
+        ax.set_xlim(1, n_max)
+        threshold = 3e3
+        mantissa, exponent = f"{threshold:.0e}".split("e")
+        exponent = int(exponent)
+        ax.axvspan(threshold, n_max, color='r', alpha=0.15, label=rf"$n \geq {mantissa}\times 10^{{{exponent}}}$")
+
+    axs[0].legend()
+
+    # axs[0].set_xlabel(r"$n$")
+    # axs[0].set_ylabel(r"$\mathbb{E}[\delta]$")
+    plt.savefig("random_walk_of_product.png")
+
+def compare_bound_growth():
+    # vprea with uniform model
+    dtype = "single"
+    n = np.logspace(0, 8, 100, dtype=int)
+    confidence = 0.99
+    vprea_u = VPREA(UniformModel(dtype))
+
+    fig, axs = plt.subplots(1, 1, figsize=(6, 4), layout="compressed")
+    gamma_u = vprea_u.get_gamma(n=n, confidence = confidence)
+    axs.plot(n, gamma_u, color='b', label=r'$\mathcal{U}$-model')
+    # vprea with beta model
+    alpha_range = [1.95, 1.97, 1.99]
+    linestyles = ['--', '-.', ':']
+    for ii, alpha in enumerate(alpha_range):
+        print(f"Processing beta model with alpha={alpha}")
+        b_model = BetaModel(dtype, alpha=alpha, beta=2.0)
+        vprea_b = VPREA(b_model)
+        gamma_b = vprea_b.get_gamma(n=n, confidence = confidence)
+
+        axs.plot(n, gamma_b, color='goldenrod', label=rf'$\beta$-model $(\alpha={alpha}, \beta=2.0)$', linestyle=linestyles[ii])
+
+    axs.set_xlabel(r"$n$")
+    axs.set_ylabel(r"$\gamma$")
+    axs.set_xscale("log")
+    axs.set_yscale("log")
+    axs.set_xlim(1, 1e8)
+    axs.legend()
+    plt.savefig("bound_growth.png")
 
 if __name__ == "__main__":
     # seed
     seed_everything()
-    # experiment 1
     # compare the rounding error distribution for addition and multiplication
     # compare_distribution_for_addition_and_multiplication()
+
     # compare the rounding error distribution when adding small number to large number
-    # compare_distribution_for_small_increments(n_max=100000000, n_samples=100000, n_res=500)
+    # compare_distribution_for_small_increments(n_max=10000, n_samples=1000000, n_res=500)
+
     # compare the trajectory of product
-    compare_the_trajectory_of_delta(n_max=50000000, n_samples=1)
+    # compare_the_trajectory_of_delta(n_max=10000, n_samples=100)
 
+    # compare the random walk
+    # compare_random_walk(n_max=10000, n_samples=100)
 
+    # compare bound growth
+    compare_bound_growth()
