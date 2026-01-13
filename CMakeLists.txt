@@ -8,18 +8,6 @@ set(EXEC run)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Add CNPY lib
-add_library(cnpy
-    lib/cnpy/cnpy.cpp
-    )
-target_include_directories(cnpy PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/lib/cnpy
-)
-# cnpy depends on zlib
-find_package(ZLIB REQUIRED)
-target_link_libraries(cnpy PUBLIC ZLIB::ZLIB)
-
-
 # Set C++ compiler version
 set(cmake_cxx_compiler "/usr/bin/g++-9")
 
@@ -53,7 +41,7 @@ file(GLOB SOURCES "src/cpp/*.cpp" "src/cuda/*.cu")
 add_executable(${EXEC} ${SOURCES})
 
 # Link CUDA libraries
-target_link_libraries(${EXEC} ${CUDA_LIBRARIES} ${CUDA_CUBLAS_LIBRARIES} cnpy)
+target_link_libraries(${EXEC} ${CUDA_LIBRARIES} ${CUDA_CUBLAS_LIBRARIES})
 
 # Set CUDA flags
 set_target_properties(${EXEC} PROPERTIES

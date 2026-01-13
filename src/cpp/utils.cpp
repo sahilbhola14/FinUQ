@@ -204,7 +204,7 @@ std::vector<int> make_logspace(int n_min, int n_max, int num_points) {
 }
 
 /* load matrix stored in binary format */
-std::vector<Matrix> load_matrices_bin(const std::string &filename) {
+std::vector<Matrix<double>> load_matrices_bin(const std::string &filename) {
   std::ifstream f(filename, std::ios::binary);
   if (!f) {
     throw std::runtime_error("Cannot open file");
@@ -217,7 +217,7 @@ std::vector<Matrix> load_matrices_bin(const std::string &filename) {
     throw std::runtime_error("Invalid number of matrices");
   }
 
-  std::vector<Matrix> matrices;
+  std::vector<Matrix<double>> matrices;
   matrices.reserve(nmat);
 
   for (int i = 0; i < nmat; ++i) {
@@ -229,7 +229,7 @@ std::vector<Matrix> load_matrices_bin(const std::string &filename) {
       throw std::runtime_error("Invalid matrix shape");
     }
 
-    Matrix M;
+    Matrix<double> M;
     M.rows = rows;
     M.cols = cols;
     M.data.resize(static_cast<size_t>(rows) * cols);

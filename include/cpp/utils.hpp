@@ -18,10 +18,11 @@ struct vector_stats {
 };
 
 /* matrix struct */
+template <typename T>
 struct Matrix {
   size_t rows;
   size_t cols;
-  std::vector<double> data; // row-major
+  std::vector<T> data; // row-major
 };
 
 /* convert precison to string for printing*/
@@ -72,6 +73,6 @@ void absolute_vector(const std::vector<T> &source, std::vector<T> &target);
 vector_stats get_vector_stats(const std::vector<double>& v, bool verbose=false);
 std::vector<int> make_logspace(int n_min, int n_max, int num_points);
 /* matrix utils */
-std::vector<Matrix> load_matrices_bin(const std::string& filename);
+std::vector<Matrix<double>> load_matrices_bin(const std::string& filename);
 
 #endif
