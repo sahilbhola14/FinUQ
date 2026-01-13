@@ -63,7 +63,8 @@ The results demonstrate that probabilistic bounds remain tight at scale and allo
 
 ```text
 .
-├── include/          # Mathematical derivations and proofs
-├── src/     # Numerical experiments and benchmarks
-├── scripts/         # Reproducibility and experiment scripts
+├── include/            # Mathematical derivations and proofs
+├── src/                # Numerical experiments and benchmarks
+├── lib/                # External libraries
+├── scripts/            # Reproducibility and experiment scripts
 └── README.md
