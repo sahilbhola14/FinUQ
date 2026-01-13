@@ -9,7 +9,6 @@
 #include "gamma.hpp"
 #include "backward_error.hpp"
 #include "forward_error.hpp"
-/* #include <nlohmann/json.hpp> */
 
 /* vector statistics */
 struct vector_stats {
@@ -18,12 +17,12 @@ struct vector_stats {
   double mean; // mean value of the vector
 };
 
-/* matrix format struct */
+/* matrix struct */
+template <typename T>
 struct Matrix {
-    int id;
-    std::string name;
-    int rows, cols;
-    std::vector<double> data;
+  size_t rows;
+  size_t cols;
+  std::vector<T> data;
 };
 
 /* convert precison to string for printing*/

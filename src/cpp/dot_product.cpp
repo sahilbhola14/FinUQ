@@ -82,9 +82,10 @@ void run_dot_product_backward_error_experiment_fixed_size(
 
   /* run the experiment */
   for (int i = 0; i < dot_product_cfg.num_experiments; i++) {
-    if (i % 10 == 0)
+    if (i % 10 == 0) {
       printf("Running backward error experiment : %d/%d for vector size: %d\n",
              i + 1, dot_product_cfg.num_experiments, n);
+    }
     /* sample the vector */
     sample_random_vector(h_a, dot_product_cfg.prec, dot_product_cfg.dist,
                          gen);  // a vector
@@ -285,16 +286,19 @@ void run_all_backward_error_experiments(Precision prec,
   dot_product_cfg.gamma_cfg.prec = prec;              // bound precision
   dot_product_cfg.num_experiments = num_experiments;  // number of experiments
   dot_product_cfg.gamma_cfg.confidence = 0.99;        // overall confidence
-  dot_product_cfg.gamma_cfg.beta_dist_beta =
-      2.0;  // beta distribution shape param. beta
-  std::vector<double> beta_dist_alpha_vals = {2.1, 2.2, 2.3,
-                                              2.4};  // shape param. alpha
+  // beta shape parameter
+  dot_product_cfg.gamma_cfg.beta_dist_beta = 2.0;
+  // alpha shape parameter
+  std::vector<double> beta_dist_alpha_vals = {1.9, 1.95, 1.97,
+                                              2.0};  // shape param. alpha
 
+  /* const int n_min = 50000000;    // minimum vector size */
   const int n_min = 10;    // minimum vector size
   const int n_evals = 10;  // number of evaluations
   int n_max;               // maximum vector size
   if (prec == Single) {
-    n_max = 20000000;
+    n_max = 50000000;
+    /* n_max = 20000000; */
   } else if (prec == Half) {
     n_max = 100000;
   }

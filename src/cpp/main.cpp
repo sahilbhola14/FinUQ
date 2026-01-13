@@ -4,10 +4,12 @@
 #include "definition.hpp"
 #include "dot_product.hpp"
 #include "gamma.hpp"
+#include "matrix_vector.hpp"
 #include "utils.hpp"
 
 int main(int argc, char **argv) {
-  std::string experiment = "compare_gamma";
+  /* std::string experiment = "compare_gamma"; */
+  std::string experiment = "testing";
   if (argc > 1) {
     experiment = argv[1];
   }
@@ -19,6 +21,8 @@ int main(int argc, char **argv) {
   } else if (experiment == "dot_product") {
     run_all_dot_product_experiments(Single);
     run_all_dot_product_experiments(Half);
+  } else if (experiment == "testing") {
+    load_matrix_market_data();
   }
   return 0;
 }
