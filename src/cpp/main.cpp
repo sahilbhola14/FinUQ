@@ -7,7 +7,7 @@
 #include "utils.hpp"
 
 int main(int argc, char **argv) {
-  std::string experiment = "dot_product";
+  std::string experiment = "compare_gamma";
   if (argc > 1) {
     experiment = argv[1];
   }

@@ -201,6 +201,25 @@ std::vector<int> make_logspace(int n_min, int n_max, int num_points) {
   return vals;
 }
 
+/* load matrix market data */
+/* std::vector<Matrix> loadMatrices(const std::string& filename) { */
+/*     std::ifstream file(filename); */
+/*     nlohmann::json j; */
+/*     file >> j; */
+
+/*     std::vector<Matrix> matrices; */
+/*     for (auto& m : j["matrices"]) { */
+/*         Matrix mat; */
+/*         mat.id = m["id"]; */
+/*         mat.name = m["name"]; */
+/*         mat.rows = m["rows"]; */
+/*         mat.cols = m["cols"]; */
+/*         mat.data = m["data"].get<std::vector<double>>(); */
+/*         matrices.push_back(mat); */
+/*     } */
+/*     return matrices; */
+/* } */
+
 /* initialize templates */
 template void convert_vector_to_double<double>(const std::vector<double> &,
                                                std::vector<double> &);

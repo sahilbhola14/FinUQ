@@ -200,9 +200,9 @@ void run_all_compare_gamma_experiments(Precision prec) {
   compare_gamma(gamma_cfg);
   gamma_cfg.confidence = 0.99;
   compare_gamma(gamma_cfg);
-  /* vary confidence for beta model (alpha = 2.01, beta=2.0)*/
+  /* vary confidence for beta model (alpha = 1.9, beta=2.0)*/
   gamma_cfg.bound_model = Beta;
-  gamma_cfg.beta_dist_alpha = 2.001;
+  gamma_cfg.beta_dist_alpha = 1.9;
   gamma_cfg.beta_dist_beta = 2.00;
   gamma_cfg.confidence = 0.9;
   compare_gamma(gamma_cfg);
@@ -210,9 +210,9 @@ void run_all_compare_gamma_experiments(Precision prec) {
   compare_gamma(gamma_cfg);
   gamma_cfg.confidence = 0.99;
   compare_gamma(gamma_cfg);
-  /* vary confidence for beta model (alpha = 2.01, beta=2.0)*/
+  /* vary confidence for beta model (alpha = 1.95, beta=2.0)*/
   gamma_cfg.bound_model = Beta;
-  gamma_cfg.beta_dist_alpha = 2.01;
+  gamma_cfg.beta_dist_alpha = 1.95;
   gamma_cfg.beta_dist_beta = 2.00;
   gamma_cfg.confidence = 0.9;
   compare_gamma(gamma_cfg);
@@ -220,9 +220,19 @@ void run_all_compare_gamma_experiments(Precision prec) {
   compare_gamma(gamma_cfg);
   gamma_cfg.confidence = 0.99;
   compare_gamma(gamma_cfg);
-  /* vary confidence for beta model (alpha = 2.2, beta=2.0)*/
+  /* vary confidence for beta model (alpha = 1.97, beta=2.0)*/
   gamma_cfg.bound_model = Beta;
-  gamma_cfg.beta_dist_alpha = 2.1;
+  gamma_cfg.beta_dist_alpha = 1.97;
+  gamma_cfg.beta_dist_beta = 2.00;
+  gamma_cfg.confidence = 0.9;
+  compare_gamma(gamma_cfg);
+  gamma_cfg.confidence = 0.95;
+  compare_gamma(gamma_cfg);
+  gamma_cfg.confidence = 0.99;
+  compare_gamma(gamma_cfg);
+  /* vary confidence for beta model (alpha = 2.0, beta=2.0)*/
+  gamma_cfg.bound_model = Beta;
+  gamma_cfg.beta_dist_alpha = 2.0;
   gamma_cfg.beta_dist_beta = 2.00;
   gamma_cfg.confidence = 0.9;
   compare_gamma(gamma_cfg);

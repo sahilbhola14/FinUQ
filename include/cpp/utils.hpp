@@ -9,12 +9,21 @@
 #include "gamma.hpp"
 #include "backward_error.hpp"
 #include "forward_error.hpp"
+/* #include <nlohmann/json.hpp> */
 
 /* vector statistics */
 struct vector_stats {
   double min; // minimum value of the vector
   double max; // max value of the vector
   double mean; // mean value of the vector
+};
+
+/* matrix format struct */
+struct Matrix {
+    int id;
+    std::string name;
+    int rows, cols;
+    std::vector<double> data;
 };
 
 /* convert precison to string for printing*/

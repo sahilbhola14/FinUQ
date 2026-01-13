@@ -15,7 +15,7 @@ parser.add_argument(
 parser.add_argument(
     "--alpha",
     type=list,
-    default=[2.001, 2.01, 2.1],
+    default=[1.9, 1.95, 1.97, 2.0],
     help="Beta bound model alpha value for each confidence",
 )
 parser.add_argument(
@@ -52,7 +52,7 @@ def plot_gamma_vs_n(prec, ax=None):
     if ax is None:
         fig, ax = plt.subplots(1, 1, figsize=(6.5, 4.5), layout="compressed")
 
-    linestyles = ["solid", "dashed", "dotted"]
+    linestyles = ["solid", "dashed", "dashdot", "dotted"]
     colors = {
         "DREA": "#000000",
         "MPREA": "red",
@@ -114,7 +114,7 @@ def plot_gamma_vs_n(prec, ax=None):
                     df_beta["n"],
                     df_beta["gamma_vprea"],
                     color=colors["VPREA_beta"],
-                    label=rf"VPREA ($\beta$-model; $\alpha$={alpha: .3f})",
+                    label=rf"VPREA ($\beta$-model; $\alpha$={alpha: .2f})",
                     linestyle=linestyles[jj],
                 )
             else:

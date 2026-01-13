@@ -75,12 +75,10 @@ void check_mean_rounding_error_sign(Precision prec, BoundModel bound_model,
   /* compute the unit roundoff */
   double urd = compute_unit_roundoff(prec);
   /* utils */
-  double L = std::log((1.0 + urd) / (1.0 - urd));
-  double p = beta_dist_alpha / (beta_dist_alpha + beta_dist_beta);
-  double logm = std::log(1.0 - urd);
-  double c = -logm / L;
+  double log_ell = std::log1p(urd) - std::log1p(-urd);
+  double h = -std::log1p(-urd) / log_ell;
   /* conditon */
-  double condition = c * beta_dist_beta / (1.0 - c);
+  double condition = h * beta_dist_beta / (1.0 - h);
 
   if (bound_model == Uniform) {
     std::cout << "Rounding error random variable mean is zero" << std::endl;
@@ -89,12 +87,12 @@ void check_mean_rounding_error_sign(Precision prec, BoundModel bound_model,
       std::cout << "Rounding error random variable mean is strictly positive. "
                    "E[delta] > 0"
                 << std::endl;
-    } else if (std::pow(beta_dist_alpha - condition, 2.0) < 1e-15) {
-      std::cout
-          << "Rounding error random variable mean is non-negative. E[delta] >=0"
-          << std::endl;
+    } else if (beta_dist_alpha < condition) {
+      std::cout << "Rounding error random variable mean is strictly negative. "
+                   "E[delta] < 0"
+                << std::endl;
     } else {
-      std::cout << "Rounding error random variable mean can be negative"
+      std::cout << "Rounding error random variable mean undecisive."
                 << std::endl;
     }
   } else {
