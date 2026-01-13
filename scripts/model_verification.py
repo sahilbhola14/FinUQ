@@ -240,7 +240,7 @@ def compare_distribution_for_small_increments(n_max:int=1000, n_samples:int=1000
     N = list(np.logspace(2, np.log10(n_max), n_res, dtype=int))
     # sample si
     # si = (rng.random(n_res).reshape(-1, 1) * N.reshape(-1, 1)).astype(T_CONVERT[dtype])
-    si = true_dp.sample_sn_discrete(N).astype(T_CONVERT[dtype]).reshape(n_res, 1)
+    si = true_dp.sample_sn_discrete(N, n_samples).astype(T_CONVERT[dtype]).reshape(n_res, n_samples)
     # sample the addition
     ai = rng.random(n_res * n_samples).reshape(n_res, n_samples).astype(T_CONVERT[dtype])
     # compute sum
@@ -256,18 +256,21 @@ def compare_distribution_for_small_increments(n_max:int=1000, n_samples:int=1000
     # axs[0].axvline(-model.urd, color='r', linestyle='--', label='__nolegend__')
     axs[0].set_xlabel(r"$\delta$")
     axs[0].set_ylabel(r"$f_{\delta}(\delta)$")
+    axs[0].grid(False, which='both')
+    axs[0].minorticks_off()
+
     # axs[0].set_title(rf"$\mathbb{{E}}[\delta] = {np.mean(delta.ravel()):.2e}$")
     axs[1].scatter(N, np.mean(delta, axis=1), color='blue', s=10)
     axs[1].axhline(0.0, color='0.7', linestyle='-')
     axs[1].set_xlabel(r"$n$")
-    axs[1].set_ylabel(r"$\mathbb{E}[\delta\vert S_{i-1}=s_{i-1}]$")
+    axs[1].set_ylabel(r"$\mathbb{E}[\delta\vert S_{n}]$")
     axs[1].set_xscale("log")
     axs[1].set_xlim(100, n_max)
-    threshold = 3e3
+    threshold = 4e3
     mantissa, exponent = f"{threshold:.0e}".split("e")
     exponent = int(exponent)
     axs[1].axvspan(threshold, n_max, color='r', alpha=0.15, label=rf"$n \geq {mantissa}\times 10^{{{exponent}}}$")
-    axs[1].set_title(r"$S_{i-1} = \sum_{i=1}^n X_i; \quad X_i ~\sim{U}(0, 1)$")
+    axs[1].set_title(r"$S_{n} = \sum_{i=1}^n X_i; \quad X_i ~\sim\mathcal{U}(0, 1)$")
     axs[1].legend()
     # fig.suptitle(f"Rounding Error Distribution for Adding Small Increments (n_max={n_max:.1e})", x=0.5, ha="center")
     plt.savefig("rounding_error_distribution_small_increments.png")
@@ -335,78 +338,58 @@ def compare_random_walk(n_max:int=1000, n_samples:int=1000):
     u_model = UniformModel(dtype)
     b_model = BetaModel(dtype, alpha=1.5, beta=2.0)
 
-    mean_true_rv = np.zeros(n_max)
-    mean_u_rv = np.zeros(n_max)
-    mean_b_rv = np.zeros(n_max)
-
-    mean_true_log_rv = np.zeros(n_max)
-    mean_u_log_rv = np.zeros(n_max)
-    mean_b_log_rv = np.zeros(n_max)
+    true_rv = np.zeros((n_max, n_samples))
+    true_logrv = np.zeros((n_max, n_samples))
+    u_rv = np.zeros((n_max, n_samples))
+    u_logrv = np.zeros((n_max, n_samples))
+    b_rv = np.zeros((n_max, n_samples))
+    b_logrv = np.zeros((n_max, n_samples))
 
     # sample the delta trajectory
-    fig, axs = plt.subplots(1, 2, figsize=(10, 4), layout="compressed")
-    alpha_samples = 0.03
-    linewidth_samples = 0.7
+    fig, axs = plt.subplots(1, 1, figsize=(6, 4), layout="compressed")
+    alpha_samples = 0.3
     for ii in range(n_samples):
+
         # sample the true delta trajectory
         true_delta_traj = true_dp.sample_delta_trajectory(n=n_max, n_traj=1)
-        true_rv = np.cumprod(1.0 + true_delta_traj, axis=0)
-        true_logrv = np.cumsum(np.log1p(true_delta_traj), axis=0)
+        true_rv[:, ii] = np.cumprod(1.0 + true_delta_traj, axis=0).ravel()
+        true_logrv[:, ii] = np.cumsum(np.log1p(true_delta_traj), axis=0).ravel()
+
         # sample the uniform model trajectory
         u_delta_traj = u_model.sample_delta_trajectory(n=n_max, n_traj=1)
-        u_rv = np.cumprod(1.0 + u_delta_traj, axis=0)
-        u_logrv = np.cumsum(u_model.sample_log1pdelta(n_max).reshape(n_max, 1), axis=0)
+        u_rv[:, ii] = np.cumprod(1.0 + u_delta_traj, axis=0).ravel()
+        u_logrv[:, ii] = np.cumsum(np.log1p(u_delta_traj), axis=0).ravel()
+
         # sample the beta model trajectory
         b_delta_traj = b_model.sample_delta_trajectory(n=n_max, n_traj=1)
-        b_rv = np.cumprod(1.0 + b_delta_traj, axis=0)
-        b_logrv = np.cumsum(b_model.sample_log1pdelta(n_max).reshape(n_max, 1), axis=0)
+        b_rv[:, ii] = np.cumprod(1.0 + b_delta_traj, axis=0).ravel()
+        b_logrv[:, ii] = np.cumsum(np.log1p(b_delta_traj), axis=0).ravel()
 
-        if ii == 0:
-            mean_true_rv = true_rv.ravel()
-            mean_u_rv = u_rv.ravel()
-            mean_b_rv = b_rv.ravel()
-            mean_true_log_rv = true_logrv.ravel()
-            mean_u_log_rv = u_logrv.ravel()
-            mean_b_log_rv = b_logrv.ravel()
-        else:
-            mean_true_rv = mean_true_rv + (true_rv.ravel() - mean_true_rv) / (ii + 1)
-            mean_u_rv = mean_u_rv + (u_rv.ravel() - mean_u_rv) / (ii + 1)
-            mean_b_rv = mean_b_rv + (b_rv.ravel() - mean_b_rv) / (ii + 1)
-            mean_true_log_rv = mean_true_log_rv + (true_logrv.ravel() - mean_true_log_rv) / (ii + 1)
-            mean_u_log_rv = mean_u_log_rv + (u_logrv.ravel() - mean_u_log_rv) / (ii + 1)
-            mean_b_log_rv = mean_b_log_rv + (b_logrv.ravel() - mean_b_log_rv) / (ii + 1)
-        axs[0].plot(true_rv, color='k', alpha=alpha_samples, linewidth=linewidth_samples)
-        axs[0].plot(u_rv, color='b', alpha=alpha_samples, linewidth=linewidth_samples)
-        axs[0].plot(b_rv, color='goldenrod', alpha=alpha_samples, linewidth=linewidth_samples)
+    N = np.arange(1, n_max+1)
+    n_std = 2.0
+    mean_true_logrv, std_true_logrv = np.mean(true_logrv, axis=1), np.std(true_logrv, axis=1)
+    mean_u_logrv, std_u_logrv = np.mean(u_logrv, axis=1), np.std(u_logrv, axis=1)
+    mean_b_logrv, std_b_logrv = np.mean(b_logrv, axis=1), np.std(b_logrv, axis=1)
 
-        axs[1].plot(true_logrv, color='k', alpha=alpha_samples, linewidth=linewidth_samples)
-        axs[1].plot(u_logrv, color='b', alpha=alpha_samples, linewidth=linewidth_samples)
-        axs[1].plot(b_logrv, color='goldenrod', alpha=alpha_samples, linewidth=linewidth_samples)
+    axs.plot(N, mean_true_logrv, color='k', label='True')
+    axs.fill_between(N, mean_true_logrv - n_std*std_true_logrv, mean_true_logrv + n_std*std_true_logrv, color='k', alpha=alpha_samples)
 
-    axs[0].plot(mean_true_rv, color='k', label=r'True')
-    axs[0].plot(mean_u_rv, color='b', label=r'$\mathcal{U}$-model')
-    axs[0].plot(mean_b_rv, color='goldenrod', label=r'$\beta$-model')
+    axs.plot(N, mean_u_logrv, color='b', label=r'$\mathcal{U}$-model')
+    axs.fill_between(N, mean_u_logrv - n_std*std_u_logrv, mean_u_logrv + n_std*std_u_logrv, color='b', alpha=alpha_samples)
 
-    axs[0].set_ylabel(r"$\prod_{i=1}^n (1 + \delta_i)$")
+    axs.plot(N, mean_b_logrv, color='goldenrod', label=r'$\beta$-model')
+    axs.fill_between(N, mean_b_logrv - n_std*std_b_logrv, mean_b_logrv + n_std*std_b_logrv, color='goldenrod', alpha=alpha_samples)
 
-    axs[1].plot(mean_true_log_rv, color='k', label='True')
-    axs[1].plot(mean_u_log_rv, color='b', label=r'$\mathcal{U}$-model')
-    axs[1].plot(mean_b_log_rv, color='goldenrod', label=r'$\beta$-model')
-    axs[1].set_ylabel(r"$\sum_{i=1}^n \log(1 + \delta_i)$")
+    axs.set_ylabel(r"$\sum_{i=1}^n \log(1 + \delta_i)$")
+    axs.set_xlabel(r"$n$")
+    axs.set_xscale("log")
+    axs.set_xlim(1, n_max)
+    threshold = 4e3
+    mantissa, exponent = f"{threshold:.0e}".split("e")
+    exponent = int(exponent)
+    axs.axvspan(threshold, n_max, color='r', alpha=0.15, label=rf"$n \geq {mantissa}\times 10^{{{exponent}}}$")
 
-    for ax in axs:
-        ax.set_xlabel(r"$n$")
-        ax.set_xscale("log")
-        ax.set_xlim(1, n_max)
-        threshold = 3e3
-        mantissa, exponent = f"{threshold:.0e}".split("e")
-        exponent = int(exponent)
-        ax.axvspan(threshold, n_max, color='r', alpha=0.15, label=rf"$n \geq {mantissa}\times 10^{{{exponent}}}$")
-
-    axs[0].legend()
-
-    # axs[0].set_xlabel(r"$n$")
-    # axs[0].set_ylabel(r"$\mathbb{E}[\delta]$")
+    axs.legend()
     plt.savefig("random_walk_of_product.png")
 
 def compare_bound_growth():
@@ -445,13 +428,13 @@ if __name__ == "__main__":
     # compare_distribution_for_addition_and_multiplication()
 
     # compare the rounding error distribution when adding small number to large number
-    # compare_distribution_for_small_increments(n_max=10000, n_samples=1000000, n_res=500)
+    # compare_distribution_for_small_increments(n_max=10000, n_samples=10000, n_res=200)
 
     # compare the trajectory of product
     # compare_the_trajectory_of_delta(n_max=10000, n_samples=100)
 
     # compare the random walk
-    # compare_random_walk(n_max=10000, n_samples=100)
+    compare_random_walk(n_max=10000, n_samples=1000)
 
     # compare bound growth
-    compare_bound_growth()
+    # compare_bound_growth()
