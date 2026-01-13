@@ -45,57 +45,72 @@ def load_matrix(filepath):
         return np.array(A)
 
 
-def save_matrices_binary(matrices_list, output_file="matrices.npy"):
-    """Save list of matrices as numpy binary file."""
-    # Pad matrices to same size or store as object array
-    np.save(output_file, np.array(matrices_list, dtype=object), allow_pickle=True)
-    return output_file
+def save_matrices_bin(
+    matrices_list,
+    output_file="square_matrices.bin",
+    dtype=np.float64,
+):
+    """
+    Save variable-size matrices in a compact binary format.
+
+    Layout:
+      int32 num_matrices
+      for each matrix:
+        int32 rows
+        int32 cols
+        rows*cols values (dtype, row-major)
+    """
+
+    save_dir = "square_matrix_data"
+    os.makedirs(save_dir, exist_ok=True)
+    path = os.path.join(save_dir, output_file)
+
+    with open(path, "wb") as f:
+        np.int32(len(matrices_list)).tofile(f)
+
+        for A, matrix_id, matrix_name in matrices_list:
+            A = np.asarray(A, dtype=dtype, order="C")
+
+            # safety checks
+            if not np.isfinite(A).all():
+                raise ValueError("NaN or Inf found in matrix")
+
+            rows, cols = A.shape
+            np.int32(rows).tofile(f)
+            np.int32(cols).tofile(f)
+            # raw contiguous write
+            A.ravel(order="C").tofile(f)
+
+    print(f"Saved {len(matrices_list)} matrices to {path}")
 
 
-def save_matrices_json(matrices_list, output_file="matrices.json"):
-    """Save matrices as JSON for easy parsing in C++."""
-
-    data = {"num_matrices": len(matrices_list), "matrices": []}
-
-    for i, (A, matrix_id, matrix_name) in enumerate(matrices_list):
-        data["matrices"].append(
-            {
-                "id": int(matrix_id),
-                "name": matrix_name,
-                "rows": int(A.shape[0]),
-                "cols": int(A.shape[1]),
-                "data": A.flatten().tolist(),  # Flattened 1D array
-            }
-        )
-
-    with open(output_file, "w") as f:
-        json.dump(data, f)
-
-    return output_file
-
-
-def download_square_matrices(n_max=10, output_format="json"):
+def download_square_matrices(n_max=10, output_format="json", size_lim=5000):
     """Download n_max square matrices with real values."""
     print(f"Searching for {n_max} square matrices...\n")
 
     # Search for matrices
-    results = search()
+    results = search(limit=10000)
 
     # Filter for square matrices
     square_matrices = []
-    for matrix in results:
-        # Filter for square matrices only
-        if matrix.rows == matrix.cols:
+    for ii, matrix in enumerate(results):
+        try:
+            rows = int(matrix.rows)
+            cols = int(matrix.cols)
+        except (TypeError, ValueError):
+            continue
+        if (rows == cols) and rows <= size_lim:
             square_matrices.append(matrix)
-            if len(square_matrices) >= n_max:
-                break
-
-    print(f"Found {len(square_matrices)} square matrices\n")
+        if len(square_matrices) >= n_max:
+            break
+    print(
+        f"Found {len(square_matrices)}/{len(results)} square matrices "
+        f"of size less than {size_lim}\n"
+    )
 
     # Download and process each matrix
     real_matrices = []
     for i, matrix in enumerate(square_matrices, 1):
-        assert matrix.rows == matrix.cols
         print(f"Processing Matrix {i}/{len(square_matrices)}: {matrix.name}")
         print(f"  ID: {matrix.id}")
         print(f"  Non-zeros: {matrix.nnz}")
@@ -107,6 +122,8 @@ def download_square_matrices(n_max=10, output_format="json"):
 
             # Load matrix
             A = load_matrix(filepath)
+            assert A.shape[0] == A.shape[1]
+            assert A.shape[0] <= size_lim
             print(f"  Matrix shape: {A.shape}")
             print(f"  Data type: {A.dtype}")
 
@@ -123,17 +140,42 @@ def download_square_matrices(n_max=10, output_format="json"):
             print(f"  Error: {e}")
 
     # Save all matrices in specified format
-    if output_format == "json":
-        output_file = save_matrices_json(
-            real_matrices, output_file="square_matrix_data.json"
-        )
-        print(f"Saved {len(real_matrices)} matrices to: {output_file}")
-    elif output_format == "npy":
-        output_file = save_matrices_binary(
-            real_matrices, output_file="square_matrix_data.npy"
-        )
-        print(f"Saved {len(real_matrices)} matrices to: {output_file}")
+    print(f"Found {len(real_matrices)} real matrices")
+    save_matrices_bin(real_matrices)
+
+
+def check_save_file(filename):
+    if not os.path.exists(filename):
+        raise FileNotFoundError(f"File not found: {filename}")
+
+    if filename.endswith(".json"):
+        with open(filename, "r") as f:
+            data = json.load(f)
+        matrices = data.get("matrices", [])
+        print(f"num_matrices: {data.get('num_matrices', len(matrices))}")
+        for i, m in enumerate(matrices):
+            rows = m.get("rows")
+            cols = m.get("cols")
+            data_len = len(m.get("data", []))
+            expected = rows * cols if rows is not None and cols is not None else None
+            print(f"{i}: id={m.get('id')} name={m.get('name')} size={rows}x{cols}")
+            if expected is not None and data_len != expected:
+                print(f"  Warning: data length {data_len} != {expected}")
+    elif filename.endswith(".npy"):
+        matrices = np.load(filename, allow_pickle=True)
+        print(f"num_matrices: {len(matrices)}")
+        for i, entry in enumerate(matrices):
+            try:
+                A, matrix_id, matrix_name = entry
+                print(
+                    f"{i}: id={matrix_id} name={matrix_name}"
+                    f"size={A.shape[0]}x{A.shape[1]}"
+                )
+            except Exception as e:
+                print(f"{i}: unable to parse entry ({e})")
+    else:
+        raise ValueError("Unsupported file type. Use .json or .npy")
 
 
 if __name__ == "__main__":
-    download_square_matrices(n_max=1)
+    download_square_matrices(n_max=10000, size_lim=5000)

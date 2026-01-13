@@ -3,9 +3,11 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <cstdint>
 #include <fstream>
 #include <iomanip>
 #include <numeric>
+#include <stdexcept>
 
 /* write gamma results to csv */
 void write_gamma_results_csv(const std::vector<gamma_result> &results,
@@ -199,6 +201,46 @@ std::vector<int> make_logspace(int n_min, int n_max, int num_points) {
     if (vals.empty() || v != vals.back()) vals.push_back(v);
   }
   return vals;
+}
+
+/* load matrix stored in binary format */
+std::vector<Matrix> load_matrices_bin(const std::string &filename) {
+  std::ifstream f(filename, std::ios::binary);
+  if (!f) {
+    throw std::runtime_error("Cannot open file");
+  }
+
+  int32_t nmat;
+  f.read(reinterpret_cast<char *>(&nmat), sizeof(int32_t));
+
+  if (nmat <= 0) {
+    throw std::runtime_error("Invalid number of matrices");
+  }
+
+  std::vector<Matrix> matrices;
+  matrices.reserve(nmat);
+
+  for (int i = 0; i < nmat; ++i) {
+    int32_t rows, cols;
+    f.read(reinterpret_cast<char *>(&rows), sizeof(int32_t));
+    f.read(reinterpret_cast<char *>(&cols), sizeof(int32_t));
+
+    if (rows <= 0 || cols <= 0) {
+      throw std::runtime_error("Invalid matrix shape");
+    }
+
+    Matrix M;
+    M.rows = rows;
+    M.cols = cols;
+    M.data.resize(static_cast<size_t>(rows) * cols);
+
+    f.read(reinterpret_cast<char *>(M.data.data()),
+           M.data.size() * sizeof(double));
+
+    matrices.push_back(std::move(M));
+  }
+
+  return matrices;
 }
 
 /* initialize templates */
