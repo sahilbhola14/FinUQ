@@ -75,4 +75,9 @@ std::vector<int> make_logspace(int n_min, int n_max, int num_points);
 /* matrix utils */
 std::vector<Matrix<double>> load_matrices_bin(const std::string& filename);
 
+/* template initialization */
+template struct Matrix<double>;
+template struct Matrix<float>;
+template struct Matrix<half>;
+
 #endif

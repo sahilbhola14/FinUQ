@@ -6,7 +6,7 @@
 #include <iostream>
 
 /* grid size */
-int get_grid_size(const int n, const int blockDim);
+int get_grid_dim(const int n, const int blockDim);
 
 /* inline error check */
 #define cudaCheck(ans) gpuAssert((ans), __FILE__, __LINE__);
