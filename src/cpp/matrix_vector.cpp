@@ -139,12 +139,8 @@ void run_matrix_vector_product_backward_error_experiment(
   /* initialization */
   std::vector<backward_error_result> results(1);
 
-  Matrix<double> test_matrix;
-  test_matrix.rows = 50;
-  test_matrix.cols = 50;
-  test_matrix.data.resize(2500);
-  std::mt19937 gen(42);
-  sample_random_vector(test_matrix.data, Double, Ones, gen);
+  /* load matrix-market data in double precision */
+  std::vector<Matrix<double>> matrices = get_matrix_market_data();
 
   /* print header */
   std::cout << std::string(50, '=') << std::endl;
@@ -152,15 +148,17 @@ void run_matrix_vector_product_backward_error_experiment(
             << " Square Matrix-vector product backward error analysis config "
             << std::string(10, '-') << std::endl;
   print_matvec_product_config(matvec_product_cfg);
+  std::cout << "Number of marices from Matrix-market: " << matrices.size()
+            << std::endl;
   std::cout << std::string(50, '=') << std::endl;
 
   /* assert statements */
   assert(matvec_product_cfg.prec == matvec_product_cfg.gamma_cfg.prec &&
          "Bound precision and compute precision must be the same");
 
-  /* test run */
-  run_matvec_product_backward_error_experiment_given_matrix<double>(
-      test_matrix, matvec_product_cfg, results[0]);
+  /* /1* test run *1/ */
+  /* run_matvec_product_backward_error_experiment_given_matrix<double>( */
+  /*     test_matrix, matvec_product_cfg, results[0]); */
 
   /* /1* run the experiment for fixed matrix size *1/ */
   /* switch (matvec_product_cfg.prec) { */
@@ -181,14 +179,8 @@ void run_matrix_vector_product_backward_error_experiment(
   /* } */
 
   /* save */
-  std::string filename =
-      make_matvec_product_filename("backward_error_result", matvec_product_cfg);
-  write_backward_error_results_csv(results, filename);
-}
-
-/* load the matrix market data */
-std::vector<Matrix<double>> get_matrix_market_data(
-    std::string filename = "square_matrices.bin") {
-  std::vector<Matrix<double>> matrices = load_matrices_bin(filename);
-  return matrices;
+  /* std::string filename = */
+  /*     make_matvec_product_filename("backward_error_result",
+   * matvec_product_cfg); */
+  /* write_backward_error_results_csv(results, filename); */
 }

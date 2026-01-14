@@ -246,6 +246,14 @@ std::vector<Matrix<double>> load_matrices_bin(const std::string &filename) {
   return matrices;
 }
 
+/* load the matrix market data */
+std::vector<Matrix<double>> get_matrix_market_data(std::string filename) {
+  std::cout << "Loading matrix market data from file : " << filename
+            << std::endl;
+  std::vector<Matrix<double>> matrices = load_matrices_bin(filename);
+  return matrices;
+}
+
 /* initialize templates */
 template void convert_vector_to_double<double>(const std::vector<double> &,
                                                std::vector<double> &);

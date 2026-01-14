@@ -75,6 +75,7 @@ vector_stats get_vector_stats(const std::vector<double>& v, bool verbose=false);
 std::vector<int> make_logspace(int n_min, int n_max, int num_points);
 /* matrix utils */
 std::vector<Matrix<double>> load_matrices_bin(const std::string& filename);
+std::vector<Matrix<double>> get_matrix_market_data(std::string filename="square_matrices.bin");
 
 /* template initialization */
 template struct Matrix<double>;

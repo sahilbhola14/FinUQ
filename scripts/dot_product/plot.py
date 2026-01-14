@@ -42,7 +42,7 @@ parser.add_argument(
 parser.add_argument(
     "--alpha",
     type=list,
-    default=[2.1, 2.2, 2.3],
+    default=[1.9, 1.95, 1.97, 2.0],
     help="Beta bound model alpha value for each confidence",
 )
 parser.add_argument(
@@ -253,6 +253,7 @@ def plot_backward_error_given_data_distribution(dist, ax):
         linestyle="--",
         marker="s",
     )
+    ax.axhline(1.0, color="0.7", alpha=0.5, linewidth=2.0, linestyle="-")
     ax.plot(n, gamma_det, label=r"DREA", color=COLORS["DREA"])
     ax.plot(n, gamma_mprea, label=r"MPREA", color=COLORS["MPREA"])
     ax.plot(
@@ -277,6 +278,7 @@ def plot_backward_error_given_data_distribution(dist, ax):
     if args.prec.lower() == "single":
         # ax.set_xlim(left=10, right=10**6)
         ax.set_xlim(left=10)
+        ax.set_ylim(bottom=1e-8)
     elif args.prec.lower() == "half":
         ax.set_xlim(left=10, right=10**5)
     return ax
@@ -295,7 +297,7 @@ def plot_backward_error():
         plot_backward_error_given_data_distribution(args.dist[ii], ax=ax)
         ax.label_outer()
         if ii == 0:
-            ax.legend(ncol=2)
+            ax.legend(ncol=2, loc="lower right")
 
     savename = get_savefig_name(experiment="backward")
     plt.savefig(savename)
