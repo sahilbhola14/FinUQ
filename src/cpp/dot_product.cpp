@@ -102,8 +102,6 @@ void run_dot_product_backward_error_experiment_fixed_size(
                                                  &h_result_true, Double);
     launch_sequential_dot_product_kernel<double>(n, h_a_true_abs, h_b_true_abs,
                                                  &h_result_true_abs, Double);
-    /* std::cout << static_cast<double>(h_result) << ", " << h_result_true  <<
-     * ", " << h_result_true_abs << std::endl; */
     /* compute the backward error */
     compute_sequential_dot_product_backward_error(
         static_cast<double>(h_result), h_result_true, h_result_true_abs,
@@ -292,15 +290,15 @@ void run_all_backward_error_experiments(Precision prec,
   std::vector<double> beta_dist_alpha_vals = {1.9, 1.95, 1.97,
                                               2.0};  // shape param. alpha
 
-  /* const int n_min = 50000000;    // minimum vector size */
   const int n_min = 10;    // minimum vector size
   const int n_evals = 10;  // number of evaluations
   int n_max;               // maximum vector size
   if (prec == Single) {
     n_max = 50000000;
-    /* n_max = 20000000; */
+    /* n_max = 100; */
   } else if (prec == Half) {
     n_max = 100000;
+    /* n_max = 100; */
   }
 
   /* data: U(0,1) */

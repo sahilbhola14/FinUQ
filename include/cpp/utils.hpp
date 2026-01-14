@@ -20,8 +20,9 @@ struct vector_stats {
 /* matrix struct */
 template <typename T>
 struct Matrix {
-  size_t rows;
-  size_t cols;
+  size_t rows; // number of rows
+  size_t cols; // number of cols
+  size_t nnz; // number of non-zero elemens
   std::vector<T> data; // row-major
 };
 

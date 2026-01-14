@@ -51,7 +51,7 @@ void write_backward_error_results_csv(
   /* header */
   file << "n,backward_error_min,backward_error_max,backward_error_mean,gamma_"
           "det,"
-          "gamma_mprea,gamma_vprea\n";
+          "gamma_mprea,gamma_vprea,nnz_to_size_ratio\n";
   /* numerical font */
   file << std::scientific << std::setprecision(10);
   /* write the results */
@@ -62,7 +62,8 @@ void write_backward_error_results_csv(
          << r.backward_error_mean << ", " << std::setw(18)
          << r.backward_error_bound.gamma_det << ", " << std::setw(18)
          << r.backward_error_bound.gamma_mprea << ", " << std::setw(18)
-         << r.backward_error_bound.gamma_vprea << "\n";
+         << r.backward_error_bound.gamma_vprea << ", " << std::setw(18)
+         << r.nnz_to_size_ratio << "\n";
   }
   /* close the file */
   file.close();
@@ -221,9 +222,10 @@ std::vector<Matrix<double>> load_matrices_bin(const std::string &filename) {
   matrices.reserve(nmat);
 
   for (int i = 0; i < nmat; ++i) {
-    int32_t rows, cols;
+    int32_t rows, cols, nnz;
     f.read(reinterpret_cast<char *>(&rows), sizeof(int32_t));
     f.read(reinterpret_cast<char *>(&cols), sizeof(int32_t));
+    f.read(reinterpret_cast<char *>(&nnz), sizeof(int32_t));
 
     if (rows <= 0 || cols <= 0) {
       throw std::runtime_error("Invalid matrix shape");
@@ -232,6 +234,7 @@ std::vector<Matrix<double>> load_matrices_bin(const std::string &filename) {
     Matrix<double> M;
     M.rows = rows;
     M.cols = cols;
+    M.nnz = nnz;
     M.data.resize(static_cast<size_t>(rows) * cols);
 
     f.read(reinterpret_cast<char *>(M.data.data()),

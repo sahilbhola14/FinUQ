@@ -13,7 +13,7 @@ struct matvec_product_config {
   gamma_config gamma_cfg; // bounds config
 };
 
-/* /1* dot product experiment *1/ */
+/* /1* matrix vector proudct experiment *1/ */
 void run_matrix_vector_product_backward_error_experiment(const matvec_product_config &matvec_product_cfg);
 
 /* /1* experiments *1/ */

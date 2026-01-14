@@ -10,6 +10,7 @@
 #include <iostream>
 
 #include "prob_model.hpp"
+#include "utils.hpp"
 
 /*
  * compute the dot-product backward error.
@@ -46,6 +47,52 @@ gamma_result compute_sequential_dot_product_backward_error_bound(
     std::cout << std::string(10, '-')
               << " Dot product backward error bounds for vector size : "
               << vector_size << " " << std::string(10, '-') << std::endl;
+    std::cout << "Deterministic: " << result.gamma_det << std::endl;
+    std::cout << "Mean-informed: " << result.gamma_mprea << std::endl;
+    std::cout << "Varinance-informed: " << result.gamma_vprea << std::endl;
+  }
+  return result;
+}
+
+/*
+ * compute the mat-vec product backward error
+ * equation (4.3) in """ A NEW APPROACH TO PROBABILISTIC ROUNDING ERROR
+ * ANALYSIS"""
+ */
+void compute_matvec_product_backward_error(
+    const std::vector<double> &result, const std::vector<double> &result_true,
+    const std::vector<double> &result_true_abs, double *backward_error) {
+  /* initialize */
+  double max = 0.0;
+  double ratio = 0.0;
+
+  /* compute the backward error */
+  for (int i = 0; i < result.size(); i++) {
+    ratio = std::abs(result[i] - result_true[i]) / result_true_abs[i];
+    max = std::max(max, ratio);
+  }
+
+  /* save */
+  *backward_error = max;
+}
+
+/* compute the mat-vec product backward error bound */
+gamma_result compute_matvec_product_backward_error_bound(
+    const int rows, const int cols, const gamma_config &gamma_cfg,
+    bool verbose) {
+  /* compute individual bound confidence when number_of_bounds to be satisfied
+   * is rows* cols */
+  long double one_minus_zeta = compute_individual_bound_one_minus_zeta(
+      rows * cols, gamma_cfg.confidence);
+
+  /* compute the bounds \gamma_{cols}*/
+  gamma_result result = get_gamma(cols, gamma_cfg, one_minus_zeta);
+  /* verbose */
+  if (verbose == true) {
+    std::cout << std::string(10, '-')
+              << " Mat-vec product backward error bounds for matrix of size : ("
+              << rows << ", " << cols << ") " << std::string(10, '-')
+              << std::endl;
     std::cout << "Deterministic: " << result.gamma_det << std::endl;
     std::cout << "Mean-informed: " << result.gamma_mprea << std::endl;
     std::cout << "Varinance-informed: " << result.gamma_vprea << std::endl;
