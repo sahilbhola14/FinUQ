@@ -3,7 +3,6 @@ import scipy.io as sio
 import numpy as np
 import tarfile
 import os
-import json
 
 
 def extract_mtx_file(tar_gz_path):
@@ -58,6 +57,7 @@ def save_matrices_bin(
       for each matrix:
         int32 rows
         int32 cols
+        int32 nnz
         rows*cols values (dtype, row-major)
     """
 
@@ -68,16 +68,17 @@ def save_matrices_bin(
     with open(path, "wb") as f:
         np.int32(len(matrices_list)).tofile(f)
 
-        for A, matrix_id, matrix_name in matrices_list:
+        for A, matrix_id, matrix_name, nnz in matrices_list:
             A = np.asarray(A, dtype=dtype, order="C")
 
             # safety checks
             if not np.isfinite(A).all():
                 raise ValueError("NaN or Inf found in matrix")
-
             rows, cols = A.shape
+            assert nnz <= rows * cols, "invalid number of nnz."
             np.int32(rows).tofile(f)
             np.int32(cols).tofile(f)
+            np.int32(nnz).tofile(f)
             # raw contiguous write
             A.ravel(order="C").tofile(f)
 
@@ -133,7 +134,7 @@ def download_square_matrices(n_max=10, output_format="json", size_lim=5000):
                 continue
 
             # Store real matrix
-            real_matrices.append((A, matrix.id, matrix.name))
+            real_matrices.append((A, matrix.id, matrix.name, int(np.count_nonzero(A))))
             print(f"{matrix.name} Stored successfully")
 
         except Exception as e:
@@ -144,38 +145,5 @@ def download_square_matrices(n_max=10, output_format="json", size_lim=5000):
     save_matrices_bin(real_matrices)
 
 
-def check_save_file(filename):
-    if not os.path.exists(filename):
-        raise FileNotFoundError(f"File not found: {filename}")
-
-    if filename.endswith(".json"):
-        with open(filename, "r") as f:
-            data = json.load(f)
-        matrices = data.get("matrices", [])
-        print(f"num_matrices: {data.get('num_matrices', len(matrices))}")
-        for i, m in enumerate(matrices):
-            rows = m.get("rows")
-            cols = m.get("cols")
-            data_len = len(m.get("data", []))
-            expected = rows * cols if rows is not None and cols is not None else None
-            print(f"{i}: id={m.get('id')} name={m.get('name')} size={rows}x{cols}")
-            if expected is not None and data_len != expected:
-                print(f"  Warning: data length {data_len} != {expected}")
-    elif filename.endswith(".npy"):
-        matrices = np.load(filename, allow_pickle=True)
-        print(f"num_matrices: {len(matrices)}")
-        for i, entry in enumerate(matrices):
-            try:
-                A, matrix_id, matrix_name = entry
-                print(
-                    f"{i}: id={matrix_id} name={matrix_name}"
-                    f"size={A.shape[0]}x{A.shape[1]}"
-                )
-            except Exception as e:
-                print(f"{i}: unable to parse entry ({e})")
-    else:
-        raise ValueError("Unsupported file type. Use .json or .npy")
-
-
 if __name__ == "__main__":
-    download_square_matrices(n_max=10000, size_lim=5000)
+    download_square_matrices(n_max=10, size_lim=5000)
