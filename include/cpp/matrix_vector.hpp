@@ -14,10 +14,10 @@ struct matvec_product_config {
 };
 
 /* /1* matrix vector proudct experiment *1/ */
-void run_matrix_vector_product_backward_error_experiment(const matvec_product_config &matvec_product_cfg);
+/* void run_matrix_vector_product_backward_error_experiment(const matvec_product_config &matvec_product_cfg); */
 
-/* /1* experiments *1/ */
-/* void run_all_matrix_vector_product_experiments(Precision prec); */
+/* experiments */
+void run_all_matrix_vector_product_experiments(Precision prec);
 
 
 #endif

@@ -146,4 +146,4 @@ def download_square_matrices(n_max=10, output_format="json", size_lim=5000):
 
 
 if __name__ == "__main__":
-    download_square_matrices(n_max=10, size_lim=5000)
+    download_square_matrices(n_max=100000, size_lim=5000)

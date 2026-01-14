@@ -248,22 +248,22 @@ std::vector<Matrix<double>> load_matrices_bin(const std::string &filename) {
 
 /* load the matrix market data */
 std::vector<Matrix<double>> get_matrix_market_data(std::string filename) {
-  /* std::cout << "Loading matrix market data from file : " << filename */
-  /*           << std::endl; */
-  /* std::vector<Matrix<double>> matrices = load_matrices_bin(filename); */
+  /* /1* for testing *1/ */
+  /* std::vector<Matrix<double>> matrices(1); */
+  /* for (auto &m : matrices) { */
+  /*   m.rows = 5; */
+  /*   m.cols = 5; */
+  /*   m.nnz = 25; */
+  /*   m.data.reserve(25); */
+  /*   for (int i = 0; i < 25; i++) { */
+  /*     m.data.push_back(1.0); */
+  /*   } */
+  /* } */
   /* return matrices; */
 
-  std::vector<Matrix<double>> matrices(1);
-  for (auto &m : matrices) {
-    m.rows = 5;
-    m.cols = 5;
-    m.nnz = 25;
-    m.data.reserve(25);
-    for (int i = 0; i < 25; i++) {
-      m.data.push_back(1.0);
-    }
-  }
-
+  std::cout << "Loading matrix market data from file : " << filename
+            << std::endl;
+  std::vector<Matrix<double>> matrices = load_matrices_bin(filename);
   return matrices;
 }
 

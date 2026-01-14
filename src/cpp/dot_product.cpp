@@ -284,6 +284,7 @@ void run_dot_product_forward_error_experiment(
 }
 
 /* run all backward experiments */
+namespace dot_product {
 void run_all_backward_error_experiments(Precision prec,
                                         const int num_experiments = 100) {
   /* configuration */
@@ -337,9 +338,10 @@ void run_all_backward_error_experiments(Precision prec,
                                               n_evals);
   }
 }
+}  // namespace dot_product
 
 /* run all experiments */
 void run_all_dot_product_experiments(Precision prec) {
   /* run all backward error experiments */
-  run_all_backward_error_experiments(prec);
+  dot_product::run_all_backward_error_experiments(prec);
 }
