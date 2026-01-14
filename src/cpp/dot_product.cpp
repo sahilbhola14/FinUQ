@@ -205,20 +205,24 @@ void run_dot_product_backward_error_experiment(
   /* run experiment for fixed vector size */
   for (size_t i = 0; i < vector_sizes.size(); i++) {
     switch (dot_product_cfg.prec) {
-      case Double:
+      case Double: {
         run_dot_product_backward_error_experiment_fixed_size<double>(
             vector_sizes[i], dot_product_cfg, results[i]);
         break;
-      case Single:
+      }
+      case Single: {
         run_dot_product_backward_error_experiment_fixed_size<float>(
             vector_sizes[i], dot_product_cfg, results[i]);
         break;
-      case Half:
+      }
+      case Half: {
         run_dot_product_backward_error_experiment_fixed_size<half>(
             vector_sizes[i], dot_product_cfg, results[i]);
         break;
-      default:
+      }
+      default: {
         throw std::invalid_argument("invalid precision");
+      }
     }
   }
 
@@ -252,20 +256,24 @@ void run_dot_product_forward_error_experiment(
          "Bound precision and compute precision must be the same");
 
   switch (dot_product_cfg.prec) {
-    case Double:
+    case Double: {
       run_dot_product_forward_error_experiment_fixed_size<double>(
           vector_size, dot_product_cfg, results);
       break;
-    case Single:
+    }
+    case Single: {
       run_dot_product_forward_error_experiment_fixed_size<float>(
           vector_size, dot_product_cfg, results);
       break;
-    case Half:
+    }
+    case Half: {
       run_dot_product_forward_error_experiment_fixed_size<half>(
           vector_size, dot_product_cfg, results);
       break;
-    default:
+    }
+    default: {
       throw std::invalid_argument("invalid precision");
+    }
   }
 
   /* save */

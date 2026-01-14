@@ -76,6 +76,8 @@ std::vector<int> make_logspace(int n_min, int n_max, int num_points);
 /* matrix utils */
 std::vector<Matrix<double>> load_matrices_bin(const std::string& filename);
 std::vector<Matrix<double>> get_matrix_market_data(std::string filename="square_matrices.bin");
+template <typename T>
+void copy_matrix_and_convert_precision(const Matrix<double> &source, Matrix<T> &target);
 
 /* template initialization */
 template struct Matrix<double>;

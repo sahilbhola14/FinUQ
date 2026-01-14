@@ -248,10 +248,38 @@ std::vector<Matrix<double>> load_matrices_bin(const std::string &filename) {
 
 /* load the matrix market data */
 std::vector<Matrix<double>> get_matrix_market_data(std::string filename) {
-  std::cout << "Loading matrix market data from file : " << filename
-            << std::endl;
-  std::vector<Matrix<double>> matrices = load_matrices_bin(filename);
+  /* std::cout << "Loading matrix market data from file : " << filename */
+  /*           << std::endl; */
+  /* std::vector<Matrix<double>> matrices = load_matrices_bin(filename); */
+  /* return matrices; */
+
+  std::vector<Matrix<double>> matrices(1);
+  for (auto &m : matrices) {
+    m.rows = 5;
+    m.cols = 5;
+    m.nnz = 25;
+    m.data.reserve(25);
+    for (int i = 0; i < 25; i++) {
+      m.data.push_back(1.0);
+    }
+  }
+
   return matrices;
+}
+
+/* copy the matrix to a target matrix and change the precision */
+template <typename T>
+void copy_matrix_and_convert_precision(const Matrix<double> &source,
+                                       Matrix<T> &target) {
+  /* copy the num rows, cols, and nnz */
+  target.rows = source.rows;
+  target.cols = source.cols;
+  target.nnz = source.nnz;
+  /* reserve the size for the data */
+  target.data.reserve(source.rows * source.cols);
+  for (const double &d : source.data) {
+    target.data.push_back(static_cast<T>(d));
+  }
 }
 
 /* initialize templates */
@@ -267,3 +295,10 @@ template void convert_vector_to_absolute_double<float>(
     const std::vector<float> &, std::vector<double> &);
 template void convert_vector_to_absolute_double<half>(const std::vector<half> &,
                                                       std::vector<double> &);
+
+template void copy_matrix_and_convert_precision<double>(
+    const Matrix<double> &source, Matrix<double> &target);
+template void copy_matrix_and_convert_precision<float>(
+    const Matrix<double> &source, Matrix<float> &target);
+template void copy_matrix_and_convert_precision<half>(
+    const Matrix<double> &source, Matrix<half> &target);

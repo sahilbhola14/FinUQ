@@ -24,6 +24,9 @@ int main(int argc, char **argv) {
   } else if (experiment == "testing") {
     matvec_product_config matvec_product_cfg;
     matvec_product_cfg.dist = Ones;
+    Precision compute_prec = Half;
+    matvec_product_cfg.prec = compute_prec;
+    matvec_product_cfg.gamma_cfg.prec = compute_prec;
     matvec_product_cfg.num_experiments = 1;
     run_matrix_vector_product_backward_error_experiment(matvec_product_cfg);
   }

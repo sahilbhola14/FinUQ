@@ -74,3 +74,11 @@ template void launch_matvec_product_kernel<double>(const Matrix<double> &,
                                                    const std::vector<double> &,
                                                    std::vector<double> &,
                                                    Precision, bool);
+template void launch_matvec_product_kernel<float>(const Matrix<float> &,
+                                                  const std::vector<float> &,
+                                                  std::vector<float> &,
+                                                  Precision, bool);
+template void launch_matvec_product_kernel<half>(const Matrix<half> &,
+                                                 const std::vector<half> &,
+                                                 std::vector<half> &, Precision,
+                                                 bool);

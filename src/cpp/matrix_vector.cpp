@@ -80,10 +80,10 @@ void run_matvec_product_backward_error_experiment_given_matrix(
   h_matrix_true_abs.cols = cols;
   h_matrix_true_abs.data.resize(rows * cols);
 
-  gamma_result backward_error_bound;
+  /* gamma_result backward_error_bound; */
   vector_stats backward_error_stats;
 
-  /* random state */
+  /* /1* random state *1/ */
   std::mt19937 gen(seed);
 
   /* run the experiment */
@@ -106,10 +106,16 @@ void run_matvec_product_backward_error_experiment_given_matrix(
     /* run the matrix vector product(s) */
     launch_matvec_product_kernel<T>(h_matrix, h_a, h_result,
                                     matvec_product_cfg.prec);
-    launch_matvec_product_kernel<T>(h_matrix_true, h_a_true, h_result_true,
-                                    matvec_product_cfg.prec);
-    launch_matvec_product_kernel<T>(h_matrix_true_abs, h_a_true_abs,
-                                    h_result_true_abs, matvec_product_cfg.prec);
+    launch_matvec_product_kernel<double>(h_matrix_true, h_a_true, h_result_true,
+                                         matvec_product_cfg.prec);
+    launch_matvec_product_kernel<double>(h_matrix_true_abs, h_a_true_abs,
+                                         h_result_true_abs,
+                                         matvec_product_cfg.prec);
+
+    for (int i = 0; i < 5; i++) {
+      printf("%f %f %f\n", static_cast<double>(h_result[i]), h_result_true[i],
+             h_result_true_abs[i]);
+    }
 
     /* compute the backward error */
     std::vector<double> h_result_converted(rows);
@@ -119,28 +125,27 @@ void run_matvec_product_backward_error_experiment_given_matrix(
                                           &backward_error[i]);
   }
 
-  /* compute the backward error statistics */
-  backward_error_stats = get_vector_stats(backward_error);
+  /* /1* compute the backward error statistics *1/ */
+  /* backward_error_stats = get_vector_stats(backward_error); */
 
-  /* compute the backward error bound */
-  backward_error_bound = compute_matvec_product_backward_error_bound(
-      rows, cols, matvec_product_cfg.gamma_cfg);
+  /* /1* compute the backward error bound *1/ */
+  /* backward_error_bound = compute_matvec_product_backward_error_bound( */
+  /*     rows, cols, matvec_product_cfg.gamma_cfg); */
 
-  /* update result */
-  result.n = rows;  // same rows and cols
-  result.backward_error_min = backward_error_stats.min;
-  result.backward_error_max = backward_error_stats.max;
-  result.backward_error_mean = backward_error_stats.mean;
-  result.backward_error_bound = backward_error_bound;
+  /* /1* update result *1/ */
+  /* result.n = rows;  // same rows and cols */
+  /* result.backward_error_min = backward_error_stats.min; */
+  /* result.backward_error_max = backward_error_stats.max; */
+  /* result.backward_error_mean = backward_error_stats.mean; */
+  /* result.backward_error_bound = backward_error_bound; */
 }
 
 void run_matrix_vector_product_backward_error_experiment(
     const matvec_product_config &matvec_product_cfg) {
-  /* initialization */
-  std::vector<backward_error_result> results(1);
-
   /* load matrix-market data in double precision */
   std::vector<Matrix<double>> matrices = get_matrix_market_data();
+  /* initialization */
+  std::vector<backward_error_result> results(matrices.size());
 
   /* print header */
   std::cout << std::string(50, '=') << std::endl;
@@ -156,27 +161,41 @@ void run_matrix_vector_product_backward_error_experiment(
   assert(matvec_product_cfg.prec == matvec_product_cfg.gamma_cfg.prec &&
          "Bound precision and compute precision must be the same");
 
-  /* /1* test run *1/ */
-  /* run_matvec_product_backward_error_experiment_given_matrix<double>( */
-  /*     test_matrix, matvec_product_cfg, results[0]); */
-
-  /* /1* run the experiment for fixed matrix size *1/ */
-  /* switch (matvec_product_cfg.prec) { */
-  /*   case Double: */
-  /*     run_matvec_product_backward_error_experiment_given_matrix<double>( */
-  /*         test_matrix, matvec_product_cfg, results[0]); */
-  /*     break; */
-  /*   case Single: */
-  /*     run_matvec_product_backward_error_experiment_given_matrix<float>( */
-  /*         test_matrix, matvec_product_cfg, results[0]); */
-  /*     break; */
-  /*   case Half: */
-  /*     run_matvec_product_backward_error_experiment_given_matrix<half>( */
-  /*         test_matrix, matvec_product_cfg, results[0]); */
-  /*     break; */
-  /*   default: */
-  /*     throw std::invalid_argument("invalid precision"); */
-  /* } */
+  /* run the experiments for each element of the matrix market matrix */
+  for (int i = 0; i < matrices.size(); i++) {
+    switch (matvec_product_cfg.prec) {
+      case Double: {
+        /* copy the sorce matrix and convert type */
+        Matrix<double> matrix_double;
+        copy_matrix_and_convert_precision(matrices[i], matrix_double);
+        /* run experiment */
+        run_matvec_product_backward_error_experiment_given_matrix<double>(
+            matrix_double, matvec_product_cfg, results[i]);
+        break;
+      }
+      case Single: {
+        /* copy the sorce matrix and convert type */
+        Matrix<float> matrix_float;
+        copy_matrix_and_convert_precision(matrices[i], matrix_float);
+        /* run experiment */
+        run_matvec_product_backward_error_experiment_given_matrix<float>(
+            matrix_float, matvec_product_cfg, results[i]);
+        break;
+      }
+      case Half: {
+        /* copy the sorce matrix and convert type */
+        Matrix<half> matrix_half;
+        copy_matrix_and_convert_precision(matrices[i], matrix_half);
+        /* run experiment */
+        run_matvec_product_backward_error_experiment_given_matrix<half>(
+            matrix_half, matvec_product_cfg, results[i]);
+        break;
+      }
+      default: {
+        throw std::invalid_argument("invalid precision");
+      }
+    }
+  }
 
   /* save */
   /* std::string filename = */
