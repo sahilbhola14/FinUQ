@@ -296,8 +296,8 @@ void run_all_backward_error_experiments(Precision prec,
   // beta shape parameter
   dot_product_cfg.gamma_cfg.beta_dist_beta = 2.0;
   // alpha shape parameter
-  std::vector<double> beta_dist_alpha_vals = {1.9, 1.95, 1.97,
-                                              2.0};  // shape param. alpha
+  std::vector<double> beta_dist_alpha_vals = {1.6,  1.7, 1.8, 1.9,
+                                              1.95, 2.0};  // shape param. alpha
 
   const int n_min = 10;    // minimum vector size
   const int n_evals = 10;  // number of evaluations
@@ -313,9 +313,9 @@ void run_all_backward_error_experiments(Precision prec,
   /* data: U(0,1) */
   dot_product_cfg.dist = ZeroOne;
 
-  dot_product_cfg.gamma_cfg.bound_model = Uniform;
-  run_dot_product_backward_error_experiment(dot_product_cfg, n_min, n_max,
-                                            n_evals);
+  /* dot_product_cfg.gamma_cfg.bound_model = Uniform; */
+  /* run_dot_product_backward_error_experiment(dot_product_cfg, n_min, n_max, */
+  /*                                           n_evals); */
 
   dot_product_cfg.gamma_cfg.bound_model = Beta;
   for (auto &alpha : beta_dist_alpha_vals) {
@@ -327,9 +327,9 @@ void run_all_backward_error_experiments(Precision prec,
   /* data: U(-1,1) */
   dot_product_cfg.dist = MinusOnePlusOne;
 
-  dot_product_cfg.gamma_cfg.bound_model = Uniform;
-  run_dot_product_backward_error_experiment(dot_product_cfg, n_min, n_max,
-                                            n_evals);
+  /* dot_product_cfg.gamma_cfg.bound_model = Uniform; */
+  /* run_dot_product_backward_error_experiment(dot_product_cfg, n_min, n_max, */
+  /*                                           n_evals); */
 
   dot_product_cfg.gamma_cfg.bound_model = Beta;
   for (auto &alpha : beta_dist_alpha_vals) {

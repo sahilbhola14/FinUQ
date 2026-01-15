@@ -43,7 +43,7 @@ parser.add_argument(
 parser.add_argument(
     "--alpha",
     type=list,
-    default=[1.9, 1.95, 1.97, 2.0],
+    default=[2.0],
     help="Beta bound model alpha value for each confidence",
 )
 parser.add_argument(
@@ -239,25 +239,66 @@ def plot_backward_error_given_data_distribution(dist, ax, x_data="n"):
     gamma_mprea = df_uniform["gamma_mprea"]
     gamma_vprea_u = df_uniform["gamma_vprea"]
 
+    # add jitter
+    backward_error_mean = backward_error_mean.clip(lower=2e-8)
+    backward_error_max = backward_error_max.clip(lower=2e-8)
+
+    alpha_ref = 0.9
+
+    s_prob = 150
+    s_ref = 75
+
+    marker_style = {
+        "DREA": "o",
+        "MPREA": "P",
+        "VPREA_u": "v",
+        "VPREA_beta": "*",
+    }
+
     ax.scatter(
         n,
         backward_error_mean,
         label=r"$e_{bwd}^{mean}$",
         color="k",
+        alpha=alpha_ref,
         marker="X",
+        s=s_ref,
     )
     ax.scatter(
         n,
         backward_error_max,
         label=r"$e_{bwd}^{max}$",
         color="k",
+        alpha=alpha_ref,
         marker="s",
+        s=s_ref,
     )
-    ax.axhline(1.0, color="0.7", alpha=0.5, linewidth=2.0, linestyle="-")
-    ax.scatter(n, gamma_det, label=r"DREA", color=COLORS["DREA"])
-    ax.scatter(n, gamma_mprea, label=r"MPREA", color=COLORS["MPREA"])
+    # ax.axhline(1.0, color="0.7", alpha=0.5, linewidth=2.0, linestyle="-")
     ax.scatter(
-        n, gamma_vprea_u, label=r"VPREA ($\mathcal{U}$-model)", color=COLORS["VPREA_U"]
+        n,
+        gamma_det,
+        label=r"DREA",
+        color=COLORS["DREA"],
+        marker=marker_style["DREA"],
+        s=s_ref,
+    )
+    ax.scatter(
+        n,
+        gamma_mprea,
+        label=r"MPREA",
+        color=COLORS["MPREA"],
+        marker=marker_style["MPREA"],
+        s=s_prob,
+        zorder=3,
+    )
+    ax.scatter(
+        n,
+        gamma_vprea_u,
+        label=r"VPREA ($\mathcal{U}$-model)",
+        color=COLORS["VPREA_U"],
+        marker=marker_style["VPREA_u"],
+        s=s_prob,
+        zorder=3,
     )
     for ii, alpha in enumerate(args.alpha):
         df_beta = get_backward_error_data(
@@ -267,29 +308,35 @@ def plot_backward_error_given_data_distribution(dist, ax, x_data="n"):
         ax.scatter(
             n,
             gamma_vprea_beta,
-            label=rf"VPREA ($\beta$-model; $\alpha$={alpha:.1f})",
+            label=rf"VPREA ($\beta$-model; $\alpha$={alpha:.2f})",
             color=COLORS["VPREA_beta"],
-            marker=MARKERSTYLES[ii],
+            marker=marker_style["VPREA_beta"],
+            s=s_prob,
+            zorder=3,
         )
-    if x_data == "n":
-        ax.set_xscale("log")
 
+    ax.set_xscale("log")
     ax.set_yscale("log")
+    ax.minorticks_off()
 
     if x_data == "n":
         ax.set_xlabel(r"Matrix dimension, $n$")
     elif x_data == "nnz_to_size_ratio":
-        ax.set_xlabel(r"$\frac{\#\text{ non-zero entries}}{n^2}$")
+        # ax.set_xlabel(r"$\frac{\#\text{ non-zero entries}}{n^2}$")
+        ax.set_xlabel(r"Matrix density ($\mathrm{nnz}(\mathbf{A}) / n^2$)")
     ax.set_ylabel(r"$e_{bwd}$")
     if args.prec.lower() == "single":
         # ax.set_xlim(left=10, right=10**6)
         if x_data == "n":
-            ax.set_xlim(left=10)
+            ax.set_xlim(left=10, right=10000)
         else:
-            ax.set_xlim(left=0, right=1)
-        ax.set_ylim(bottom=1e-8)
+            ax.set_xlim(left=1e-4, right=1)
+
+        ax.set_ylim(bottom=1e-8, top=1e-1)
+
     elif args.prec.lower() == "half":
         ax.set_xlim(left=10, right=10**5)
+
     return ax
 
 
@@ -297,7 +344,7 @@ def plot_backward_error(x_data="n"):
     fig, axs = plt.subplots(
         1,
         len(args.dist),
-        figsize=(6.8 * len(args.dist), 5),
+        figsize=(6 * len(args.dist), 5),
         sharex=True,
         sharey=True,
         layout="compressed",
@@ -315,4 +362,5 @@ def plot_backward_error(x_data="n"):
 if __name__ == "__main__":
     # plot_backward_error()
     plot_backward_error(x_data="nnz_to_size_ratio")
+    plot_backward_error(x_data="n")
     # plot_forward_error_cdf()

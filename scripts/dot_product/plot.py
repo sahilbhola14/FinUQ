@@ -267,7 +267,7 @@ def plot_backward_error_given_data_distribution(dist, ax):
         ax.plot(
             n,
             gamma_vprea_beta,
-            label=rf"VPREA ($\beta$-model; $\alpha$={alpha:.1f})",
+            label=rf"VPREA ($\beta$-model; $\alpha$={alpha:.2f})",
             color=COLORS["VPREA_beta"],
             linestyle=LINESTYLES[ii],
         )
