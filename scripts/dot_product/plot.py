@@ -42,7 +42,7 @@ parser.add_argument(
 parser.add_argument(
     "--alpha",
     type=list,
-    default=[1.9, 1.95, 1.97, 2.0],
+    default=[1.6, 1.7, 1.8],
     help="Beta bound model alpha value for each confidence",
 )
 parser.add_argument(

@@ -14,8 +14,9 @@ struct bvp_config{
 };
 
 /* compute analytical qoi */
-void compute_analytical_qoi(const int num_mcmc_samples=100000000, bool verbose =false, const int seed=42);
+void compute_analytical_qoi(const int num_samples=100000000, bool verbose =false, const int seed=42);
 
 /* compute analytical solution of the linear system */
+/* void compute_analytical_state(); */
 
 #endif

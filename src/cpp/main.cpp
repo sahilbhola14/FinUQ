@@ -1,7 +1,6 @@
 #include <iostream>
 #include <vector>
 
-#include "boundary_value_prob.hpp"
 #include "definition.hpp"
 #include "dot_product.hpp"
 #include "gamma.hpp"
@@ -26,7 +25,8 @@ int main(int argc, char **argv) {
     run_all_matrix_vector_product_experiments(Single);
     run_all_matrix_vector_product_experiments(Half);
   } else if (experiment == "testing") {
-    compute_analytical_qoi(100000000, true);
+    run_all_matrix_vector_product_experiments(Single);
+    run_all_matrix_vector_product_experiments(Half);
   }
   return 0;
 }

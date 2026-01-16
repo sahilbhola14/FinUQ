@@ -240,8 +240,8 @@ def plot_backward_error_given_data_distribution(dist, ax, x_data="n"):
     gamma_vprea_u = df_uniform["gamma_vprea"]
 
     # add jitter
-    backward_error_mean = backward_error_mean.clip(lower=2e-8)
-    backward_error_max = backward_error_max.clip(lower=2e-8)
+    # backward_error_mean = backward_error_mean.clip(lower=2e-8)
+    # backward_error_max = backward_error_max.clip(lower=2e-8)
 
     alpha_ref = 0.9
 
@@ -335,7 +335,10 @@ def plot_backward_error_given_data_distribution(dist, ax, x_data="n"):
         ax.set_ylim(bottom=1e-8, top=1e-1)
 
     elif args.prec.lower() == "half":
-        ax.set_xlim(left=10, right=10**5)
+        if x_data == "n":
+            ax.set_xlim(left=10, right=10**5)
+        else:
+            ax.set_xlim(left=1e-4, right=1)
 
     return ax
 

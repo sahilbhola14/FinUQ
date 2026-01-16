@@ -218,7 +218,7 @@ void run_all_backward_error_experiments(Precision prec,
   // beta shape parameter
   matvec_product_cfg.gamma_cfg.beta_dist_beta = 2.0;
   // alpha shape parameter
-  std::vector<double> beta_dist_alpha_vals = {1.9, 1.95, 1.97,
+  std::vector<double> beta_dist_alpha_vals = {1.6, 1.7, 1.8, 1.9,
                                               2.0};  // shape param. alpha
 
   /* data: U(0,1) */
@@ -254,5 +254,5 @@ void run_all_backward_error_experiments(Precision prec,
 /* run all experiments */
 void run_all_matrix_vector_product_experiments(Precision prec) {
   /* run all backward error experiments */
-  matvec::run_all_backward_error_experiments(prec);
+  matvec::run_all_backward_error_experiments(prec, 10);
 }
