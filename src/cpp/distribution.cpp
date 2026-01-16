@@ -86,3 +86,15 @@ template void sample_random_vector<float>(std::vector<float> &, Precision,
 template void sample_random_vector<half>(std::vector<half> &, Precision,
                                          Distribution, std::mt19937 &,
                                          const int);
+template void sample_uniform_distribution<double>(std::vector<double> &vector,
+                                                  const double lower,
+                                                  const double upper,
+                                                  std::mt19937 &gen);
+template void sample_uniform_distribution<float>(std::vector<float> &vector,
+                                                 const double lower,
+                                                 const double upper,
+                                                 std::mt19937 &gen);
+template void sample_uniform_distribution<half>(std::vector<half> &vector,
+                                                const double lower,
+                                                const double upper,
+                                                std::mt19937 &gen);
