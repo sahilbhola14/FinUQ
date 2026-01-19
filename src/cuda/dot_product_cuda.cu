@@ -95,9 +95,9 @@ void launch_sequential_dot_product_kernel(const int n,
   /* device to host */
   cudaCheck(cudaMemcpy(h_result, d_result, sizeof(T), cudaMemcpyDeviceToHost));
   /* free */
-  cudaFree(d_a);
-  cudaFree(d_b);
-  cudaFree(d_result);
+  cudaCheck(cudaFree(d_a));
+  cudaCheck(cudaFree(d_b));
+  cudaCheck(cudaFree(d_result));
 }
 
 void launch_sequential_dot_product_model_kernel(
@@ -132,9 +132,9 @@ void launch_sequential_dot_product_model_kernel(
   cudaCheck(
       cudaMemcpy(h_result, d_result, sizeof(double), cudaMemcpyDeviceToHost));
   /* free */
-  cudaFree(d_a);
-  cudaFree(d_b);
-  cudaFree(d_result);
+  cudaCheck(cudaFree(d_a));
+  cudaCheck(cudaFree(d_b));
+  cudaCheck(cudaFree(d_result));
 }
 
 /* initialize template */

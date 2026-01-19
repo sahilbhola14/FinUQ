@@ -64,9 +64,9 @@ void launch_matvec_product_kernel(const Matrix<T> &h_matrix,
   cudaCheck(cudaMemcpy(h_result.data(), d_result, result_size,
                        cudaMemcpyDeviceToHost));
   /* free */
-  cudaFree(d_matrix);
-  cudaFree(d_a);
-  cudaFree(d_result);
+  cudaCheck(cudaFree(d_matrix));
+  cudaCheck(cudaFree(d_a));
+  cudaCheck(cudaFree(d_result));
 }
 
 /* initialize template */
