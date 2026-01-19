@@ -139,6 +139,7 @@ void run_matrix_vector_product_backward_error_experiment(
       get_matrix_market_data(matrix_data_file);
   /* initialization */
   std::vector<backward_error_result> results(matrices.size());
+  printf("%lu", matrices.size());
 
   /* print header */
   std::cout << std::string(50, '=') << std::endl;
@@ -218,15 +219,15 @@ void run_all_backward_error_experiments(Precision prec,
   // beta shape parameter
   matvec_product_cfg.gamma_cfg.beta_dist_beta = 2.0;
   // alpha shape parameter
-  std::vector<double> beta_dist_alpha_vals = {1.6, 1.7, 1.8, 1.9,
-                                              2.0};  // shape param. alpha
+  std::vector<double> beta_dist_alpha_vals = {1.6, 1.7, 1.8,
+                                              1.9};  // shape param. alpha
 
   /* data: U(0,1) */
   matvec_product_cfg.dist = ZeroOne;
 
-  matvec_product_cfg.gamma_cfg.bound_model = Uniform;
-  run_matrix_vector_product_backward_error_experiment(matvec_product_cfg,
-                                                      matrix_data_file);
+  /* matvec_product_cfg.gamma_cfg.bound_model = Uniform; */
+  /* run_matrix_vector_product_backward_error_experiment(matvec_product_cfg, */
+  /*                                                     matrix_data_file); */
 
   matvec_product_cfg.gamma_cfg.bound_model = Beta;
   for (auto &alpha : beta_dist_alpha_vals) {
@@ -238,9 +239,9 @@ void run_all_backward_error_experiments(Precision prec,
   /* data: U(-1,1) */
   matvec_product_cfg.dist = MinusOnePlusOne;
 
-  matvec_product_cfg.gamma_cfg.bound_model = Uniform;
-  run_matrix_vector_product_backward_error_experiment(matvec_product_cfg,
-                                                      matrix_data_file);
+  /* matvec_product_cfg.gamma_cfg.bound_model = Uniform; */
+  /* run_matrix_vector_product_backward_error_experiment(matvec_product_cfg, */
+  /*                                                     matrix_data_file); */
 
   matvec_product_cfg.gamma_cfg.bound_model = Beta;
   for (auto &alpha : beta_dist_alpha_vals) {
@@ -254,5 +255,5 @@ void run_all_backward_error_experiments(Precision prec,
 /* run all experiments */
 void run_all_matrix_vector_product_experiments(Precision prec) {
   /* run all backward error experiments */
-  matvec::run_all_backward_error_experiments(prec, 10);
+  matvec::run_all_backward_error_experiments(prec);
 }

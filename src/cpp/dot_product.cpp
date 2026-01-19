@@ -283,8 +283,9 @@ void run_dot_product_forward_error_experiment(
   write_forward_error_results_csv(results, filename);
 }
 
-/* run all backward experiments */
+/* namespace dot product*/
 namespace dot_product {
+/* backward error all experiments */
 void run_all_backward_error_experiments(Precision prec,
                                         const int num_experiments = 100) {
   /* configuration */
@@ -313,9 +314,9 @@ void run_all_backward_error_experiments(Precision prec,
   /* data: U(0,1) */
   dot_product_cfg.dist = ZeroOne;
 
-  /* dot_product_cfg.gamma_cfg.bound_model = Uniform; */
-  /* run_dot_product_backward_error_experiment(dot_product_cfg, n_min, n_max, */
-  /*                                           n_evals); */
+  dot_product_cfg.gamma_cfg.bound_model = Uniform;
+  run_dot_product_backward_error_experiment(dot_product_cfg, n_min, n_max,
+                                            n_evals);
 
   dot_product_cfg.gamma_cfg.bound_model = Beta;
   for (auto &alpha : beta_dist_alpha_vals) {
@@ -327,9 +328,9 @@ void run_all_backward_error_experiments(Precision prec,
   /* data: U(-1,1) */
   dot_product_cfg.dist = MinusOnePlusOne;
 
-  /* dot_product_cfg.gamma_cfg.bound_model = Uniform; */
-  /* run_dot_product_backward_error_experiment(dot_product_cfg, n_min, n_max, */
-  /*                                           n_evals); */
+  dot_product_cfg.gamma_cfg.bound_model = Uniform;
+  run_dot_product_backward_error_experiment(dot_product_cfg, n_min, n_max,
+                                            n_evals);
 
   dot_product_cfg.gamma_cfg.bound_model = Beta;
   for (auto &alpha : beta_dist_alpha_vals) {
@@ -338,10 +339,60 @@ void run_all_backward_error_experiments(Precision prec,
                                               n_evals);
   }
 }
+/* forward error all experiments */
+void run_all_forward_error_experiments(Precision prec,
+                                       const int num_experiments = 10000) {
+  /* configuration */
+  dot_product_config dot_product_cfg;
+  dot_product_cfg.prec = prec;                        // sampling precision
+  dot_product_cfg.gamma_cfg.prec = prec;              // bound precision
+  dot_product_cfg.num_experiments = num_experiments;  // number of experiments
+  dot_product_cfg.gamma_cfg.confidence = 0.99;        // overall confidence
+  // beta shape parameter
+  dot_product_cfg.gamma_cfg.beta_dist_beta = 2.0;
+  // alpha shape parameter
+  std::vector<double> beta_dist_alpha_vals = {1.6, 1.7,
+                                              1.8};  // shape param. alpha
+
+  /* vector size */
+  int vector_size;
+  if (prec == Single) {
+    vector_size = 10000000;
+  } else if (prec == Half) {
+    vector_size = 10000;
+  }
+
+  /* data: U(0,1) */
+  dot_product_cfg.dist = ZeroOne;
+
+  dot_product_cfg.gamma_cfg.bound_model = Uniform;
+  run_dot_product_forward_error_experiment(vector_size, dot_product_cfg);
+
+  dot_product_cfg.gamma_cfg.bound_model = Beta;
+  for (auto &alpha : beta_dist_alpha_vals) {
+    dot_product_cfg.gamma_cfg.beta_dist_alpha = alpha;
+    run_dot_product_forward_error_experiment(vector_size, dot_product_cfg);
+  }
+
+  /* data: U(-1,1) */
+  dot_product_cfg.dist = MinusOnePlusOne;
+
+  dot_product_cfg.gamma_cfg.bound_model = Uniform;
+  run_dot_product_forward_error_experiment(vector_size, dot_product_cfg);
+
+  dot_product_cfg.gamma_cfg.bound_model = Beta;
+  for (auto &alpha : beta_dist_alpha_vals) {
+    dot_product_cfg.gamma_cfg.beta_dist_alpha = alpha;
+    run_dot_product_forward_error_experiment(vector_size, dot_product_cfg);
+  }
+}
+
 }  // namespace dot_product
 
 /* run all experiments */
 void run_all_dot_product_experiments(Precision prec) {
   /* run all backward error experiments */
-  dot_product::run_all_backward_error_experiments(prec);
+  /* dot_product::run_all_backward_error_experiments(prec); */
+  /* run all forward error experiments */
+  dot_product::run_all_forward_error_experiments(prec);
 }

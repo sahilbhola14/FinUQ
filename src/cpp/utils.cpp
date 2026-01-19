@@ -204,6 +204,26 @@ std::vector<int> make_logspace(int n_min, int n_max, int num_points) {
   return vals;
 }
 
+/* make linspace */
+std::vector<double> make_linspace(double start, double end,
+                                  std::size_t num_points) {
+  if (num_points == 0) {
+    return {};
+  }
+  if (num_points == 1) {
+    return {start};
+  }
+
+  std::vector<double> result(num_points);
+  double step = (end - start) / static_cast<double>(num_points - 1);
+
+  for (std::size_t i = 0; i < num_points; ++i) {
+    result[i] = start + step * static_cast<double>(i);
+  }
+
+  return result;
+}
+
 /* load matrix stored in binary format */
 std::vector<Matrix<double>> load_matrices_bin(const std::string &filename) {
   std::ifstream f(filename, std::ios::binary);
