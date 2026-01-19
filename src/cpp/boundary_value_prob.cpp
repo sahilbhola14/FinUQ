@@ -5,6 +5,7 @@
 #include <random>
 
 #include "backward_error.hpp"
+#include "boundary_value_prob_cuda.cuh"
 #include "distribution.hpp"
 #include "prob_model.hpp"
 #include "utils.hpp"
@@ -93,16 +94,51 @@ void compute_analytical_qoi(const int num_samples, bool verbose,
            num_samples);
 }
 
-/* template <typename T> */
-/* void compute_the_diagonals( */
-/*     std::vector<T> &sub_diag, */
-/*     std::vector<T> &main_diag, */
-/*     std::vector<T> &super_diag, */
-/*     const double theta_one, */
-/*     const double theta_two, */
-/*     ){ */
-/*   printf("dhfgl;ad"); */
-/* } */
+/* compute the diagonals */
+template <typename T>
+void compute_the_diagonals(std::vector<T> &sub_diag, std::vector<T> &main_diag,
+                           std::vector<T> &super_diag, const double theta_one,
+                           const double theta_two) {
+  /* initialize */
+  const int num_intervals = sub_diag.size() + 1;
+  const T delta_x = static_cast<T>(1.0) / num_intervals;
+  const T delta_x_sq = delta_x * delta_x;
+  const T one_half = static_cast<T>(0.5);
+  const T one = static_cast<T>(1.0);
+  const T theta_one_conv = static_cast<T>(theta_one);
+
+  /* compute constant vector and diagonals */
+  for (int i = 1; i <= num_intervals; i++) {
+    T x = i * delta_x;
+    T constant_val = one + theta_one_conv * (x - one_half * delta_x);
+    if (i < num_intervals) {
+      sub_diag[i - 1] = constant_val;
+    }
+    if (i > 1) {
+      super_diag[i - 2] = constant_val;
+    }
+  }
+  /* compute the main diagonal */
+  for (int i = 0; i < static_cast<int>(sub_diag.size()); ++i) {
+    main_diag[i] = -(sub_diag[i] + super_diag[i]);
+  }
+}
+
+/* compute the rhs */
+template <typename T>
+void compute_rhs(std::vector<T> &rhs, const int num_intervals,
+                 const double theta_one, const double theta_two) {
+  /* initialize */
+  const T delta_x = static_cast<T>(1.0) / num_intervals;
+  const T delta_x_sq = delta_x * delta_x;
+  const T theta_two_conv = static_cast<T>(theta_two);
+  const T fifty = static_cast<T>(50.0);
+  const T coeff = -fifty * theta_two_conv * theta_two_conv * delta_x_sq;
+  /* fill rhs vector */
+  for (int i = 0; i < num_intervals - 1; i++) {
+    rhs[i] = coeff;
+  }
+}
 
 /* run bvp backward error experiment for fixed interval*/
 template <typename T>
@@ -111,22 +147,26 @@ void run_ode_backward_error_experiment_fixed_interval(
     const int num_intervals, backward_error_result &result) {
   /* initialize */
   const int Ns = num_intervals - 1;  // number of states to solve
-  /* const int num_samples = bvp_parameters.theta_one.size(); */
-  std::vector<T> sub_diag(Ns), main_diag(Ns), super_diag(Ns);
-  printf("dhfjkld");
+  assert(bvp_params.theta_one.size() == bvp_params.theta_two.size() &&
+         "inconsistent number of params");
+  const int num_samples = bvp_params.theta_one.size();
 
-  /* /1* run the experiment *1/ */
-  /* for (int i=0; i < num_samples; i++){ */
-  /*   /1* compute the diagonals *1/ */
-  /*   compute_the_diagonals<T>( */
-  /*       sub_diag, */
-  /*       main_diag, */
-  /*       super_diag, */
-  /*       bvp_params.theta_one[i], */
-  /*       bvp_params.theta_two[i], */
-  /*       ); */
+  std::vector<T> h_sub_diag(Ns), h_main_diag(Ns), h_super_diag(Ns), h_rhs(Ns),
+      h_state(Ns);
 
-  /* } */
+  /* run the experiment */
+  for (int i = 0; i < num_samples; i++) {
+    /* compute the diagonals */
+    compute_the_diagonals<T>(h_sub_diag, h_main_diag, h_super_diag,
+                             bvp_params.theta_one[i], bvp_params.theta_two[i]);
+    /* compute the rhs */
+    compute_rhs<T>(h_rhs, num_intervals, bvp_params.theta_one[i],
+                   bvp_params.theta_two[i]);
+    /* run the Thomas algorithm */
+    launch_thomas_algorithm_kernel<T>(num_intervals, h_sub_diag, h_main_diag,
+                                      h_super_diag, h_rhs, h_state,
+                                      bvp_cfg.prec);
+  }
 }
 
 /* run bvp backward error experiment */
