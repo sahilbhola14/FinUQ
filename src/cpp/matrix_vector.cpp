@@ -225,9 +225,9 @@ void run_all_backward_error_experiments(Precision prec,
   /* data: U(0,1) */
   matvec_product_cfg.dist = ZeroOne;
 
-  /* matvec_product_cfg.gamma_cfg.bound_model = Uniform; */
-  /* run_matrix_vector_product_backward_error_experiment(matvec_product_cfg, */
-  /*                                                     matrix_data_file); */
+  matvec_product_cfg.gamma_cfg.bound_model = Uniform;
+  run_matrix_vector_product_backward_error_experiment(matvec_product_cfg,
+                                                      matrix_data_file);
 
   matvec_product_cfg.gamma_cfg.bound_model = Beta;
   for (auto &alpha : beta_dist_alpha_vals) {
@@ -239,9 +239,9 @@ void run_all_backward_error_experiments(Precision prec,
   /* data: U(-1,1) */
   matvec_product_cfg.dist = MinusOnePlusOne;
 
-  /* matvec_product_cfg.gamma_cfg.bound_model = Uniform; */
-  /* run_matrix_vector_product_backward_error_experiment(matvec_product_cfg, */
-  /*                                                     matrix_data_file); */
+  matvec_product_cfg.gamma_cfg.bound_model = Uniform;
+  run_matrix_vector_product_backward_error_experiment(matvec_product_cfg,
+                                                      matrix_data_file);
 
   matvec_product_cfg.gamma_cfg.bound_model = Beta;
   for (auto &alpha : beta_dist_alpha_vals) {

@@ -43,7 +43,7 @@ parser.add_argument(
 parser.add_argument(
     "--alpha",
     type=list,
-    default=[2.0],
+    default=[1.9],
     help="Beta bound model alpha value for each confidence",
 )
 parser.add_argument(
@@ -240,8 +240,14 @@ def plot_backward_error_given_data_distribution(dist, ax, x_data="n"):
     gamma_vprea_u = df_uniform["gamma_vprea"]
 
     # add jitter
-    # backward_error_mean = backward_error_mean.clip(lower=2e-8)
-    # backward_error_max = backward_error_max.clip(lower=2e-8)
+    if args.prec.lower() == "single":
+        print("backward error mean and max clipping to 1e-8")
+        backward_error_mean = backward_error_mean.clip(lower=1e-8)
+        backward_error_max = backward_error_max.clip(lower=1e-8)
+    else:
+        print("backward error mean and max clipping to 1e-4")
+        backward_error_mean = backward_error_mean.clip(lower=1e-4)
+        backward_error_max = backward_error_max.clip(lower=1e-4)
 
     alpha_ref = 0.9
 
@@ -336,9 +342,12 @@ def plot_backward_error_given_data_distribution(dist, ax, x_data="n"):
 
     elif args.prec.lower() == "half":
         if x_data == "n":
-            ax.set_xlim(left=10, right=10**5)
+            ax.set_xlim(left=10, right=10**4)
         else:
             ax.set_xlim(left=1e-4, right=1)
+
+        ax.set_ylim(bottom=1e-4, top=1e2)
+    ax.axhline(1.0, color="0.7", alpha=0.5, linewidth=2.0, linestyle="-")
 
     return ax
 
@@ -366,4 +375,3 @@ if __name__ == "__main__":
     # plot_backward_error()
     plot_backward_error(x_data="nnz_to_size_ratio")
     plot_backward_error(x_data="n")
-    # plot_forward_error_cdf()
