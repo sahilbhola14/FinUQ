@@ -359,7 +359,7 @@ void run_all_forward_error_experiments(Precision prec,
   if (prec == Single) {
     vector_size = 10000000;
   } else if (prec == Half) {
-    vector_size = 10000;
+    vector_size = 5000;
   }
 
   /* data: U(0,1) */

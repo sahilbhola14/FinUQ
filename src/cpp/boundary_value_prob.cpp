@@ -154,6 +154,8 @@ void run_ode_backward_error_experiment_fixed_interval(
   std::vector<T> h_sub_diag(Ns), h_main_diag(Ns), h_super_diag(Ns), h_rhs(Ns),
       h_state(Ns);
 
+  T h_state_integral;
+
   /* run the experiment */
   for (int i = 0; i < num_samples; i++) {
     /* compute the diagonals */
@@ -163,9 +165,18 @@ void run_ode_backward_error_experiment_fixed_interval(
     compute_rhs<T>(h_rhs, num_intervals, bvp_params.theta_one[i],
                    bvp_params.theta_two[i]);
     /* run the Thomas algorithm */
-    launch_thomas_algorithm_kernel<T>(num_intervals, h_sub_diag, h_main_diag,
-                                      h_super_diag, h_rhs, h_state,
-                                      bvp_cfg.prec);
+    /* launch_thomas_algorithm_kernel<T>( */
+    /*     num_intervals, */
+    /*     h_sub_diag, */
+    /*     h_main_diag, */
+    /*     h_super_diag, */
+    /*     h_rhs, */
+    /*     h_state, */
+    /*     bvp_cfg.prec */
+    /*     ); */
+    launch_ode_state_integral_kernel(num_intervals, h_sub_diag, h_main_diag,
+                                     h_super_diag, h_rhs, h_state_integral,
+                                     bvp_cfg.prec, );
   }
 }
 

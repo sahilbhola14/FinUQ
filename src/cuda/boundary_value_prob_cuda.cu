@@ -51,6 +51,20 @@ __global__ void backward_substitution_kernel(const int n, T *u_main_diag,
   }
 }
 
+/* state integral kernel */
+template <typename T>
+__global__ void state_integral_kernel(const int n, T *state,
+                                      T *state_integral) {
+  int tid = threadIdx.x;
+  int gid = blockIdx.x * blockDim.x + threadIdx.x;
+  T delta_x = static_cast<T>(1.0) / (n + 1);
+  T sum = static_cast<T>(0.0);
+  for (int i = 0; i < n; i++) {
+    sum = sum + state[i];
+  }
+  *state_integral = delta_x * sum;
+}
+
 /* LU decomposition kernel launcher */
 template <typename T>
 void launch_lu_decomposition_kernel(const int num_intervals,
@@ -175,9 +189,6 @@ void launch_backward_substitution_kernel(const int num_intervals,
   cudaCheck(cudaGetLastError());
   /* device to host */
   cudaCheck(cudaMemcpy(h_state.data(), d_state, size, cudaMemcpyDeviceToHost));
-  for (auto &a : h_state) {
-    printf("%f\n", a);
-  }
   /* free */
   cudaCheck(cudaFree(d_u_main_diag));
   cudaCheck(cudaFree(d_forward_sol));
@@ -185,6 +196,40 @@ void launch_backward_substitution_kernel(const int num_intervals,
   cudaCheck(cudaFree(d_state));
 }
 
+/* state integral kernel launcher */
+template <typename T>
+void launch_state_integral_kernel(const int num_intervals,
+                                  std::vector<T> &h_state, T &h_state_integral,
+                                  Precision prec, bool verbose = false) {
+  /* kernel parameters */
+  dim3 blockDim = 1;
+  dim3 gridDim = 1;
+  /* initialize */
+  const int Ns = num_intervals - 1;
+  const int size = Ns * sizeof(T);
+  T *d_state;
+  T *d_state_integral;
+  /* allocate */
+  cudaCheck(cudaMalloc((void **)&d_state, size));
+  cudaCheck(cudaMalloc((void **)&d_state_integral, sizeof(T)));
+  /* host to device */
+  cudaCheck(cudaMemcpy(d_state, h_state.data(), size, cudaMemcpyHostToDevice));
+  /* launch kernel */
+  if (verbose == true)
+    std::cout << "launching kernel for integrating ode solution in "
+              << to_string(prec) << " precision" << std::endl;
+  state_integral_kernel<<<gridDim, blockDim>>>(Ns, d_state, d_state_integral);
+  cudaCheck(cudaGetLastError());
+  cudaCheck(cudaDeviceSynchronize());
+  /* device to host */
+  cudaCheck(cudaMemcpy(&h_state_integral, d_state_integral, sizeof(T),
+                       cudaMemcpyDeviceToHost));
+  /* free */
+  cudaCheck(cudaFree(d_state));
+  cudaCheck(cudaFree(d_state_integral));
+}
+
+/* launch thomas algorithm kernel(s) */
 template <typename T>
 void launch_thomas_algorithm_kernel(const int num_intervals,
                                     const std::vector<T> &h_sub_diag,
@@ -208,8 +253,37 @@ void launch_thomas_algorithm_kernel(const int num_intervals,
       num_intervals, h_u_main_diag, h_forward_sol, h_super_diag, h_state, prec);
 }
 
+/* launch ode state integral kernerl(s) */
+template <typename T>
+void launch_ode_state_integral_kernel(const int num_intervals,
+                                      const std::vector<T> &h_sub_diag,
+                                      const std::vector<T> &h_main_diag,
+                                      const std::vector<T> &h_super_diag,
+                                      const std::vector<T> &h_rhs,
+                                      T &h_state_integral, Precision prec,
+                                      bool verbose) {
+  /* initialize */
+  const int Ns = num_intervals - 1;
+  std::vector<T> h_state(Ns);
+  /* launch thomas algorithm */
+  launch_thomas_algorithm_kernel<T>(num_intervals, h_sub_diag, h_main_diag,
+                                    h_super_diag, h_rhs, h_state, prec);
+  /* launch state integral kernel */
+  launch_state_integral_kernel<T>(num_intervals, h_state, h_state_integral,
+                                  prec);
+  /* print */
+  if (verbose == true) {
+    printf("State integral: %f\n", h_state_integral);
+  }
+}
+
 /* template initialization */
 template void launch_thomas_algorithm_kernel<double>(
     const int, const std::vector<double> &, const std::vector<double> &,
     const std::vector<double> &, const std::vector<double> &,
     std::vector<double> &, Precision);
+
+template void launch_ode_state_integral_kernel<double>(
+    const int, const std::vector<double> &, const std::vector<double> &,
+    const std::vector<double> &, const std::vector<double> &, double &,
+    Precision, bool);
