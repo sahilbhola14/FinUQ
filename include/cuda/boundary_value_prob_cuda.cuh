@@ -12,7 +12,8 @@ void launch_thomas_algorithm_kernel(const int num_intervals,
                                     const std::vector<T> &h_main_diag,
                                     const std::vector<T> &h_super_diag,
                                     const std::vector<T> &h_rhs,
-                                    std::vector<T> &h_state, Precision prec);
+                                    std::vector<T> &h_state, Precision prec,
+                                    bool verbose = false);
 
 /* ode state integral kernel */
 template <typename T>

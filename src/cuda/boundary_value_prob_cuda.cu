@@ -7,62 +7,132 @@
 #include "utils.hpp"
 #include "utils_cuda.cuh"
 
-/* LU decomposition kernel */
+/* LU decomposition kernel
+ * l_sub_diag[i] = sub_diag[i] / u_main_diag[i - 1];
+ * u_main_diag[i] = main_diag[i] - l_sub_diag[i] * super_diag[i - 1];
+ */
 template <typename T>
 __global__ void lu_decomposition_kernel(const int n, T *sub_diag, T *main_diag,
                                         T *super_diag, T *l_sub_diag,
-                                        T *u_main_diag) {
+                                        T *u_main_diag, Precision prec) {
   /* initialize */
   int tid = threadIdx.x;
   int gid = blockIdx.x * blockDim.x + threadIdx.x;
   /* compute the LU decomposition */
   u_main_diag[0] = main_diag[0];
   for (int i = 1; i < n; i++) {
-    l_sub_diag[i] = sub_diag[i] / u_main_diag[i - 1];
-    u_main_diag[i] = main_diag[i] - l_sub_diag[i] * super_diag[i - 1];
+    if (prec == Double) {
+      l_sub_diag[i] = __ddiv_rn(sub_diag[i], u_main_diag[i - 1]);
+      u_main_diag[i] =
+          __dsub_rn(main_diag[i], __dmul_rn(l_sub_diag[i], super_diag[i - 1]));
+    } else if (prec == Single) {
+      l_sub_diag[i] = __fdiv_rn(sub_diag[i], u_main_diag[i - 1]);
+      u_main_diag[i] =
+          __fsub_rn(main_diag[i], __fmul_rn(l_sub_diag[i], super_diag[i - 1]));
+    } else if (prec == Half) {
+      l_sub_diag[i] = __hdiv(sub_diag[i], u_main_diag[i - 1]);
+      u_main_diag[i] =
+          __hsub_rn(main_diag[i], __hmul_rn(l_sub_diag[i], super_diag[i - 1]));
+    } else {
+      printf("<Cuda Error>: Invalid precision\n");
+      return;
+    }
   }
 }
 
-/* forward substituion kernel */
+/* forward substituion kernel
+  forward_sol[i] = rhs[i] - l_sub_diag[i] * forward_sol[i - 1];
+*/
 template <typename T>
 __global__ void forward_substitution_kernel(const int n, T *l_sub_diag, T *rhs,
-                                            T *forward_sol) {
+                                            T *forward_sol, Precision prec) {
   /* initialize */
   int tid = threadIdx.x;
   int gid = blockIdx.x * blockDim.x + threadIdx.x;
   /* forward substitution */
   forward_sol[0] = rhs[0];
+
   for (int i = 1; i < n; i++) {
-    forward_sol[i] = rhs[i] - l_sub_diag[i] * forward_sol[i - 1];
+    if (prec == Double) {
+      forward_sol[i] =
+          __dsub_rn(rhs[i], __dmul_rn(l_sub_diag[i], forward_sol[i - 1]));
+    } else if (prec == Single) {
+      forward_sol[i] =
+          __fsub_rn(rhs[i], __fmul_rn(l_sub_diag[i], forward_sol[i - 1]));
+    } else if (prec == Half) {
+      forward_sol[i] =
+          __hsub_rn(rhs[i], __hmul_rn(l_sub_diag[i], forward_sol[i - 1]));
+    } else {
+      printf("<Cuda Error>: Invalid precision\n");
+      return;
+    }
   }
 }
 
-/* backward substituion kernel */
+/* backward substituion kernel
+  state[i] = (forward_sol[i] - super_diag[i] * state[i + 1]) / u_main_diag[i];
+ */
 template <typename T>
 __global__ void backward_substitution_kernel(const int n, T *u_main_diag,
                                              T *forward_sol, T *super_diag,
-                                             T *state) {
+                                             T *state, Precision prec) {
   int tid = threadIdx.x;
   int gid = blockIdx.x * blockDim.x + threadIdx.x;
+
   /* backward substituion */
-  state[n - 1] = forward_sol[n - 1] / u_main_diag[n - 1];
+  if (prec == Double) {
+    state[n - 1] = __ddiv_rn(forward_sol[n - 1], u_main_diag[n - 1]);
+  } else if (prec == Single) {
+    state[n - 1] = __fdiv_rn(forward_sol[n - 1], u_main_diag[n - 1]);
+  } else if (prec == Half) {
+    state[n - 1] = __hdiv(forward_sol[n - 1], u_main_diag[n - 1]);
+  } else {
+    printf("<Cuda Error>: Invalid precision\n");
+    return;
+  }
+
   for (int i = n - 2; i > -1; i--) {
-    state[i] = (forward_sol[i] - super_diag[i] * state[i + 1]) / u_main_diag[i];
+    if (prec == Double) {
+      state[i] = __ddiv_rn(
+          __dsub_rn(forward_sol[i], __dmul_rn(super_diag[i], state[i + 1])),
+          u_main_diag[i]);
+    } else if (prec == Single) {
+      state[i] = __fdiv_rn(
+          __fsub_rn(forward_sol[i], __fmul_rn(super_diag[i], state[i + 1])),
+          u_main_diag[i]);
+    } else if (prec == Half) {
+      state[i] = __hdiv(
+          __hsub_rn(forward_sol[i], __hmul_rn(super_diag[i], state[i + 1])),
+          u_main_diag[i]);
+    }
   }
 }
 
 /* state integral kernel */
 template <typename T>
-__global__ void state_integral_kernel(const int n, T *state,
-                                      T *state_integral) {
+__global__ void state_integral_kernel(const int n, T *state, T *state_integral,
+                                      Precision prec) {
   int tid = threadIdx.x;
   int gid = blockIdx.x * blockDim.x + threadIdx.x;
   T delta_x = static_cast<T>(1.0) / (n + 1);
   T sum = static_cast<T>(0.0);
   for (int i = 0; i < n; i++) {
-    sum = sum + state[i];
+    if (prec == Double) {
+      sum = __dadd_rn(sum, state[i]);
+    } else if (prec == Single) {
+      sum = __fadd_rn(sum, state[i]);
+    } else if (prec == Half) {
+      sum = __hadd_rn(sum, state[i]);
+    }
   }
-  *state_integral = delta_x * sum;
+
+  if (prec == Double) {
+    *state_integral = __dmul_rn(delta_x, sum);
+  } else if (prec == Single) {
+    *state_integral = __fmul_rn(delta_x, sum);
+  } else if (prec == Half) {
+    *state_integral = __hmul_rn(delta_x, sum);
+  }
 }
 
 /* LU decomposition kernel launcher */
@@ -99,8 +169,9 @@ void launch_lu_decomposition_kernel(const int num_intervals,
     std::cout << "launching kernel for LU decomposition in " << to_string(prec)
               << " precision" << std::endl;
 
-  lu_decomposition_kernel<<<gridDim, blockDim>>>(
-      Ns, d_sub_diag, d_main_diag, d_super_diag, d_l_sub_diag, d_u_main_diag);
+  lu_decomposition_kernel<<<gridDim, blockDim>>>(Ns, d_sub_diag, d_main_diag,
+                                                 d_super_diag, d_l_sub_diag,
+                                                 d_u_main_diag, prec);
   cudaCheck(cudaGetLastError());
   /* device to host */
   cudaCheck(cudaMemcpy(h_l_sub_diag.data(), d_l_sub_diag, size,
@@ -142,7 +213,7 @@ void launch_forward_substitution_kernel(const int num_intervals,
     std::cout << "launching kernel for forward substitution in "
               << to_string(prec) << " precision" << std::endl;
   forward_substitution_kernel<<<gridDim, blockDim>>>(Ns, d_l_sub_diag, d_rhs,
-                                                     d_forward_sol);
+                                                     d_forward_sol, prec);
   cudaCheck(cudaGetLastError());
   /* device to host */
   cudaCheck(cudaMemcpy(h_forward_sol.data(), d_forward_sol, size,
@@ -185,7 +256,7 @@ void launch_backward_substitution_kernel(const int num_intervals,
     std::cout << "launching kernel for backward substitution in "
               << to_string(prec) << " precision" << std::endl;
   backward_substitution_kernel<<<gridDim, blockDim>>>(
-      Ns, d_u_main_diag, d_forward_sol, d_super_diag, d_state);
+      Ns, d_u_main_diag, d_forward_sol, d_super_diag, d_state, prec);
   cudaCheck(cudaGetLastError());
   /* device to host */
   cudaCheck(cudaMemcpy(h_state.data(), d_state, size, cudaMemcpyDeviceToHost));
@@ -218,7 +289,8 @@ void launch_state_integral_kernel(const int num_intervals,
   if (verbose == true)
     std::cout << "launching kernel for integrating ode solution in "
               << to_string(prec) << " precision" << std::endl;
-  state_integral_kernel<<<gridDim, blockDim>>>(Ns, d_state, d_state_integral);
+  state_integral_kernel<<<gridDim, blockDim>>>(Ns, d_state, d_state_integral,
+                                               prec);
   cudaCheck(cudaGetLastError());
   cudaCheck(cudaDeviceSynchronize());
   /* device to host */
@@ -236,7 +308,8 @@ void launch_thomas_algorithm_kernel(const int num_intervals,
                                     const std::vector<T> &h_main_diag,
                                     const std::vector<T> &h_super_diag,
                                     const std::vector<T> &h_rhs,
-                                    std::vector<T> &h_state, Precision prec) {
+                                    std::vector<T> &h_state, Precision prec,
+                                    bool verbose) {
   // initialize
   const int Ns = num_intervals - 1;
   std::vector<T> h_l_sub_diag(Ns), h_u_main_diag(Ns), h_forward_sol(Ns);
@@ -251,6 +324,14 @@ void launch_thomas_algorithm_kernel(const int num_intervals,
   /* backward substitution */
   launch_backward_substitution_kernel<T>(
       num_intervals, h_u_main_diag, h_forward_sol, h_super_diag, h_state, prec);
+
+  if (verbose == true) {
+    printf("Thomas algorithm computed state in %s precision\n",
+           to_string(prec).c_str());
+    for (auto &a : h_state) {
+      printf("%f\n", a);
+    }
+  }
 }
 
 /* launch ode state integral kernerl(s) */
@@ -267,7 +348,8 @@ void launch_ode_state_integral_kernel(const int num_intervals,
   std::vector<T> h_state(Ns);
   /* launch thomas algorithm */
   launch_thomas_algorithm_kernel<T>(num_intervals, h_sub_diag, h_main_diag,
-                                    h_super_diag, h_rhs, h_state, prec);
+                                    h_super_diag, h_rhs, h_state, prec,
+                                    verbose);
   /* launch state integral kernel */
   launch_state_integral_kernel<T>(num_intervals, h_state, h_state_integral,
                                   prec);
@@ -281,7 +363,7 @@ void launch_ode_state_integral_kernel(const int num_intervals,
 template void launch_thomas_algorithm_kernel<double>(
     const int, const std::vector<double> &, const std::vector<double> &,
     const std::vector<double> &, const std::vector<double> &,
-    std::vector<double> &, Precision);
+    std::vector<double> &, Precision, bool);
 
 template void launch_ode_state_integral_kernel<double>(
     const int, const std::vector<double> &, const std::vector<double> &,

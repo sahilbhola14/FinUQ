@@ -176,7 +176,7 @@ void run_ode_backward_error_experiment_fixed_interval(
     /*     ); */
     launch_ode_state_integral_kernel(num_intervals, h_sub_diag, h_main_diag,
                                      h_super_diag, h_rhs, h_state_integral,
-                                     bvp_cfg.prec, );
+                                     bvp_cfg.prec);
   }
 }
 
@@ -211,5 +211,5 @@ void run_ode_backward_error_experiment(const bvp_config &bvp_cfg,
   bvp_params.theta_two[0] = 1.0;  // for testing
   /* run experiment for fixed interval */
   run_ode_backward_error_experiment_fixed_interval<double>(
-      bvp_cfg, bvp_params, num_intervals[0], results[0]);
+      bvp_cfg, bvp_params, num_intervals[2], results[0]);
 }
