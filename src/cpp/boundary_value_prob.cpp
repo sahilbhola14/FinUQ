@@ -101,7 +101,7 @@ void compute_the_diagonals(std::vector<T> &sub_diag, std::vector<T> &main_diag,
                            const double theta_two) {
   /* initialize */
   const int num_intervals = sub_diag.size() + 1;
-  const T delta_x = static_cast<T>(1.0) / num_intervals;
+  const T delta_x = static_cast<T>(1.0 / num_intervals);
   const T delta_x_sq = delta_x * delta_x;
   const T one_half = static_cast<T>(0.5);
   const T one = static_cast<T>(1.0);
@@ -109,7 +109,7 @@ void compute_the_diagonals(std::vector<T> &sub_diag, std::vector<T> &main_diag,
 
   /* compute constant vector and diagonals */
   for (int i = 1; i <= num_intervals; i++) {
-    T x = i * delta_x;
+    T x = static_cast<T>(i) * delta_x;
     T constant_val = one + theta_one_conv * (x - one_half * delta_x);
     if (i < num_intervals) {
       sub_diag[i - 1] = constant_val;
@@ -129,7 +129,7 @@ template <typename T>
 void compute_rhs(std::vector<T> &rhs, const int num_intervals,
                  const double theta_one, const double theta_two) {
   /* initialize */
-  const T delta_x = static_cast<T>(1.0) / num_intervals;
+  const T delta_x = static_cast<T>(1.0 / num_intervals);
   const T delta_x_sq = delta_x * delta_x;
   const T theta_two_conv = static_cast<T>(theta_two);
   const T fifty = static_cast<T>(50.0);
@@ -164,19 +164,10 @@ void run_ode_backward_error_experiment_fixed_interval(
     /* compute the rhs */
     compute_rhs<T>(h_rhs, num_intervals, bvp_params.theta_one[i],
                    bvp_params.theta_two[i]);
-    /* run the Thomas algorithm */
-    /* launch_thomas_algorithm_kernel<T>( */
-    /*     num_intervals, */
-    /*     h_sub_diag, */
-    /*     h_main_diag, */
-    /*     h_super_diag, */
-    /*     h_rhs, */
-    /*     h_state, */
-    /*     bvp_cfg.prec */
-    /*     ); */
-    launch_ode_state_integral_kernel(num_intervals, h_sub_diag, h_main_diag,
-                                     h_super_diag, h_rhs, h_state_integral,
-                                     bvp_cfg.prec);
+    /* compute the QoI */
+    launch_thomas_algorithm_kernel<T>(num_intervals, h_sub_diag, h_main_diag,
+                                      h_super_diag, h_rhs, h_state,
+                                      bvp_cfg.prec);
   }
 }
 
@@ -210,6 +201,24 @@ void run_ode_backward_error_experiment(const bvp_config &bvp_cfg,
   bvp_params.theta_one[0] = 1.0;  // for testing
   bvp_params.theta_two[0] = 1.0;  // for testing
   /* run experiment for fixed interval */
-  run_ode_backward_error_experiment_fixed_interval<double>(
-      bvp_cfg, bvp_params, num_intervals[2], results[0]);
+  switch (bvp_cfg.prec) {
+    case Double: {
+      run_ode_backward_error_experiment_fixed_interval<double>(
+          bvp_cfg, bvp_params, num_intervals[0], results[0]);
+      break;
+    }
+    case Single: {
+      run_ode_backward_error_experiment_fixed_interval<float>(
+          bvp_cfg, bvp_params, num_intervals[0], results[0]);
+      break;
+    }
+    case Half: {
+      run_ode_backward_error_experiment_fixed_interval<half>(
+          bvp_cfg, bvp_params, num_intervals[0], results[0]);
+      break;
+    }
+    default: {
+      throw std::invalid_argument("invalid precision");
+    }
+  }
 }

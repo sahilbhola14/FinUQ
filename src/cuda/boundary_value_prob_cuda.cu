@@ -365,6 +365,16 @@ template void launch_thomas_algorithm_kernel<double>(
     const std::vector<double> &, const std::vector<double> &,
     std::vector<double> &, Precision, bool);
 
+template void launch_thomas_algorithm_kernel<float>(
+    const int, const std::vector<float> &, const std::vector<float> &,
+    const std::vector<float> &, const std::vector<float> &,
+    std::vector<float> &, Precision, bool);
+
+template void launch_thomas_algorithm_kernel<half>(
+    const int, const std::vector<half> &, const std::vector<half> &,
+    const std::vector<half> &, const std::vector<half> &, std::vector<half> &,
+    Precision, bool);
+
 template void launch_ode_state_integral_kernel<double>(
     const int, const std::vector<double> &, const std::vector<double> &,
     const std::vector<double> &, const std::vector<double> &, double &,
