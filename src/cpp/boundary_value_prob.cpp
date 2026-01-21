@@ -177,6 +177,12 @@ void run_ode_backward_error_experiment_fixed_interval(
 
   /* run the experiment */
   for (int i = 0; i < num_samples; i++) {
+    if (i % 10 == 0) {
+      printf(
+          "Running backward error experiment : %d/%d for num intervals: %d\n",
+          i + 1, num_samples, num_intervals);
+    }
+
     /* compute the diagonals */
     compute_the_diagonals<T>(h_sub_diag, h_main_diag, h_super_diag,
                              bvp_params.theta_one[i], bvp_params.theta_two[i]);
@@ -195,11 +201,10 @@ void run_ode_backward_error_experiment_fixed_interval(
 
   /* compute the backward error statistics */
   backward_error_stats = get_vector_stats(backward_error);
-  printf("%.3e\n", backward_error_stats.mean);
 
   /* compute the backward error bound */
   backward_error_bound =
-      compute_ode_backward_error_bound(num_intervals, bvp_cfg.gamma_cfg, true);
+      compute_ode_backward_error_bound(num_intervals, bvp_cfg.gamma_cfg);
 
   /* update result */
   result.n = num_intervals;
@@ -211,10 +216,11 @@ void run_ode_backward_error_experiment_fixed_interval(
 
 /* run bvp backward error experiment */
 void run_ode_backward_error_experiment(const bvp_config &bvp_cfg,
-                                       const int num_samples, const int seed) {
+                                       const int num_samples,
+                                       const int seed = 42) {
   /* initialize */
-  std::vector<int> num_intervals = {4,   8,   16,   32,   64,  128,
-                                    256, 512, 1024, 2048, 4069};
+  std::vector<int> num_intervals = {16,  32,   64,   128, 256,
+                                    512, 1024, 2048, 4069};
   std::vector<backward_error_result> results(num_intervals.size());
   /* random generator */
   std::mt19937 gen(seed);
@@ -264,4 +270,38 @@ void run_ode_backward_error_experiment(const bvp_config &bvp_cfg,
   /* save */
   std::string filename = make_bvp_filename("backward_error_result", bvp_cfg);
   write_backward_error_results_csv(results, filename);
+}
+
+namespace bvp {
+/* backward error all experiments */
+void run_all_backward_error_experiments(Precision prec,
+                                        const int num_samples = 10000) {
+  /* configuration */
+  bvp_config bvp_cfg;
+  bvp_cfg.prec = prec;
+  bvp_cfg.prec = prec;                  // sampling precision
+  bvp_cfg.gamma_cfg.prec = prec;        // bound precision
+  bvp_cfg.gamma_cfg.confidence = 0.99;  // overall confidence
+  // beta shape parameter
+  bvp_cfg.gamma_cfg.beta_dist_beta = 2.0;
+  // alpha shape parameter
+  std::vector<double> beta_dist_alpha_vals = {1.6, 1.7, 1.8, 1.9, 2.0};
+
+  // run uniform model
+  bvp_cfg.gamma_cfg.bound_model = Uniform;
+  run_ode_backward_error_experiment(bvp_cfg, num_samples);
+
+  // run beta model
+  bvp_cfg.gamma_cfg.bound_model = Beta;
+  for (auto &alpha : beta_dist_alpha_vals) {
+    bvp_cfg.gamma_cfg.beta_dist_alpha = alpha;
+    run_ode_backward_error_experiment(bvp_cfg, num_samples);
+  }
+}
+
+}  // namespace bvp
+
+/* run all experiments */
+void run_all_ode_experiments(Precision prec) {
+  bvp::run_all_backward_error_experiments(prec);
 }
