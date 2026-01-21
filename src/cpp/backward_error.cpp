@@ -9,7 +9,6 @@
 #include <cmath>
 #include <iostream>
 
-#include "boundary_value_prob_cuda.cuh"
 #include "prob_model.hpp"
 #include "utils.hpp"
 
@@ -113,12 +112,9 @@ void compute_ode_backward_error(const int num_intervals,
   const int Ns = num_intervals - 1;
   std::vector<double> h_a_mat_times_state_true_minus_rhs(
       Ns);  // A \times state - rhs in double precision
-  std::vector<double> h_abs_lu_mult_true(
-      Ns * Ns);  // |\hat{L}|\times |\hat{U}| in double precision
-  std::vector<double> h_abs_lu_mult_times_abs_state(
-      Ns);  // |\hat{L}|\times |\hat{U}| |state| in double precision
+  std::vector<double> h_a_mat_abs_times_abs_state_true(Ns);  //|A| * |state|
 
-  /* compute A \times state - RHS */
+  /* compute A \times state - RHS and |A|\times|state|*/
   for (int i = 0; i < Ns; i++) {
     /* compute A \times state */
     if (i == 0) {
@@ -127,11 +123,25 @@ void compute_ode_backward_error(const int num_intervals,
               static_cast<double>(h_state[i]) +
           static_cast<double>(h_super_diag[i]) *
               static_cast<double>(h_state[i + 1]);
+
+      h_a_mat_abs_times_abs_state_true[i] =
+          std::abs(static_cast<double>(h_main_diag[i])) *
+              std::abs(static_cast<double>(h_state[i])) +
+          std::abs(static_cast<double>(h_super_diag[i])) *
+              std::abs(static_cast<double>(h_state[i + 1]));
+
     } else if (i == Ns - 1) {
       h_a_mat_times_state_true_minus_rhs[i] =
           static_cast<double>(h_sub_diag[i]) *
               static_cast<double>(h_state[i - 1]) +
           static_cast<double>(h_main_diag[i]) * static_cast<double>(h_state[i]);
+
+      h_a_mat_abs_times_abs_state_true[i] =
+          std::abs(static_cast<double>(h_sub_diag[i])) *
+              std::abs(static_cast<double>(h_state[i - 1])) +
+          std::abs(static_cast<double>(h_main_diag[i])) *
+              std::abs(static_cast<double>(h_state[i]));
+
     } else {
       h_a_mat_times_state_true_minus_rhs[i] =
           static_cast<double>(h_sub_diag[i]) *
@@ -140,33 +150,26 @@ void compute_ode_backward_error(const int num_intervals,
               static_cast<double>(h_state[i]) +
           static_cast<double>(h_super_diag[i]) *
               static_cast<double>(h_state[i + 1]);
+
+      h_a_mat_abs_times_abs_state_true[i] =
+          std::abs(static_cast<double>(h_sub_diag[i])) *
+              std::abs(static_cast<double>(h_state[i - 1])) +
+          std::abs(static_cast<double>(h_main_diag[i])) *
+              std::abs(static_cast<double>(h_state[i])) +
+          std::abs(static_cast<double>(h_super_diag[i])) *
+              std::abs(static_cast<double>(h_state[i + 1]));
     }
     /* subtract RHS */
     h_a_mat_times_state_true_minus_rhs[i] =
         h_a_mat_times_state_true_minus_rhs[i] - static_cast<double>(h_rhs[i]);
   }
 
-  /* compute |\hat{L}|\times|\hat{U}| */
-  launch_abs_lu_multiplication_kernel(num_intervals, h_sub_diag, h_main_diag,
-                                      h_super_diag, h_rhs, h_abs_lu_mult_true,
-                                      prec);
-
-  /* compute |\hat{L}|\times|\hat{U}| \times |state| */
-  for (int i = 0; i < Ns; i++) {
-    h_abs_lu_mult_times_abs_state[i] = 0.0;
-    for (int j = 0; j < Ns; j++) {
-      h_abs_lu_mult_times_abs_state[i] =
-          h_abs_lu_mult_times_abs_state[i] +
-          h_abs_lu_mult_true[i * Ns + j] *
-              std::abs(static_cast<double>(h_state[j]));
-    }
-  }
   /* compute backward error */
   double max = 0.0;
   double ratio = 0.0;
   for (int i = 0; i < Ns; i++) {
     ratio = std::abs(h_a_mat_times_state_true_minus_rhs[i]) /
-            h_abs_lu_mult_times_abs_state[i];
+            h_a_mat_abs_times_abs_state_true[i];
     max = std::max(max, ratio);
   }
 

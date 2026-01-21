@@ -28,6 +28,24 @@ void print_bvp_config(const bvp_config &bvp_cfg) {
             << bvp_cfg.gamma_cfg.confidence << std::endl;
 }
 
+/* BVP filename */
+std::string make_bvp_filename(const std::string prefix, const bvp_config &cfg) {
+  std::ostringstream ss;
+  ss << prefix << "_bvp_" << to_string(cfg.prec) << "_prec"
+     << "_bound_confidence_" << std::fixed << std::setprecision(5)
+     << cfg.gamma_cfg.confidence << "_bound_model_"
+     << to_string(cfg.gamma_cfg.bound_model);
+
+  if (cfg.gamma_cfg.bound_model == Beta) {
+    ss << "_a_" << cfg.gamma_cfg.beta_dist_alpha << "_b_"
+       << cfg.gamma_cfg.beta_dist_beta;
+  }
+
+  ss << ".csv";
+
+  return ss.str();
+}
+
 bvp_parameters sample_bvp_parameters(const int num_samples, std::mt19937 &gen) {
   /* initialize */
   bvp_parameters bvp_params;
@@ -182,14 +200,21 @@ void run_ode_backward_error_experiment_fixed_interval(
   /* compute the backward error bound */
   backward_error_bound =
       compute_ode_backward_error_bound(num_intervals, bvp_cfg.gamma_cfg, true);
+
+  /* update result */
+  result.n = num_intervals;
+  result.backward_error_min = backward_error_stats.min;
+  result.backward_error_max = backward_error_stats.max;
+  result.backward_error_mean = backward_error_stats.mean;
+  result.backward_error_bound = backward_error_bound;
 }
 
 /* run bvp backward error experiment */
 void run_ode_backward_error_experiment(const bvp_config &bvp_cfg,
                                        const int num_samples, const int seed) {
   /* initialize */
-  /* std::vector<int> num_intervals = {4, 8, 16, 32, 64, 128}; */
-  std::vector<int> num_intervals = {128, 256, 512, 1024, 2048};
+  std::vector<int> num_intervals = {4,   8,   16,   32,   64,  128,
+                                    256, 512, 1024, 2048, 4069};
   std::vector<backward_error_result> results(num_intervals.size());
   /* random generator */
   std::mt19937 gen(seed);
@@ -212,28 +237,31 @@ void run_ode_backward_error_experiment(const bvp_config &bvp_cfg,
   /* sample the parameters */
   bvp_parameters bvp_params = sample_bvp_parameters(num_samples, gen);
 
-  bvp_params.theta_one[0] = 1.0;  // for testing
-  bvp_params.theta_two[0] = 1.0;  // for testing
   /* run experiment for fixed interval */
-  int test_interval = 4;
-  switch (bvp_cfg.prec) {
-    case Double: {
-      run_ode_backward_error_experiment_fixed_interval<double>(
-          bvp_cfg, bvp_params, num_intervals[test_interval], results[0]);
-      break;
-    }
-    case Single: {
-      run_ode_backward_error_experiment_fixed_interval<float>(
-          bvp_cfg, bvp_params, num_intervals[test_interval], results[0]);
-      break;
-    }
-    case Half: {
-      run_ode_backward_error_experiment_fixed_interval<half>(
-          bvp_cfg, bvp_params, num_intervals[test_interval], results[0]);
-      break;
-    }
-    default: {
-      throw std::invalid_argument("invalid precision");
+  for (size_t i = 0; i < num_intervals.size(); i++) {
+    switch (bvp_cfg.prec) {
+      case Double: {
+        run_ode_backward_error_experiment_fixed_interval<double>(
+            bvp_cfg, bvp_params, num_intervals[i], results[i]);
+        break;
+      }
+      case Single: {
+        run_ode_backward_error_experiment_fixed_interval<float>(
+            bvp_cfg, bvp_params, num_intervals[i], results[i]);
+        break;
+      }
+      case Half: {
+        run_ode_backward_error_experiment_fixed_interval<half>(
+            bvp_cfg, bvp_params, num_intervals[i], results[i]);
+        break;
+      }
+      default: {
+        throw std::invalid_argument("invalid precision");
+      }
     }
   }
+
+  /* save */
+  std::string filename = make_bvp_filename("backward_error_result", bvp_cfg);
+  write_backward_error_results_csv(results, filename);
 }

@@ -24,7 +24,7 @@ void compute_analytical_state(std::vector<double> &state, const double theta_one
 /* run ode experiment */
 void run_ode_backward_error_experiment(
     const bvp_config &bvp_cfg,
-    const int num_samples=1, // number of parameter samples
+    const int num_samples=20, // number of parameter samples
     const int seed=42
     );
 
