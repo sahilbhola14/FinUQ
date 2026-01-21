@@ -103,7 +103,7 @@ gamma_result compute_matvec_product_backward_error_bound(
 
 /* compute the boundary value problem backward error */
 template <typename T>
-void compute_bvp_backward_error(const int num_intervals,
+void compute_ode_backward_error(const int num_intervals,
                                 std::vector<T> &h_sub_diag,
                                 std::vector<T> &h_main_diag,
                                 std::vector<T> &h_super_diag,
@@ -174,18 +174,51 @@ void compute_bvp_backward_error(const int num_intervals,
   *backward_error = max;
 }
 
+/* compute the boundary value problem backward error bound*/
+gamma_result compute_ode_backward_error_bound(const int num_intervals,
+                                              const gamma_config &gamma_cfg,
+                                              bool verbose) {
+  const int Ns = num_intervals - 1;
+  /* compute individual bound confidence when number_of_bounds to be satisfied
+   * is 7*Ns - 6 */
+  long double one_minus_zeta =
+      compute_individual_bound_one_minus_zeta(7 * Ns - 6, gamma_cfg.confidence);
+  /* compute the bounds 2.0\gamma_1 + \gamma_2 + \gamma_1\gamma_2*/
+  gamma_result gamma1 = get_gamma(1, gamma_cfg, one_minus_zeta);
+  gamma_result gamma2 = get_gamma(2, gamma_cfg, one_minus_zeta);
+
+  gamma_result result;
+  result.gamma_det = 2.0 * gamma1.gamma_det + gamma2.gamma_det +
+                     gamma1.gamma_det * gamma2.gamma_det;
+  result.gamma_mprea = 2.0 * gamma1.gamma_mprea + gamma2.gamma_mprea +
+                       gamma1.gamma_mprea * gamma2.gamma_mprea;
+  result.gamma_vprea = 2.0 * gamma1.gamma_vprea + gamma2.gamma_vprea +
+                       gamma1.gamma_vprea * gamma2.gamma_vprea;
+
+  /* verbose */
+  if (verbose == true) {
+    std::cout << std::string(10, '-')
+              << " ODE backward error bounds for number of intervals : "
+              << num_intervals << " " << std::string(10, '-') << std::endl;
+    std::cout << "Deterministic: " << result.gamma_det << std::endl;
+    std::cout << "Mean-informed: " << result.gamma_mprea << std::endl;
+    std::cout << "Varinance-informed: " << result.gamma_vprea << std::endl;
+  }
+  return result;
+}
+
 /* template initialization */
-template void compute_bvp_backward_error<double>(
+template void compute_ode_backward_error<double>(
     const int num_intervals, std::vector<double> &h_sub_diag,
     std::vector<double> &h_main_diag, std::vector<double> &h_super_diag,
     std::vector<double> &h_rhs, std::vector<double> &h_state,
     double *backward_error, Precision);
-template void compute_bvp_backward_error<float>(
+template void compute_ode_backward_error<float>(
     const int num_intervals, std::vector<float> &h_sub_diag,
     std::vector<float> &h_main_diag, std::vector<float> &h_super_diag,
     std::vector<float> &h_rhs, std::vector<float> &h_state,
     double *backward_error, Precision);
-template void compute_bvp_backward_error<half>(
+template void compute_ode_backward_error<half>(
     const int num_intervals, std::vector<half> &h_sub_diag,
     std::vector<half> &h_main_diag, std::vector<half> &h_super_diag,
     std::vector<half> &h_rhs, std::vector<half> &h_state,

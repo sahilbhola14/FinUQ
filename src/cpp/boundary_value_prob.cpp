@@ -151,6 +151,8 @@ void run_ode_backward_error_experiment_fixed_interval(
          "inconsistent number of params");
   const int num_samples = bvp_params.theta_one.size();
   std::vector<double> backward_error(num_samples);
+  vector_stats backward_error_stats;
+  gamma_result backward_error_bound;
 
   std::vector<T> h_sub_diag(Ns), h_main_diag(Ns), h_super_diag(Ns), h_rhs(Ns),
       h_state(Ns);
@@ -163,23 +165,31 @@ void run_ode_backward_error_experiment_fixed_interval(
     /* compute the rhs */
     compute_rhs<T>(h_rhs, num_intervals, bvp_params.theta_one[i],
                    bvp_params.theta_two[i]);
-    /* compute the solution state(s) */
+    /* compute the solution state */
     launch_thomas_algorithm_kernel<T>(num_intervals, h_sub_diag, h_main_diag,
                                       h_super_diag, h_rhs, h_state,
                                       bvp_cfg.prec);
     /* compute the backward error */
-    compute_bvp_backward_error(num_intervals, h_sub_diag, h_main_diag,
+    compute_ode_backward_error(num_intervals, h_sub_diag, h_main_diag,
                                h_super_diag, h_rhs, h_state, &backward_error[i],
                                bvp_cfg.prec);
-    printf("%.3e\n", backward_error[i]);
   }
+
+  /* compute the backward error statistics */
+  backward_error_stats = get_vector_stats(backward_error);
+  printf("%.3e\n", backward_error_stats.mean);
+
+  /* compute the backward error bound */
+  backward_error_bound =
+      compute_ode_backward_error_bound(num_intervals, bvp_cfg.gamma_cfg, true);
 }
 
 /* run bvp backward error experiment */
 void run_ode_backward_error_experiment(const bvp_config &bvp_cfg,
                                        const int num_samples, const int seed) {
   /* initialize */
-  std::vector<int> num_intervals = {4, 8, 16, 32, 64, 128};
+  /* std::vector<int> num_intervals = {4, 8, 16, 32, 64, 128}; */
+  std::vector<int> num_intervals = {128, 256, 512, 1024, 2048};
   std::vector<backward_error_result> results(num_intervals.size());
   /* random generator */
   std::mt19937 gen(seed);
@@ -205,7 +215,7 @@ void run_ode_backward_error_experiment(const bvp_config &bvp_cfg,
   bvp_params.theta_one[0] = 1.0;  // for testing
   bvp_params.theta_two[0] = 1.0;  // for testing
   /* run experiment for fixed interval */
-  int test_interval = 0;
+  int test_interval = 4;
   switch (bvp_cfg.prec) {
     case Double: {
       run_ode_backward_error_experiment_fixed_interval<double>(
