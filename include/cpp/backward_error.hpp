@@ -3,6 +3,7 @@
 
 #include <vector>
 #include "gamma.hpp"
+#include "definition.hpp"
 
 /* backward error results */
 struct backward_error_result {
@@ -25,6 +26,19 @@ gamma_result compute_matvec_product_backward_error_bound(
     const int cols,
     const gamma_config &gamma_cfg,
     bool verbose = false
+    );
+
+/* boundary value problem backward error */
+template <typename T>
+void compute_bvp_backward_error(
+    const int num_intervals,
+    std::vector<T> &h_sub_diag,
+    std::vector<T> &h_main_diag,
+    std::vector<T> &h_super_diag,
+    std::vector<T> &h_rhs,
+    std::vector<T> &h_state,
+    double *backward_error,
+    Precision prec
     );
 
 

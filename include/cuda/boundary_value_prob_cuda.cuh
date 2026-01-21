@@ -5,6 +5,14 @@
 
 #include "definition.hpp"
 
+/* |\hat{L}||\hat{U}| kernel */
+template <typename T>
+void launch_abs_lu_multiplication_kernel(
+    const int num_intervals, const std::vector<T> &h_sub_diag,
+    const std::vector<T> &h_main_diag, const std::vector<T> &h_super_diag,
+    const std::vector<T> &h_rhs, std::vector<double> &h_abs_lu_mult_true,
+    Precision prec, bool verbose = false);
+
 /* thomas algorithm kernel */
 template <typename T>
 void launch_thomas_algorithm_kernel(const int num_intervals,

@@ -150,11 +150,10 @@ void run_ode_backward_error_experiment_fixed_interval(
   assert(bvp_params.theta_one.size() == bvp_params.theta_two.size() &&
          "inconsistent number of params");
   const int num_samples = bvp_params.theta_one.size();
+  std::vector<double> backward_error(num_samples);
 
   std::vector<T> h_sub_diag(Ns), h_main_diag(Ns), h_super_diag(Ns), h_rhs(Ns),
       h_state(Ns);
-
-  T h_state_integral;
 
   /* run the experiment */
   for (int i = 0; i < num_samples; i++) {
@@ -164,10 +163,15 @@ void run_ode_backward_error_experiment_fixed_interval(
     /* compute the rhs */
     compute_rhs<T>(h_rhs, num_intervals, bvp_params.theta_one[i],
                    bvp_params.theta_two[i]);
-    /* compute the QoI */
+    /* compute the solution state(s) */
     launch_thomas_algorithm_kernel<T>(num_intervals, h_sub_diag, h_main_diag,
                                       h_super_diag, h_rhs, h_state,
                                       bvp_cfg.prec);
+    /* compute the backward error */
+    compute_bvp_backward_error(num_intervals, h_sub_diag, h_main_diag,
+                               h_super_diag, h_rhs, h_state, &backward_error[i],
+                               bvp_cfg.prec);
+    printf("%.3e\n", backward_error[i]);
   }
 }
 
@@ -201,20 +205,21 @@ void run_ode_backward_error_experiment(const bvp_config &bvp_cfg,
   bvp_params.theta_one[0] = 1.0;  // for testing
   bvp_params.theta_two[0] = 1.0;  // for testing
   /* run experiment for fixed interval */
+  int test_interval = 0;
   switch (bvp_cfg.prec) {
     case Double: {
       run_ode_backward_error_experiment_fixed_interval<double>(
-          bvp_cfg, bvp_params, num_intervals[0], results[0]);
+          bvp_cfg, bvp_params, num_intervals[test_interval], results[0]);
       break;
     }
     case Single: {
       run_ode_backward_error_experiment_fixed_interval<float>(
-          bvp_cfg, bvp_params, num_intervals[0], results[0]);
+          bvp_cfg, bvp_params, num_intervals[test_interval], results[0]);
       break;
     }
     case Half: {
       run_ode_backward_error_experiment_fixed_interval<half>(
-          bvp_cfg, bvp_params, num_intervals[0], results[0]);
+          bvp_cfg, bvp_params, num_intervals[test_interval], results[0]);
       break;
     }
     default: {

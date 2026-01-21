@@ -114,7 +114,7 @@ __global__ void state_integral_kernel(const int n, T *state, T *state_integral,
                                       Precision prec) {
   int tid = threadIdx.x;
   int gid = blockIdx.x * blockDim.x + threadIdx.x;
-  T delta_x = static_cast<T>(1.0) / (n + 1);
+  T delta_x = static_cast<T>(1.0 / (n + 1));
   T sum = static_cast<T>(0.0);
   for (int i = 0; i < n; i++) {
     if (prec == Double) {
@@ -329,7 +329,7 @@ void launch_thomas_algorithm_kernel(const int num_intervals,
     printf("Thomas algorithm computed state in %s precision\n",
            to_string(prec).c_str());
     for (auto &a : h_state) {
-      printf("%f\n", a);
+      printf("%f\n", static_cast<double>(a));
     }
   }
 }
@@ -355,7 +355,58 @@ void launch_ode_state_integral_kernel(const int num_intervals,
                                   prec);
   /* print */
   if (verbose == true) {
-    printf("State integral: %f\n", h_state_integral);
+    printf("State integral: %f\n", static_cast<double>(h_state_integral));
+  }
+}
+
+/* launch |\hat{L}|{\hat{U}| kernel
+  Kernel first computes the LU decomposition in the prescribed precision and
+  then casts it to double precison to compute the |\hat{L}||\hat{U}|, where
+  \hat{L} and \hat{U} are the computed factors. This is required for the
+  backward error analysis for solving a linear system. Notes:
+  1. See eq. 4.4 in A NEW APPROACH TO PROBABILISTIC ROUNDING ERROR ANALYSIS.
+  2. output h_abs_lu_mult_true is stored in row-major
+*/
+template <typename T>
+void launch_abs_lu_multiplication_kernel(
+    const int num_intervals, const std::vector<T> &h_sub_diag,
+    const std::vector<T> &h_main_diag, const std::vector<T> &h_super_diag,
+    const std::vector<T> &h_rhs, std::vector<double> &h_abs_lu_mult_true,
+    Precision prec, bool verbose) {
+  // initialize
+  const int Ns = num_intervals - 1;
+  std::vector<T> h_l_sub_diag(Ns), h_u_main_diag(Ns);
+  std::vector<double> h_l_sub_diag_abs, h_u_main_diag_abs, h_super_diag_abs;
+
+  // LU decomposition
+  launch_lu_decomposition_kernel<T>(num_intervals, h_sub_diag, h_main_diag,
+                                    h_super_diag, h_l_sub_diag, h_u_main_diag,
+                                    prec);
+  // compute the absolute value
+  convert_vector_to_absolute_double(h_l_sub_diag, h_l_sub_diag_abs);
+  convert_vector_to_absolute_double(h_u_main_diag, h_u_main_diag_abs);
+  convert_vector_to_absolute_double(h_super_diag, h_super_diag_abs);
+
+  // compute |\hat{L}||\hat{U}|
+  h_abs_lu_mult_true.assign(Ns * Ns, 0.0);
+  for (int i = 0; i < Ns; i++) {
+    // main diagonal
+    double main_val = h_u_main_diag_abs[i];
+    if (i > 0) {
+      main_val += h_l_sub_diag_abs[i] * h_super_diag_abs[i - 1];
+    }
+    h_abs_lu_mult_true[i * Ns + i] = main_val;
+
+    // super diagonal
+    if (i < Ns - 1) {
+      h_abs_lu_mult_true[i * Ns + (i + 1)] = h_super_diag_abs[i];
+    }
+
+    // sub diagonal
+    if (i > 0) {
+      h_abs_lu_mult_true[i * Ns + (i - 1)] =
+          h_l_sub_diag_abs[i] * h_u_main_diag_abs[i - 1];
+    }
   }
 }
 
@@ -378,4 +429,31 @@ template void launch_thomas_algorithm_kernel<half>(
 template void launch_ode_state_integral_kernel<double>(
     const int, const std::vector<double> &, const std::vector<double> &,
     const std::vector<double> &, const std::vector<double> &, double &,
+    Precision, bool);
+
+template void launch_ode_state_integral_kernel<float>(
+    const int, const std::vector<float> &, const std::vector<float> &,
+    const std::vector<float> &, const std::vector<float> &, float &, Precision,
+    bool);
+
+template void launch_ode_state_integral_kernel<half>(const int,
+                                                     const std::vector<half> &,
+                                                     const std::vector<half> &,
+                                                     const std::vector<half> &,
+                                                     const std::vector<half> &,
+                                                     half &, Precision, bool);
+
+template void launch_abs_lu_multiplication_kernel(
+    const int, const std::vector<double> &, const std::vector<double> &,
+    const std::vector<double> &, const std::vector<double> &,
+    std::vector<double> &, Precision, bool);
+
+template void launch_abs_lu_multiplication_kernel(
+    const int, const std::vector<float> &, const std::vector<float> &,
+    const std::vector<float> &, const std::vector<float> &,
+    std::vector<double> &, Precision, bool);
+
+template void launch_abs_lu_multiplication_kernel(
+    const int, const std::vector<half> &, const std::vector<half> &,
+    const std::vector<half> &, const std::vector<half> &, std::vector<double> &,
     Precision, bool);
