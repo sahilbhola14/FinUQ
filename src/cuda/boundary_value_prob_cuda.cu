@@ -4,6 +4,7 @@
 #include <iostream>
 
 #include "boundary_value_prob_cuda.cuh"
+#include "rounding_error_model.cuh"
 #include "utils.hpp"
 #include "utils_cuda.cuh"
 
@@ -37,6 +38,54 @@ __global__ void lu_decomposition_kernel(const int n, T *sub_diag, T *main_diag,
       printf("<Cuda Error>: Invalid precision\n");
       return;
     }
+  }
+}
+
+/* LU decomposition model kernel
+ * l_sub_diag[i] = sub_diag[i] / u_main_diag[i - 1];
+ * u_main_diag[i] = main_diag[i] - l_sub_diag[i] * super_diag[i - 1];
+ */
+template <BVPKernelTag K>
+__global__ void lu_decomposition_model_kernel(
+    const int n, double *sub_diag, double *main_diag, double *super_diag,
+    double *l_sub_diag, double *u_main_diag, Precision prec,
+    BoundModel bound_model, const double beta_dist_alpha,
+    const double beta_dist_beta, const int experiment_id,
+    unsigned long long seed = 1234ULL) {
+  /* initialize */
+  int tid = threadIdx.x;
+  int gid = blockIdx.x * blockDim.x + tid;
+  int threads = gridDim.x * blockDim.x;
+  constexpr int kernel_id = static_cast<int>(K);
+  /* roundig error */
+  const int num_perturb = 3;
+  double rounding_error[num_perturb];
+  /* random state */
+  curandState state;
+  long long sequence =
+      (long long)experiment_id * (int)BVPKernelTag::Count * threads +
+      kernel_id * threads + gid;
+  curand_init(seed, sequence, 0, &state);
+
+  /* compute the LU decomposition */
+  u_main_diag[0] = main_diag[0];
+  for (int i = 1; i < n; i++) {
+    /* sample rounding error delta */
+    sample_rounding_error_distribution(num_perturb, rounding_error, prec,
+                                       bound_model, beta_dist_alpha,
+                                       beta_dist_beta, &state);
+    for (int j = 0; j < num_perturb; j++)
+      rounding_error[j] = 1.0 + rounding_error[j];
+
+    /* compute */
+    l_sub_diag[i] = __ddiv_rn(sub_diag[i],
+                              __dmul_rn(u_main_diag[i - 1], rounding_error[0]));
+
+    u_main_diag[i] = __ddiv_rn(
+        __dsub_rn(main_diag[i],
+                  __dmul_rn(l_sub_diag[i],
+                            __dmul_rn(super_diag[i - 1], rounding_error[1]))),
+        rounding_error[2]);
   }
 }
 
@@ -219,6 +268,64 @@ void launch_lu_decomposition_kernel(const int num_intervals,
   cudaCheck(cudaFree(d_u_main_diag));
 }
 
+/* LU decomposition model kernel launcher */
+void launch_lu_decomposition_model_kernel(
+    const int num_intervals, const std::vector<double> &h_sub_diag,
+    const std::vector<double> &h_main_diag,
+    const std::vector<double> &h_super_diag, std::vector<double> &h_l_sub_diag,
+    std::vector<double> &h_u_main_diag, Precision prec,
+    const gamma_config &gamma_cfg, const int experiment_id,
+    bool verbose = false) {
+  /* /1* kernel parameters *1/ */
+  dim3 blockDim = 1;
+  dim3 gridDim = 1;
+  /* initialize */
+  const int Ns = num_intervals - 1;
+  int size = Ns * sizeof(double);
+  double *d_sub_diag, *d_main_diag, *d_super_diag, *d_l_sub_diag,
+      *d_u_main_diag;
+  BoundModel bound_model = gamma_cfg.bound_model;
+  const double beta_dist_alpha = gamma_cfg.beta_dist_alpha;
+  const double beta_dist_beta = gamma_cfg.beta_dist_beta;
+
+  /* allocate memory */
+  cudaCheck(cudaMalloc((void **)&d_sub_diag, size));
+  cudaCheck(cudaMalloc((void **)&d_main_diag, size));
+  cudaCheck(cudaMalloc((void **)&d_super_diag, size));
+  cudaCheck(cudaMalloc((void **)&d_l_sub_diag, size));
+  cudaCheck(cudaMalloc((void **)&d_u_main_diag, size));
+  /* host to device */
+  cudaCheck(
+      cudaMemcpy(d_sub_diag, h_sub_diag.data(), size, cudaMemcpyHostToDevice));
+  cudaCheck(cudaMemcpy(d_main_diag, h_main_diag.data(), size,
+                       cudaMemcpyHostToDevice));
+  cudaCheck(cudaMemcpy(d_super_diag, h_super_diag.data(), size,
+                       cudaMemcpyHostToDevice));
+  /* /1* launch kernel *1/ */
+  if (verbose == true)
+    std::cout << "launching kernel for LU decomposition in "
+              << to_string(Double) << " precision" << std::endl;
+
+  lu_decomposition_model_kernel<BVPKernelTag::LUDecomposition>
+      <<<gridDim, blockDim>>>(Ns, d_sub_diag, d_main_diag, d_super_diag,
+                              d_l_sub_diag, d_u_main_diag, prec, bound_model,
+                              beta_dist_alpha, beta_dist_beta, experiment_id);
+  cudaCheck(cudaDeviceSynchronize());
+
+  /* cudaCheck(cudaGetLastError()); */
+  /* /1* device to host *1/ */
+  /* cudaCheck(cudaMemcpy(h_l_sub_diag.data(), d_l_sub_diag, size, */
+  /*                      cudaMemcpyDeviceToHost)); */
+  /* cudaCheck(cudaMemcpy(h_u_main_diag.data(), d_u_main_diag, size, */
+  /*                      cudaMemcpyDeviceToHost)); */
+  /* /1* free *1/ */
+  /* cudaCheck(cudaFree(d_sub_diag)); */
+  /* cudaCheck(cudaFree(d_main_diag)); */
+  /* cudaCheck(cudaFree(d_super_diag)); */
+  /* cudaCheck(cudaFree(d_l_sub_diag)); */
+  /* cudaCheck(cudaFree(d_u_main_diag)); */
+}
+
 /* forward substituion kernel launcher */
 template <typename T>
 void launch_forward_substitution_kernel(const int num_intervals,
@@ -365,6 +472,23 @@ void launch_thomas_algorithm_kernel(const int num_intervals,
       printf("%f\n", static_cast<double>(a));
     }
   }
+}
+
+/* launch thomas algorithm model kernel */
+void launch_thomas_algorithm_model_kernel(
+    const int num_intervals, const std::vector<double> &h_sub_diag,
+    const std::vector<double> &h_main_diag,
+    const std::vector<double> &h_super_diag, const std::vector<double> &h_rhs,
+    std::vector<double> &h_state, Precision prec, const gamma_config &gamma_cfg,
+    const int experiment_id, bool verbose) {
+  // initialize
+  const int Ns = num_intervals - 1;
+  std::vector<double> h_l_sub_diag(Ns), h_u_main_diag(Ns), h_forward_sol(Ns);
+
+  // LU decomposition (KERNEL 0)
+  launch_lu_decomposition_model_kernel(
+      num_intervals, h_sub_diag, h_main_diag, h_super_diag, h_l_sub_diag,
+      h_u_main_diag, prec, gamma_cfg, experiment_id);
 }
 
 /* launch ode state integral kernerl(s) */

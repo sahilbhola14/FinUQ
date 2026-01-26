@@ -238,6 +238,9 @@ void run_forward_error_qoi_experiment_fixed_interval(
 
   double h_qoi_true;
 
+  std::vector<double> h_state_model(Ns), h_state_integral_model(num_samples);
+  double h_qoi_model;
+
   /* run the experiment */
   for (int i = 0; i < num_samples; i++) {
     if (i % 10 == 0) {
@@ -262,6 +265,10 @@ void run_forward_error_qoi_experiment_fixed_interval(
     launch_thomas_algorithm_kernel<double>(num_intervals, h_sub_diag_true,
                                            h_main_diag_true, h_super_diag_true,
                                            h_rhs_true, h_state_true, Double);
+    launch_thomas_algorithm_model_kernel(
+        num_intervals, h_sub_diag_true, h_main_diag_true, h_super_diag_true,
+        h_rhs_true, h_state_model, bvp_cfg.prec, bvp_cfg.gamma_cfg, i);
+
     /* integrate the state(s) using Reimann integration */
     launch_state_integral_kernel<T>(num_intervals, h_state, h_state_integral[i],
                                     bvp_cfg.prec);
@@ -280,7 +287,6 @@ void run_forward_error_qoi_experiment_fixed_interval(
                                            bvp_cfg.prec);
   launch_monte_carlo_expectation_kernel<double>(h_state_integral_true,
                                                 h_qoi_true, Double);
-  /* printf("%f %f \n", static_cast<double>(h_qoi), h_qoi_true); */
 
   /* compute the forward error in qoi */
   compute_bvp_qoi_forward_error(static_cast<double>(h_qoi), h_qoi_true,
@@ -365,7 +371,7 @@ void run_forward_error_qoi_experiment(const bvp_config &bvp_cfg,
   /* initialize */
   /* std::vector<int> num_intervals = {16,  32,   64,   128, 256, */
   /*                                   512, 1024, 2048, 4069}; */
-  std::vector<int> num_intervals = {4, 16, 32, 64};
+  std::vector<int> num_intervals = {4};
   std::vector<bvp_forward_error_result> results(num_intervals.size());
 
   /* random generator */
@@ -421,7 +427,7 @@ void run_forward_error_qoi_experiment(const bvp_config &bvp_cfg,
   std::ostringstream ss;
   ss << "forward_error_result_num_samples_" << num_samples;
   std::string filename = make_bvp_filename(ss.str(), bvp_cfg);
-  write_bvp_forward_error_results_csv(results, filename, true);
+  write_bvp_forward_error_results_csv(results, filename);
 }
 
 namespace bvp {
@@ -485,5 +491,5 @@ void run_all_ode_experiments(Precision prec) {
   // backward error in solving the tri-diagonal system
   /* bvp::run_all_backward_error_ode_sol_experiments(prec); */
   // forward error in obtainig the QoI
-  bvp::run_all_forward_error_qoi_experiments(prec, 10);
+  bvp::run_all_forward_error_qoi_experiments(prec, 1);
 }
