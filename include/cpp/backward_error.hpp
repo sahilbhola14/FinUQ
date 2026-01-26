@@ -31,11 +31,11 @@ gamma_result compute_matvec_product_backward_error_bound(
 template <typename T>
 void compute_ode_backward_error(
     const int num_intervals,
-    std::vector<T> &h_sub_diag,
-    std::vector<T> &h_main_diag,
-    std::vector<T> &h_super_diag,
-    std::vector<T> &h_rhs,
-    std::vector<T> &h_state,
+    const std::vector<T> &h_sub_diag,
+    const std::vector<T> &h_main_diag,
+    const std::vector<T> &h_super_diag,
+    const std::vector<T> &h_rhs,
+    const std::vector<T> &h_state,
     double *backward_error,
     Precision prec
     );

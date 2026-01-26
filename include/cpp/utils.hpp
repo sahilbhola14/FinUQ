@@ -9,6 +9,7 @@
 #include "gamma.hpp"
 #include "backward_error.hpp"
 #include "forward_error.hpp"
+#include "boundary_value_prob.hpp"
 
 /* vector statistics */
 struct vector_stats {
@@ -60,6 +61,7 @@ inline std::string to_string(Distribution dist){
 void write_gamma_results_csv(const std::vector<gamma_result> &results, const std::string filename, bool verbose=false);
 void write_backward_error_results_csv(const std::vector<backward_error_result> &results, const std::string filename, bool verbose=false);
 void write_forward_error_results_csv(const forward_error_result &results, const std::string filename, bool verbose=false);
+void write_bvp_forward_error_results_csv(const std::vector<bvp_forward_error_result> &results, const std::string filename, bool verbose=false);
 /* vector utils */
 template <typename T>
 void convert_vector_to_double(const std::vector<T> &source, std::vector<double> &target);

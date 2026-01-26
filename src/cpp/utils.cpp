@@ -105,6 +105,39 @@ void write_forward_error_results_csv(const forward_error_result &results,
   }
 }
 
+/* write bvp forward error results to csv */
+void write_bvp_forward_error_results_csv(
+    const std::vector<bvp_forward_error_result> &results, std::string filename,
+    bool verbose) {
+  /* open the file */
+  std::ofstream file(filename);
+  /* check */
+  if (!file.is_open()) {
+    std::cerr << "Error: could not open file " << filename << "\n";
+    return;
+  }
+  /* header */
+  file << "n,forward_error,forward_error_model,gamma_det,"
+          "gamma_mprea,gamma_vprea\n";
+  /* numerical font */
+  file << std::scientific << std::setprecision(10);
+  /* write the results */
+  for (const auto &r : results) {
+    file << std::left << std::setw(12) << r.n << ", " << std::setw(18)
+         << r.qoi_forward_error << ", " << std::setw(18)
+         << r.qoi_forward_error_model << ", " << std::setw(18)
+         << r.forward_error_bound.gamma_det << ", " << std::setw(18)
+         << r.forward_error_bound.gamma_mprea << ", " << std::setw(18)
+         << r.forward_error_bound.gamma_vprea << "\n";
+  }
+  /* close the file */
+  file.close();
+  /* print */
+  if (verbose == true) {
+    std::cout << "forward error results saved to " << filename << std::endl;
+  }
+}
+
 /* convert to double */
 template <typename T>
 void convert_vector_to_double(const std::vector<T> &source,

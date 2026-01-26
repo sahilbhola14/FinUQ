@@ -15,10 +15,10 @@ struct gamma_config {
 
 /* gamma results */
 struct gamma_result {
-    int n; // vector size
-    long double gamma_det; // gamma deterministic
-    long double gamma_mprea; // mean-informed probabilitic gamma
-    long double gamma_vprea; // variance-informed probabilitic gamma
+    int n=0; // vector size
+    long double gamma_det = 0.0L; // gamma deterministic
+    long double gamma_mprea = 0.0L; // mean-informed probabilitic gamma
+    long double gamma_vprea = 0.0L; // variance-informed probabilitic gamma
 };
 
 
@@ -27,6 +27,13 @@ void compare_gamma(const gamma_config &gamma_cfg = gamma_config(), bool verbose 
 
 /* get gamma */
 gamma_result get_gamma(const int n, const gamma_config &gamma_cfg, const long double one_minus_zeta);
+
+/* gamma operators */
+gamma_result operator+(const gamma_result &a, const gamma_result &b);
+gamma_result operator+(long double c, const gamma_result& g);
+gamma_result operator*(long double c, const gamma_result& g);
+gamma_result operator*(const gamma_result& a, const gamma_result& b);
+gamma_result gamma_abs(const gamma_result& g);
 
 /* experiments */
 void run_all_compare_gamma_experiments(Precision prec);

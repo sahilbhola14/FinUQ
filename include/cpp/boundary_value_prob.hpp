@@ -15,6 +15,13 @@ struct bvp_config{
   gamma_config gamma_cfg; // bounds config
 };
 
+struct bvp_forward_error_result {
+  int n;
+  double qoi_forward_error; // forward error
+  double qoi_forward_error_model; // forward error model
+  gamma_result forward_error_bound; // forward error bound
+};
+
 /* compute analytical qoi */
 void compute_analytical_qoi(const int num_samples=100000000, bool verbose =false, const int seed=42);
 

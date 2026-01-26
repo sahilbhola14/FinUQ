@@ -33,4 +33,16 @@ void launch_ode_state_integral_kernel(const int num_intervals,
                                       T &h_state_integral, Precision prec,
                                       bool verbose = false);
 
+/* integrate the state (obtained from Thomas) kernel */
+template <typename T>
+void launch_state_integral_kernel(const int num_intervals,
+                                  std::vector<T> &h_state, T &h_state_integral,
+                                  Precision prec, bool verbose = false);
+
+/* monte carlo expectation kernel */
+template <typename T>
+void launch_monte_carlo_expectation_kernel(const std::vector<T> &h_integrand,
+                                           T &h_integral, Precision prec,
+                                           bool verbose = false);
+
 #endif

@@ -187,6 +187,38 @@ void compare_gamma(const gamma_config &gamma_cfg, bool verbose) {
   write_gamma_results_csv(results, filename, verbose);
 }
 
+/* operator for gamma */
+gamma_result operator+(const gamma_result &a, const gamma_result &b) {
+  return gamma_result{a.n + b.n, a.gamma_det + b.gamma_det,
+                      a.gamma_mprea + b.gamma_mprea,
+                      a.gamma_vprea + b.gamma_vprea};
+}
+
+gamma_result operator+(long double c, const gamma_result &g) {
+  return gamma_result{g.n, c + g.gamma_det, c + g.gamma_mprea,
+                      c + g.gamma_vprea};
+}
+
+gamma_result operator*(long double c, const gamma_result &g) {
+  return gamma_result{g.n, c * g.gamma_det, c * g.gamma_mprea,
+                      c * g.gamma_vprea};
+}
+
+gamma_result operator*(const gamma_result &a, const gamma_result &b) {
+  return gamma_result{a.n * b.n, a.gamma_det * b.gamma_det,
+                      a.gamma_mprea * b.gamma_mprea,
+                      a.gamma_vprea * b.gamma_vprea};
+}
+
+gamma_result gamma_abs(const gamma_result &g) {
+  return gamma_result{
+      g.n,
+      std::abs(g.gamma_det),
+      std::abs(g.gamma_mprea),
+      std::abs(g.gamma_vprea),
+  };
+}
+
 /* experiments */
 void run_all_compare_gamma_experiments(Precision prec) {
   /* configuration */

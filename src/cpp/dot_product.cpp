@@ -136,7 +136,7 @@ void run_dot_product_forward_error_experiment_fixed_size(
   std::vector<double> h_a_true_abs(n), h_b_true_abs(n);
   T h_result;
   double h_result_true, h_result_true_abs, h_result_model;
-  gamma_result forward_error_bound;
+  /* gamma_result forward_error_bound; */
   /* random state */
   std::mt19937 gen(seed);
 

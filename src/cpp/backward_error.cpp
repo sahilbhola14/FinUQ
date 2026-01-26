@@ -103,10 +103,11 @@ gamma_result compute_matvec_product_backward_error_bound(
 /* compute the boundary value problem backward error */
 template <typename T>
 void compute_ode_backward_error(const int num_intervals,
-                                std::vector<T> &h_sub_diag,
-                                std::vector<T> &h_main_diag,
-                                std::vector<T> &h_super_diag,
-                                std::vector<T> &h_rhs, std::vector<T> &h_state,
+                                const std::vector<T> &h_sub_diag,
+                                const std::vector<T> &h_main_diag,
+                                const std::vector<T> &h_super_diag,
+                                const std::vector<T> &h_rhs,
+                                const std::vector<T> &h_state,
                                 double *backward_error, Precision prec) {
   /* initialization */
   const int Ns = num_intervals - 1;
@@ -212,17 +213,17 @@ gamma_result compute_ode_backward_error_bound(const int num_intervals,
 
 /* template initialization */
 template void compute_ode_backward_error<double>(
-    const int num_intervals, std::vector<double> &h_sub_diag,
-    std::vector<double> &h_main_diag, std::vector<double> &h_super_diag,
-    std::vector<double> &h_rhs, std::vector<double> &h_state,
-    double *backward_error, Precision);
+    const int num_intervals, const std::vector<double> &h_sub_diag,
+    const std::vector<double> &h_main_diag,
+    const std::vector<double> &h_super_diag, const std::vector<double> &h_rhs,
+    const std::vector<double> &h_state, double *backward_error, Precision);
 template void compute_ode_backward_error<float>(
-    const int num_intervals, std::vector<float> &h_sub_diag,
-    std::vector<float> &h_main_diag, std::vector<float> &h_super_diag,
-    std::vector<float> &h_rhs, std::vector<float> &h_state,
-    double *backward_error, Precision);
+    const int num_intervals, const std::vector<float> &h_sub_diag,
+    const std::vector<float> &h_main_diag,
+    const std::vector<float> &h_super_diag, const std::vector<float> &h_rhs,
+    const std::vector<float> &h_state, double *backward_error, Precision);
 template void compute_ode_backward_error<half>(
-    const int num_intervals, std::vector<half> &h_sub_diag,
-    std::vector<half> &h_main_diag, std::vector<half> &h_super_diag,
-    std::vector<half> &h_rhs, std::vector<half> &h_state,
+    const int num_intervals, const std::vector<half> &h_sub_diag,
+    const std::vector<half> &h_main_diag, const std::vector<half> &h_super_diag,
+    const std::vector<half> &h_rhs, const std::vector<half> &h_state,
     double *backward_error, Precision);

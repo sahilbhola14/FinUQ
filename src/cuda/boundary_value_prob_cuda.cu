@@ -135,6 +135,39 @@ __global__ void state_integral_kernel(const int n, T *state, T *state_integral,
   }
 }
 
+/* monte carlo kernel */
+template <typename T>
+__global__ void monte_carlo_expectation_kernel(const int num_samples,
+                                               T *integrand, T *result,
+                                               Precision prec) {
+  int tid = threadIdx.x;
+  int gid = blockIdx.x * blockDim.x + tid;
+
+  /* compute the summation */
+  T sum = static_cast<T>(0.0);
+  for (int i = 0; i < num_samples; i++) {
+    if (prec == Double) {
+      sum = __dadd_rn(sum, integrand[i]);
+    } else if (prec == Single) {
+      sum = __fadd_rn(sum, integrand[i]);
+    } else if (prec == Half) {
+      sum = __hadd_rn(sum, static_cast<half>(integrand[i]));
+    } else {
+      printf("<Cuda Error>: Invalid precision\n");
+      return;
+    }
+  }
+
+  /* multiply */
+  if (prec == Double) {
+    *result = __dmul_rn(sum, static_cast<double>(1.0 / num_samples));
+  } else if (prec == Single) {
+    *result = __fmul_rn(sum, static_cast<float>(1.0 / num_samples));
+  } else if (prec == Half) {
+    *result = __hmul_rn(sum, static_cast<half>(1.0 / num_samples));
+  }
+}
+
 /* LU decomposition kernel launcher */
 template <typename T>
 void launch_lu_decomposition_kernel(const int num_intervals,
@@ -271,7 +304,7 @@ void launch_backward_substitution_kernel(const int num_intervals,
 template <typename T>
 void launch_state_integral_kernel(const int num_intervals,
                                   std::vector<T> &h_state, T &h_state_integral,
-                                  Precision prec, bool verbose = false) {
+                                  Precision prec, bool verbose) {
   /* kernel parameters */
   dim3 blockDim = 1;
   dim3 gridDim = 1;
@@ -410,6 +443,41 @@ void launch_abs_lu_multiplication_kernel(
   }
 }
 
+template <typename T>
+void launch_monte_carlo_expectation_kernel(const std::vector<T> &h_integrand,
+                                           T &h_result, Precision prec,
+                                           bool verbose) {
+  /* kernel parameters */
+  dim3 blockDim = 1;
+  dim3 gridDim = 1;
+  /* initialization */
+  const int num_samples = h_integrand.size();
+  T *d_integrand, *d_result;
+  const int size = num_samples * sizeof(T);
+  /* memory allocation */
+  cudaCheck(cudaMalloc((void **)&d_integrand, size));
+  cudaCheck(cudaMalloc((void **)&d_result, sizeof(T)));
+  /* host to device */
+  cudaCheck(cudaMemcpy(d_integrand, h_integrand.data(), size,
+                       cudaMemcpyHostToDevice));
+
+  if (verbose == true)
+    std::cout << "launching Monte-Carlo integral kernel using " << num_samples
+              << "for in" << to_string(prec) << " precision" << std::endl;
+
+  monte_carlo_expectation_kernel<<<gridDim, blockDim>>>(
+      num_samples, d_integrand, d_result, prec);
+  cudaCheck(cudaDeviceSynchronize());
+  cudaCheck(cudaGetLastError());
+
+  /* device to host */
+  cudaCheck(cudaMemcpy(&h_result, d_result, sizeof(T), cudaMemcpyDeviceToHost));
+
+  /* free */
+  cudaCheck(cudaFree(d_integrand));
+  cudaCheck(cudaFree(d_result));
+}
+
 /* template initialization */
 template void launch_thomas_algorithm_kernel<double>(
     const int, const std::vector<double> &, const std::vector<double> &,
@@ -457,3 +525,22 @@ template void launch_abs_lu_multiplication_kernel(
     const int, const std::vector<half> &, const std::vector<half> &,
     const std::vector<half> &, const std::vector<half> &, std::vector<double> &,
     Precision, bool);
+
+template void launch_state_integral_kernel<double>(const int,
+                                                   std::vector<double> &,
+                                                   double &, Precision, bool);
+template void launch_state_integral_kernel<float>(const int,
+                                                  std::vector<float> &, float &,
+                                                  Precision, bool);
+template void launch_state_integral_kernel<half>(const int, std::vector<half> &,
+                                                 half &, Precision, bool);
+
+template void launch_monte_carlo_expectation_kernel<double>(
+    const std::vector<double> &h_integrad, double &h_integral, Precision prec,
+    bool verbose);
+template void launch_monte_carlo_expectation_kernel<float>(
+    const std::vector<float> &h_integrad, float &h_integral, Precision prec,
+    bool verbose);
+template void launch_monte_carlo_expectation_kernel<half>(
+    const std::vector<half> &h_integrad, half &h_integral, Precision prec,
+    bool verbose);
