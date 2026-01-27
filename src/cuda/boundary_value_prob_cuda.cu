@@ -118,6 +118,50 @@ __global__ void forward_substitution_kernel(const int n, T *l_sub_diag, T *rhs,
   }
 }
 
+/* forward substituion model kernel
+  forward_sol[i] = rhs[i] - l_sub_diag[i] * forward_sol[i - 1];
+*/
+template <BVPKernelTag K>
+__global__ void forward_substitution_model_kernel(
+    const int n, double *l_sub_diag, double *rhs, double *forward_sol,
+    Precision prec, BoundModel bound_model, const double beta_dist_alpha,
+    const double beta_dist_beta, const int experiment_id,
+    unsigned long long seed = 1234ULL) {
+  /* initialize */
+  int tid = threadIdx.x;
+  int gid = blockIdx.x * blockDim.x + tid;
+  int threads = gridDim.x * blockDim.x;
+  constexpr int kernel_id = static_cast<int>(K);
+  /* roundig error */
+  const int num_perturb = 2;
+  double rounding_error[num_perturb];
+  /* random state */
+  curandState state;
+  long long sequence =
+      (long long)experiment_id * (int)BVPKernelTag::Count * threads +
+      kernel_id * threads + gid;
+  curand_init(seed, sequence, 0, &state);
+
+  /* forward substitution */
+  forward_sol[0] = rhs[0];
+
+  for (int i = 1; i < n; i++) {
+    /* sample rounding error delta */
+    sample_rounding_error_distribution(num_perturb, rounding_error, prec,
+                                       bound_model, beta_dist_alpha,
+                                       beta_dist_beta, &state);
+    for (int j = 0; j < num_perturb; j++) {
+      rounding_error[j] = 1.0 + rounding_error[j];
+    }
+
+    forward_sol[i] = __ddiv_rn(
+        __dsub_rn(rhs[i],
+                  __dmul_rn(l_sub_diag[i],
+                            __dmul_rn(forward_sol[i - 1], rounding_error[0]))),
+        rounding_error[1]);
+  }
+}
+
 /* backward substituion kernel
   state[i] = (forward_sol[i] - super_diag[i] * state[i + 1]) / u_main_diag[i];
  */
@@ -154,6 +198,60 @@ __global__ void backward_substitution_kernel(const int n, T *u_main_diag,
           __hsub_rn(forward_sol[i], __hmul_rn(super_diag[i], state[i + 1])),
           u_main_diag[i]);
     }
+  }
+}
+
+/* backward substituion model kernel
+  state[i] = (forward_sol[i] - super_diag[i] * state[i + 1]) / u_main_diag[i];
+ */
+template <BVPKernelTag K>
+__global__ void backward_substitution_model_kernel(
+    const int n, double *u_main_diag, double *forward_sol, double *super_diag,
+    double *state, Precision prec, BoundModel bound_model,
+    const double beta_dist_alpha, const double beta_dist_beta,
+    const int experiment_id, unsigned long long seed = 1234ULL) {
+  // initialize
+  int tid = threadIdx.x;
+  int gid = blockIdx.x * blockDim.x + threadIdx.x;
+  int threads = gridDim.x * blockDim.x;
+  constexpr int kernel_id = static_cast<int>(K);
+  /* roundig error */
+  const int num_perturb = 4;
+  double rounding_error[num_perturb];
+  /* random state */
+  curandState randstate;
+  long long sequence =
+      (long long)experiment_id * (int)BVPKernelTag::Count * threads +
+      kernel_id * threads + gid;
+  curand_init(seed, sequence, 0, &randstate);
+
+  /* backward substituion */
+  sample_rounding_error_distribution(num_perturb, rounding_error, prec,
+                                     bound_model, beta_dist_alpha,
+                                     beta_dist_beta, &randstate);
+  for (int j = 0; j < num_perturb; j++) {
+    rounding_error[j] = 1.0 + rounding_error[j];
+  }
+
+  state[n - 1] = __ddiv_rn(forward_sol[n - 1],
+                           __dmul_rn(u_main_diag[n - 1], rounding_error[0]));
+
+  for (int i = n - 2; i > -1; i--) {
+    // sample rounding error
+    sample_rounding_error_distribution(num_perturb, rounding_error, prec,
+                                       bound_model, beta_dist_alpha,
+                                       beta_dist_beta, &randstate);
+    for (int j = 0; j < num_perturb; j++) {
+      rounding_error[j] = 1.0 + rounding_error[j];
+    }
+
+    // solve
+    state[i] = __ddiv_rn(
+        __dsub_rn(forward_sol[i],
+                  __dmul_rn(super_diag[i],
+                            __dmul_rn(state[i + 1], rounding_error[1]))),
+        __dmul_rn(u_main_diag[i],
+                  __dmul_rn(rounding_error[2], rounding_error[3])));
   }
 }
 
@@ -310,20 +408,18 @@ void launch_lu_decomposition_model_kernel(
       <<<gridDim, blockDim>>>(Ns, d_sub_diag, d_main_diag, d_super_diag,
                               d_l_sub_diag, d_u_main_diag, prec, bound_model,
                               beta_dist_alpha, beta_dist_beta, experiment_id);
-  cudaCheck(cudaDeviceSynchronize());
-
-  /* cudaCheck(cudaGetLastError()); */
-  /* /1* device to host *1/ */
-  /* cudaCheck(cudaMemcpy(h_l_sub_diag.data(), d_l_sub_diag, size, */
-  /*                      cudaMemcpyDeviceToHost)); */
-  /* cudaCheck(cudaMemcpy(h_u_main_diag.data(), d_u_main_diag, size, */
-  /*                      cudaMemcpyDeviceToHost)); */
-  /* /1* free *1/ */
-  /* cudaCheck(cudaFree(d_sub_diag)); */
-  /* cudaCheck(cudaFree(d_main_diag)); */
-  /* cudaCheck(cudaFree(d_super_diag)); */
-  /* cudaCheck(cudaFree(d_l_sub_diag)); */
-  /* cudaCheck(cudaFree(d_u_main_diag)); */
+  cudaCheck(cudaGetLastError());
+  /* device to host */
+  cudaCheck(cudaMemcpy(h_l_sub_diag.data(), d_l_sub_diag, size,
+                       cudaMemcpyDeviceToHost));
+  cudaCheck(cudaMemcpy(h_u_main_diag.data(), d_u_main_diag, size,
+                       cudaMemcpyDeviceToHost));
+  /* free */
+  cudaCheck(cudaFree(d_sub_diag));
+  cudaCheck(cudaFree(d_main_diag));
+  cudaCheck(cudaFree(d_super_diag));
+  cudaCheck(cudaFree(d_l_sub_diag));
+  cudaCheck(cudaFree(d_u_main_diag));
 }
 
 /* forward substituion kernel launcher */
@@ -354,6 +450,49 @@ void launch_forward_substitution_kernel(const int num_intervals,
               << to_string(prec) << " precision" << std::endl;
   forward_substitution_kernel<<<gridDim, blockDim>>>(Ns, d_l_sub_diag, d_rhs,
                                                      d_forward_sol, prec);
+  cudaCheck(cudaGetLastError());
+  /* device to host */
+  cudaCheck(cudaMemcpy(h_forward_sol.data(), d_forward_sol, size,
+                       cudaMemcpyDeviceToHost));
+  /* free */
+  cudaCheck(cudaFree(d_l_sub_diag));
+  cudaCheck(cudaFree(d_rhs));
+  cudaCheck(cudaFree(d_forward_sol));
+}
+
+/* forward substituion model kernel launcher */
+void launch_forward_substitution_model_kernel(
+    const int num_intervals, const std::vector<double> &h_l_sub_diag,
+    const std::vector<double> &h_rhs, std::vector<double> &h_forward_sol,
+    Precision prec, const gamma_config &gamma_cfg, const int experiment_id,
+    bool verbose = false) {
+  /* kernel parameters */
+  dim3 blockDim = 1;
+  dim3 gridDim = 1;
+  /* initialize */
+  const int Ns = num_intervals - 1;
+  int size = Ns * sizeof(double);
+  double *d_l_sub_diag, *d_rhs, *d_forward_sol;
+  BoundModel bound_model = gamma_cfg.bound_model;
+  const double beta_dist_alpha = gamma_cfg.beta_dist_alpha;
+  const double beta_dist_beta = gamma_cfg.beta_dist_beta;
+
+  /* allocate memory */
+  cudaCheck(cudaMalloc((void **)&d_l_sub_diag, size));
+  cudaCheck(cudaMalloc((void **)&d_rhs, size));
+  cudaCheck(cudaMalloc((void **)&d_forward_sol, size));
+  /* host to device */
+  cudaCheck(cudaMemcpy(d_l_sub_diag, h_l_sub_diag.data(), size,
+                       cudaMemcpyHostToDevice));
+  cudaCheck(cudaMemcpy(d_rhs, h_rhs.data(), size, cudaMemcpyHostToDevice));
+  /* launch kernel */
+  if (verbose == true)
+    std::cout << "launching kernel for forward substitution in "
+              << to_string(Double) << " precision" << std::endl;
+  forward_substitution_model_kernel<BVPKernelTag::ForwardSubstitution>
+      <<<gridDim, blockDim>>>(Ns, d_l_sub_diag, d_rhs, d_forward_sol, prec,
+                              bound_model, beta_dist_alpha, beta_dist_beta,
+                              experiment_id);
   cudaCheck(cudaGetLastError());
   /* device to host */
   cudaCheck(cudaMemcpy(h_forward_sol.data(), d_forward_sol, size,
@@ -401,6 +540,53 @@ void launch_backward_substitution_kernel(const int num_intervals,
   /* device to host */
   cudaCheck(cudaMemcpy(h_state.data(), d_state, size, cudaMemcpyDeviceToHost));
   /* free */
+  cudaCheck(cudaFree(d_u_main_diag));
+  cudaCheck(cudaFree(d_forward_sol));
+  cudaCheck(cudaFree(d_super_diag));
+  cudaCheck(cudaFree(d_state));
+}
+
+/* backward substituion model kernel launcher */
+void launch_backward_substitution_model_kernel(
+    const int num_intervals, const std::vector<double> h_u_main_diag,
+    const std::vector<double> h_forward_sol,
+    const std::vector<double> h_super_diag, std::vector<double> &h_state,
+    Precision prec, const gamma_config &gamma_cfg, const int experiment_id,
+    bool verbose = false) {
+  /* kernel parameters */
+  dim3 blockDim = 1;
+  dim3 gridDim = 1;
+  /* initialize */
+  const int Ns = num_intervals - 1;
+  int size = Ns * sizeof(double);
+  double *d_u_main_diag, *d_forward_sol, *d_super_diag, *d_state;
+  BoundModel bound_model = gamma_cfg.bound_model;
+  const double beta_dist_alpha = gamma_cfg.beta_dist_alpha;
+  const double beta_dist_beta = gamma_cfg.beta_dist_beta;
+  /* allocate */
+  cudaCheck(cudaMalloc((void **)&d_u_main_diag, size));
+  cudaCheck(cudaMalloc((void **)&d_forward_sol, size));
+  cudaCheck(cudaMalloc((void **)&d_super_diag, size));
+  cudaCheck(cudaMalloc((void **)&d_state, size));
+  /* host to device */
+  cudaCheck(cudaMemcpy(d_u_main_diag, h_u_main_diag.data(), size,
+                       cudaMemcpyHostToDevice));
+  cudaCheck(cudaMemcpy(d_forward_sol, h_forward_sol.data(), size,
+                       cudaMemcpyHostToDevice));
+  cudaCheck(cudaMemcpy(d_super_diag, h_super_diag.data(), size,
+                       cudaMemcpyHostToDevice));
+  /* launch kernel */
+  if (verbose == true)
+    std::cout << "launching kernel for backward substitution in "
+              << to_string(Double) << " precision" << std::endl;
+  backward_substitution_model_kernel<BVPKernelTag::BackwardSubstitution>
+      <<<gridDim, blockDim>>>(Ns, d_u_main_diag, d_forward_sol, d_super_diag,
+                              d_state, prec, bound_model, beta_dist_alpha,
+                              beta_dist_beta, experiment_id);
+  cudaCheck(cudaGetLastError());
+  // device to host
+  cudaCheck(cudaMemcpy(h_state.data(), d_state, size, cudaMemcpyDeviceToHost));
+  // free
   cudaCheck(cudaFree(d_u_main_diag));
   cudaCheck(cudaFree(d_forward_sol));
   cudaCheck(cudaFree(d_super_diag));
@@ -485,10 +671,25 @@ void launch_thomas_algorithm_model_kernel(
   const int Ns = num_intervals - 1;
   std::vector<double> h_l_sub_diag(Ns), h_u_main_diag(Ns), h_forward_sol(Ns);
 
-  // LU decomposition (KERNEL 0)
+  // LU decomposition
   launch_lu_decomposition_model_kernel(
       num_intervals, h_sub_diag, h_main_diag, h_super_diag, h_l_sub_diag,
       h_u_main_diag, prec, gamma_cfg, experiment_id);
+
+  /* forward substitution */
+  launch_forward_substitution_model_kernel(num_intervals, h_l_sub_diag, h_rhs,
+                                           h_forward_sol, prec, gamma_cfg,
+                                           experiment_id);
+
+  /* backward substitution */
+  launch_backward_substitution_model_kernel(
+      num_intervals, h_u_main_diag, h_forward_sol, h_super_diag, h_state, prec,
+      gamma_cfg, experiment_id);
+
+  for (int i = 0; i < Ns; i++) {
+    printf("%f %f %f %f\n", h_l_sub_diag[i], h_u_main_diag[i], h_forward_sol[i],
+           h_state[i]);
+  }
 }
 
 /* launch ode state integral kernerl(s) */

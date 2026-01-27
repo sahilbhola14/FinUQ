@@ -269,6 +269,9 @@ void run_forward_error_qoi_experiment_fixed_interval(
         num_intervals, h_sub_diag_true, h_main_diag_true, h_super_diag_true,
         h_rhs_true, h_state_model, bvp_cfg.prec, bvp_cfg.gamma_cfg, i);
 
+    for (int i = 0; i < Ns; i++) {
+    }
+
     /* integrate the state(s) using Reimann integration */
     launch_state_integral_kernel<T>(num_intervals, h_state, h_state_integral[i],
                                     bvp_cfg.prec);
@@ -395,6 +398,8 @@ void run_forward_error_qoi_experiment(const bvp_config &bvp_cfg,
 
   /* sample the parameters */
   bvp_parameters bvp_params = sample_bvp_parameters(num_samples, gen);
+  bvp_params.theta_one[0] = 1.0;
+  bvp_params.theta_two[0] = 1.0;
 
   /* run experiment for fixed interval */
   for (size_t i = 0; i < num_intervals.size(); i++) {
