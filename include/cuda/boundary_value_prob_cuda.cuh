@@ -67,6 +67,12 @@ void launch_monte_carlo_expectation_kernel(const std::vector<T> &h_integrand,
                                            T &h_integral, Precision prec,
                                            bool verbose = false);
 
+/* monte carlo expectation model kernel */
+void launch_monte_carlo_expectation_model_kernel(
+    const std::vector<double> &h_integrand, double &h_integral, Precision prec,
+    const gamma_config &gamma_cfg, const int experiment_id,
+    bool verbose = false);
+
 /* kernel tags */
 enum class BVPKernelTag : int {
   LUDecomposition,

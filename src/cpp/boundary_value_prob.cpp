@@ -290,6 +290,9 @@ void run_forward_error_qoi_experiment_fixed_interval(
                                            bvp_cfg.prec);
   launch_monte_carlo_expectation_kernel<double>(h_state_integral_true,
                                                 h_qoi_true, Double);
+  launch_monte_carlo_expectation_model_kernel(
+      h_state_integral_model, h_qoi_model, bvp_cfg.prec, bvp_cfg.gamma_cfg,
+      num_samples + 1);
 
   /* compute the forward error in qoi */
   compute_bvp_qoi_forward_error(static_cast<double>(h_qoi), h_qoi_true,
@@ -498,5 +501,5 @@ void run_all_ode_experiments(Precision prec) {
   // backward error in solving the tri-diagonal system
   /* bvp::run_all_backward_error_ode_sol_experiments(prec); */
   // forward error in obtainig the QoI
-  bvp::run_all_forward_error_qoi_experiments(prec, 2);
+  bvp::run_all_forward_error_qoi_experiments(prec, 20);
 }

@@ -363,6 +363,55 @@ __global__ void monte_carlo_expectation_kernel(const int num_samples,
   }
 }
 
+/* monte carlo model kernel */
+template <BVPKernelTag K>
+__global__ void monte_carlo_expectation_model_kernel(
+    const int num_samples, double *integrand, double *result, Precision prec,
+    BoundModel bound_model, const double beta_dist_alpha,
+    const double beta_dist_beta, const int experiment_id,
+    unsigned long long seed = 1234ULL) {
+  // initialize
+  int tid = threadIdx.x;
+  int gid = blockIdx.x * blockDim.x + threadIdx.x;
+  int threads = gridDim.x * blockDim.x;
+  constexpr int kernel_id = static_cast<int>(K);
+  /* roundig error */
+  const int num_perturb = 1;
+  double rounding_error[num_perturb];
+  /* random state */
+  curandState randstate;
+  long long sequence =
+      (long long)experiment_id * (int)BVPKernelTag::Count * threads +
+      kernel_id * threads + gid;
+  curand_init(seed, sequence, 0, &randstate);
+
+  /* compute the summation */
+  double sum = static_cast<double>(0.0);
+  for (int i = 0; i < num_samples; i++) {
+    // sample rounding error
+    sample_rounding_error_distribution(num_perturb, rounding_error, prec,
+                                       bound_model, beta_dist_alpha,
+                                       beta_dist_beta, &randstate);
+    for (int j = 0; j < num_perturb; j++) {
+      rounding_error[j] = 1.0 + rounding_error[j];
+    }
+
+    // compute
+    sum = __dadd_rn(sum, __dmul_rn(integrand[i], rounding_error[0]));
+  }
+
+  // normalize
+  sample_rounding_error_distribution(num_perturb, rounding_error, prec,
+                                     bound_model, beta_dist_alpha,
+                                     beta_dist_beta, &randstate);
+  for (int j = 0; j < num_perturb; j++) {
+    rounding_error[j] = 1.0 + rounding_error[j];
+  }
+
+  *result = __dmul_rn(sum, __dmul_rn(static_cast<double>(1.0 / num_samples),
+                                     rounding_error[0]));
+}
+
 /* LU decomposition kernel launcher */
 template <typename T>
 void launch_lu_decomposition_kernel(const int num_intervals,
@@ -774,11 +823,6 @@ void launch_thomas_algorithm_model_kernel(
   launch_backward_substitution_model_kernel(
       num_intervals, h_u_main_diag, h_forward_sol, h_super_diag, h_state, prec,
       gamma_cfg, experiment_id);
-
-  for (int i = 0; i < Ns; i++) {
-    printf("%f %f %f %f\n", h_l_sub_diag[i], h_u_main_diag[i], h_forward_sol[i],
-           h_state[i]);
-  }
 }
 
 /* launch ode state integral kernerl(s) */
@@ -909,6 +953,47 @@ void launch_monte_carlo_expectation_kernel(const std::vector<T> &h_integrand,
 
   /* device to host */
   cudaCheck(cudaMemcpy(&h_result, d_result, sizeof(T), cudaMemcpyDeviceToHost));
+
+  /* free */
+  cudaCheck(cudaFree(d_integrand));
+  cudaCheck(cudaFree(d_result));
+}
+
+void launch_monte_carlo_expectation_model_kernel(
+    const std::vector<double> &h_integrand, double &h_result, Precision prec,
+    const gamma_config &gamma_cfg, const int experiment_id, bool verbose) {
+  /* kernel parameters */
+  dim3 blockDim = 1;
+  dim3 gridDim = 1;
+  /* initialization */
+  const int num_samples = h_integrand.size();
+  double *d_integrand, *d_result;
+  const int size = num_samples * sizeof(double);
+  BoundModel bound_model = gamma_cfg.bound_model;
+  const double beta_dist_alpha = gamma_cfg.beta_dist_alpha;
+  const double beta_dist_beta = gamma_cfg.beta_dist_beta;
+  /* memory allocation */
+  cudaCheck(cudaMalloc((void **)&d_integrand, size));
+  cudaCheck(cudaMalloc((void **)&d_result, sizeof(double)));
+  /* host to device */
+  cudaCheck(cudaMemcpy(d_integrand, h_integrand.data(), size,
+                       cudaMemcpyHostToDevice));
+
+  if (verbose == true)
+    std::cout << "launching Monte-Carlo integral kernel using " << num_samples
+              << "for in" << to_string(Double) << " precision" << std::endl;
+
+  monte_carlo_expectation_model_kernel<BVPKernelTag::MonteCarlo>
+      <<<gridDim, blockDim>>>(num_samples, d_integrand, d_result, prec,
+                              bound_model, beta_dist_alpha, beta_dist_beta,
+                              experiment_id);
+
+  cudaCheck(cudaDeviceSynchronize());
+  cudaCheck(cudaGetLastError());
+
+  /* device to host */
+  cudaCheck(
+      cudaMemcpy(&h_result, d_result, sizeof(double), cudaMemcpyDeviceToHost));
 
   /* free */
   cudaCheck(cudaFree(d_integrand));
