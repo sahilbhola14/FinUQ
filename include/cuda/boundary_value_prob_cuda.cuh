@@ -42,11 +42,24 @@ void launch_ode_state_integral_kernel(const int num_intervals,
                                       T &h_state_integral, Precision prec,
                                       bool verbose = false);
 
+/* ode state integral model kernel */
+void launch_ode_state_integral_model_kernel(
+    const int num_intervals, const std::vector<double> &h_sub_diag,
+    const std::vector<double> &h_main_diag,
+    const std::vector<double> &h_super_diag, const std::vector<double> &h_rhs,
+    double &h_state_integral, Precision prec, const gamma_config &gamma_cfg,
+    const int experiment_id, bool verbose = false);
+
 /* integrate the state (obtained from Thomas) kernel */
 template <typename T>
 void launch_state_integral_kernel(const int num_intervals,
                                   std::vector<T> &h_state, T &h_state_integral,
                                   Precision prec, bool verbose = false);
+
+void launch_state_integral_model_kernel(
+    const int num_intervals, std::vector<double> &h_state,
+    double &h_state_integral, Precision prec, const gamma_config &gamma_cfg,
+    const int experiment_id, bool verbose = false);
 
 /* monte carlo expectation kernel */
 template <typename T>

@@ -282,6 +282,54 @@ __global__ void state_integral_kernel(const int n, T *state, T *state_integral,
   }
 }
 
+/* state integral model kernel */
+template <BVPKernelTag K>
+__global__ void state_integral_model_kernel(
+    const int n, double *state, double *state_integral, Precision prec,
+    BoundModel bound_model, const double beta_dist_alpha,
+    const double beta_dist_beta, const int experiment_id,
+    unsigned long long seed = 1234ULL) {
+  // initialize
+  int tid = threadIdx.x;
+  int gid = blockIdx.x * blockDim.x + threadIdx.x;
+  int threads = gridDim.x * blockDim.x;
+  constexpr int kernel_id = static_cast<int>(K);
+  /* roundig error */
+  const int num_perturb = 1;
+  double rounding_error[num_perturb];
+  /* random state */
+  curandState randstate;
+  long long sequence =
+      (long long)experiment_id * (int)BVPKernelTag::Count * threads +
+      kernel_id * threads + gid;
+  curand_init(seed, sequence, 0, &randstate);
+
+  double delta_x = static_cast<double>(1.0 / (n + 1));
+  double sum = static_cast<double>(0.0);
+  for (int i = 0; i < n; i++) {
+    // sample rounding error
+    sample_rounding_error_distribution(num_perturb, rounding_error, prec,
+                                       bound_model, beta_dist_alpha,
+                                       beta_dist_beta, &randstate);
+    for (int j = 0; j < num_perturb; j++) {
+      rounding_error[j] = 1.0 + rounding_error[j];
+    }
+
+    // compute
+    sum = __dadd_rn(sum, __dmul_rn(state[i], rounding_error[0]));
+  }
+
+  // normalize
+  sample_rounding_error_distribution(num_perturb, rounding_error, prec,
+                                     bound_model, beta_dist_alpha,
+                                     beta_dist_beta, &randstate);
+  for (int j = 0; j < num_perturb; j++) {
+    rounding_error[j] = 1.0 + rounding_error[j];
+  }
+
+  *state_integral = __dmul_rn(delta_x, __dmul_rn(sum, rounding_error[0]));
+}
+
 /* monte carlo kernel */
 template <typename T>
 __global__ void monte_carlo_expectation_kernel(const int num_samples,
@@ -627,6 +675,47 @@ void launch_state_integral_kernel(const int num_intervals,
   cudaCheck(cudaFree(d_state_integral));
 }
 
+/* state integral model kernel launcher */
+void launch_state_integral_model_kernel(const int num_intervals,
+                                        std::vector<double> &h_state,
+                                        double &h_state_integral,
+                                        Precision prec,
+                                        const gamma_config &gamma_cfg,
+                                        const int experiment_id, bool verbose) {
+  /* kernel parameters */
+  dim3 blockDim = 1;
+  dim3 gridDim = 1;
+  /* initialize */
+  const int Ns = num_intervals - 1;
+  const int size = Ns * sizeof(double);
+  double *d_state;
+  double *d_state_integral;
+  BoundModel bound_model = gamma_cfg.bound_model;
+  const double beta_dist_alpha = gamma_cfg.beta_dist_alpha;
+  const double beta_dist_beta = gamma_cfg.beta_dist_beta;
+
+  /* allocate */
+  cudaCheck(cudaMalloc((void **)&d_state, size));
+  cudaCheck(cudaMalloc((void **)&d_state_integral, sizeof(double)));
+  /* host to device */
+  cudaCheck(cudaMemcpy(d_state, h_state.data(), size, cudaMemcpyHostToDevice));
+  /* launch kernel */
+  if (verbose == true)
+    std::cout << "launching kernel for integrating ode solution in "
+              << to_string(Double) << " precision" << std::endl;
+  state_integral_model_kernel<BVPKernelTag::StateIntegral>
+      <<<gridDim, blockDim>>>(Ns, d_state, d_state_integral, prec, bound_model,
+                              beta_dist_alpha, beta_dist_beta, experiment_id);
+  cudaCheck(cudaGetLastError());
+  cudaCheck(cudaDeviceSynchronize());
+  /* device to host */
+  cudaCheck(cudaMemcpy(&h_state_integral, d_state_integral, sizeof(double),
+                       cudaMemcpyDeviceToHost));
+  /* free */
+  cudaCheck(cudaFree(d_state));
+  cudaCheck(cudaFree(d_state_integral));
+}
+
 /* launch thomas algorithm kernel(s) */
 template <typename T>
 void launch_thomas_algorithm_kernel(const int num_intervals,
@@ -711,6 +800,29 @@ void launch_ode_state_integral_kernel(const int num_intervals,
   /* launch state integral kernel */
   launch_state_integral_kernel<T>(num_intervals, h_state, h_state_integral,
                                   prec);
+  /* print */
+  if (verbose == true) {
+    printf("State integral: %f\n", static_cast<double>(h_state_integral));
+  }
+}
+
+/* launch ode state integral model kernerl(s) */
+void launch_ode_state_integral_model_kernel(
+    const int num_intervals, const std::vector<double> &h_sub_diag,
+    const std::vector<double> &h_main_diag,
+    const std::vector<double> &h_super_diag, const std::vector<double> &h_rhs,
+    double &h_state_integral, Precision prec, const gamma_config &gamma_cfg,
+    const int experiment_id, bool verbose) {
+  /* initialize */
+  const int Ns = num_intervals - 1;
+  std::vector<double> h_state(Ns);
+  /* launch thomas algorithm */
+  launch_thomas_algorithm_model_kernel(num_intervals, h_sub_diag, h_main_diag,
+                                       h_super_diag, h_rhs, h_state, prec,
+                                       gamma_cfg, experiment_id, verbose);
+  /* launch state integral kernel */
+  launch_state_integral_model_kernel(num_intervals, h_state, h_state_integral,
+                                     prec, gamma_cfg, experiment_id);
   /* print */
   if (verbose == true) {
     printf("State integral: %f\n", static_cast<double>(h_state_integral));
