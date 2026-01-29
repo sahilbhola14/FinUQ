@@ -123,90 +123,201 @@ std::vector<double> compute_abs_a_inv_abs_a_abs_sol(
   return abs_a_inv_abs_a_abs_sol;
 }
 
+/*compute the forward error bonds for the boundary value problem state
+ * compute |u - \hat{u}| \leq \Gamma |A^{-1}| |A| |\hat{u}| where the bounds
+ * are satisfied with probability Q(M + 8 * Ns - 6). The probaiblity assumes
+ * that the state perturbation is propagated to compute the QoI later. M :
+ * Number of monte carlo samples Ns : Number of intervals - 1, that is, the
+ * state size.
+ */
+template <typename T>
+std::vector<gamma_result> compute_bvp_state_forward_error_bound(
+    const int num_intervals, const int num_samples,
+    const std::vector<T> &h_sub_diag, const std::vector<T> &h_main_diag,
+    const std::vector<T> &h_super_diag, const std::vector<T> &h_state,
+    const gamma_config &gamma_cfg, bool verbose = false) {
+  // initialization
+  const int Ns = num_intervals - 1;  // state size
+  const int M = num_samples;         // number of monte carlo samples
+  const int number_of_bounds =
+      M + 8 * Ns - 6;  // number of bounds to be satisfied
+  // compute individual bound one_minus_zeta
+  long double one_minus_zeta = compute_individual_bound_one_minus_zeta(
+      number_of_bounds, gamma_cfg.confidence);
+
+  // compute gamma(s)
+  gamma_result gamma_one = get_gamma(1, gamma_cfg, one_minus_zeta);
+  gamma_result gamma_two = get_gamma(2, gamma_cfg, one_minus_zeta);
+  gamma_result gamma_thomas =
+      2.0 * gamma_one + gamma_two + gamma_one * gamma_two;
+
+  // compute |A^{-1}||A||\hat{u}| in double precision
+  std::vector<double> abs_a_inv_abs_a_abs_sol = compute_abs_a_inv_abs_a_abs_sol(
+      num_intervals, h_sub_diag, h_main_diag, h_super_diag, h_state);
+
+  // compute the bound
+  std::vector<gamma_result> state_bounds;
+  state_bounds.reserve(Ns);
+  for (int i = 0; i < Ns; i++) {
+    state_bounds[i] = abs_a_inv_abs_a_abs_sol[i] * gamma_thomas;
+  }
+
+  // print
+  if (verbose == true) {
+    std::cout << std::string(10, '-')
+              << " State bounds for Number of intervals: " << num_intervals
+              << " and Number of Monte-Carlo samples: " << num_samples << " "
+              << std::string(10, '-') << std::endl;
+
+    for (int i = 0; i < Ns; i++) {
+      std::cout << "i = " << i << std::endl;
+      print_gamma(state_bounds[i], true);
+    }
+  }
+
+  return state_bounds;
+}
+
 /* compute the forward error bounds for the boundary value problem state
- * integral */
+ * integral
+ * compute |p - \hat{p}| \leq \Delta x \sum_{i=1}^{Ns} |\Delta u_i|,
+ * wher \Delta u_i is the propagated perturbation.
+ * */
 template <typename T>
 gamma_result compute_bvp_state_integral_forward_error_bound(
     const int num_intervals, const int num_samples,
     const std::vector<T> &h_sub_diag, const std::vector<T> &h_main_diag,
     const std::vector<T> &h_super_diag, const std::vector<T> &h_state,
-    const T &h_state_integral, const gamma_config &gamma_cfg, bool verbose) {
-  /* compute |A^{-1}||A||\hat{u}| in double precision */
-  std::vector<double> abs_a_inv_abs_a_abs_sol = compute_abs_a_inv_abs_a_abs_sol(
-      num_intervals, h_sub_diag, h_main_diag, h_super_diag, h_state);
-  /* compute individual bound confidence when number_of_bounds to be satisfied
-   * is (Ns + 8(M-1) - 6) */
-  const int Ns = num_intervals - 1;
-  const int number_of_bounds = num_samples + 8 * Ns - 6;
+    const gamma_config &gamma_cfg, bool verbose) {
+  // initialization
+  const int Ns = num_intervals - 1;  // state size
+  const int M = num_samples;         // number of monte carlo samples
+  const int number_of_bounds =
+      M + 8 * Ns - 6;  // number of bounds to be satisfied
+  const double delta_x = 1.0 / num_intervals;  // discretization
+
+  // compute individual bound one_minus_zeta
   long double one_minus_zeta = compute_individual_bound_one_minus_zeta(
       number_of_bounds, gamma_cfg.confidence);
 
-  /* compute \gamma_{M-1} (|\hat{u}} + (2\gamma_1 + \gamma_2 + \gamma_1\gamma2)
-   * ... abs_a_inv_abs_a_abs_sol), that is the bound for |Delta state| */
-  gamma_result gamma1 = get_gamma(1, gamma_cfg, one_minus_zeta);
-  gamma_result gamma2 = get_gamma(2, gamma_cfg, one_minus_zeta);
-  gamma_result gammaNs =
-      get_gamma(num_intervals - 1, gamma_cfg, one_minus_zeta);
-  gamma_result gamma_thomas = 2.0 * gamma1 + gamma2 + gamma1 * gamma2;
-  std::vector<gamma_result> DeltaU;
-  DeltaU.reserve(Ns);
-  double state_abs;
+  // compute gamma(s)
+  gamma_result gamma_Ns = get_gamma(Ns, gamma_cfg, one_minus_zeta);
+
+  // compute the bounds for the state aboluste forward error
+  std::vector<gamma_result> state_bounds =
+      compute_bvp_state_forward_error_bound(
+          num_intervals, num_samples, h_sub_diag, h_main_diag, h_super_diag,
+          h_state, gamma_cfg, verbose);
+
+  // compute absolute state
+  std::vector<double> state_abs;
+  state_abs.reserve(Ns);
   for (int i = 0; i < Ns; i++) {
-    state_abs = std::abs(static_cast<double>(h_state[i]));
-    DeltaU.push_back((state_abs + abs_a_inv_abs_a_abs_sol[i] * gamma_thomas) *
-                     gammaNs);
+    state_abs.push_back(std::abs(static_cast<double>(h_state[i])));
   }
 
-  /* sum_{i=1}^Ns \DeltaU_i*/
-  gamma_result sum_absDeltaU;
+  // compute the bounds for the realization p, that is, the state integral
+  gamma_result state_integral_bounds;
   for (int i = 0; i < Ns; i++) {
-    sum_absDeltaU = sum_absDeltaU + gamma_abs(DeltaU[i]);
+    state_integral_bounds =
+        state_integral_bounds + (state_abs[i] + state_bounds[i]);
   }
+  state_integral_bounds = delta_x * gamma_Ns * state_integral_bounds;
 
-  /* compute gamma_{num_samples} * (|state_integral| + \Delta x \sum_{i=1}^{Ns}
-   * |Delta state|) that is the bounds for Delta p
-   */
-  const double delta_x = static_cast<double>(1.0 / num_intervals);
-  gamma_result Deltap;
-  gamma_result gamma_samples =
-      get_gamma(num_samples, gamma_cfg, one_minus_zeta);
-  Deltap = (std::abs(static_cast<double>(h_state_integral)) +
-            delta_x * sum_absDeltaU) *
-           gamma_samples;
-
-  /* print */
+  // print
   if (verbose == true) {
     std::cout << std::string(10, '-')
-              << " Dot product forward error bounds for number of interval: "
-              << num_intervals << " and number of samples: " << num_samples
-              << " " << std::string(10, '-') << std::endl;
-    std::cout << "Deterministic: " << Deltap.gamma_det << std::endl;
-    std::cout << "Mean-informed: " << Deltap.gamma_mprea << std::endl;
-    std::cout << "Varinance-informed: " << Deltap.gamma_vprea << std::endl;
+              << " State integral bounds for Number of intervals: "
+              << num_intervals
+              << " and Number of Monte-Carlo samples: " << num_samples << " "
+              << std::string(10, '-') << std::endl;
+    print_gamma(state_integral_bounds, true);
   }
 
-  return Deltap;
+  return state_integral_bounds;
 }
 
 /* compute the forward error in qoi computation for the boundary value problem
  */
 void compute_bvp_qoi_forward_error(double result, double result_true,
-                                   double *forward_error) {
+                                   double *forward_error, bool verbose) {
   *forward_error = std::abs(result - result_true);
+  if (verbose == true) {
+    printf("Absolute forward error in the Qoi: %.5e\n", *forward_error);
+  }
+}
+
+/* compute the forward error bounds for the boundary value problem qoi
+ */
+template <typename T>
+gamma_result compute_bvp_qoi_forward_error_bound(
+    const int num_intervals, const int num_samples,
+    const std::vector<T> &h_state_integral,
+    const std::vector<gamma_result> &forward_error_bound_state_integral,
+    const gamma_config &gamma_cfg, bool verbose) {
+  // initialization
+  const int Ns = num_intervals - 1;  // state size
+  const int M = num_samples;         // number of monte carlo samples
+  const int number_of_bounds =
+      M + 8 * Ns - 6;  // number of bounds to be satisfied
+  const double delta_x = 1.0 / num_intervals;  // discretization
+
+  // compute individual bound one_minus_zeta
+  long double one_minus_zeta = compute_individual_bound_one_minus_zeta(
+      number_of_bounds, gamma_cfg.confidence);
+
+  // compute gamma
+  gamma_result gamma_M = get_gamma(M, gamma_cfg, one_minus_zeta);
+
+  // compute absolute state_integral
+  std::vector<double> state_integral_abs;
+  state_integral_abs.reserve(M);
+  for (int i = 0; i < M; i++) {
+    state_integral_abs.push_back(
+        std::abs(static_cast<double>(h_state_integral[i])));
+  }
+
+  // compute the bounds for the qoi, that is, expected state integral
+  gamma_result qoi_bounds;
+  for (int i = 0; i < M; i++) {
+    // print_gamma(forward_error_bound_state_integral[i]);
+    qoi_bounds = qoi_bounds + (state_integral_abs[i] +
+                               forward_error_bound_state_integral[i]);
+  }
+  qoi_bounds = (1.0 / M) * gamma_M * qoi_bounds;
+
+  // print
+  if (verbose == true) {
+    std::cout << std::string(10, '-')
+              << " QoI bounds for Number of intervals: " << num_intervals
+              << " and Number of Monte-Carlo samples: " << num_samples << " "
+              << std::string(10, '-') << std::endl;
+    print_gamma(qoi_bounds, true);
+  }
+
+  return qoi_bounds;
 }
 
 /* template initialization */
 template gamma_result compute_bvp_state_integral_forward_error_bound<double>(
     const int, const int, const std::vector<double> &,
     const std::vector<double> &, const std::vector<double> &,
-    const std::vector<double> &, const double &, const gamma_config &,
-    bool verbose);
+    const std::vector<double> &, const gamma_config &, bool verbose);
 template gamma_result compute_bvp_state_integral_forward_error_bound<float>(
     const int, const int, const std::vector<float> &,
     const std::vector<float> &, const std::vector<float> &,
-    const std::vector<float> &, const float &, const gamma_config &,
-    bool verbose);
+    const std::vector<float> &, const gamma_config &, bool verbose);
 template gamma_result compute_bvp_state_integral_forward_error_bound<half>(
     const int, const int, const std::vector<half> &, const std::vector<half> &,
-    const std::vector<half> &, const std::vector<half> &, const half &,
-    const gamma_config &, bool verbose);
+    const std::vector<half> &, const std::vector<half> &, const gamma_config &,
+    bool verbose);
+
+template gamma_result compute_bvp_qoi_forward_error_bound<double>(
+    const int, const int, const std::vector<double> &,
+    const std::vector<gamma_result> &, const gamma_config &, bool);
+template gamma_result compute_bvp_qoi_forward_error_bound<float>(
+    const int, const int, const std::vector<float> &,
+    const std::vector<gamma_result> &, const gamma_config &, bool);
+template gamma_result compute_bvp_qoi_forward_error_bound<half>(
+    const int, const int, const std::vector<half> &,
+    const std::vector<gamma_result> &, const gamma_config &, bool);

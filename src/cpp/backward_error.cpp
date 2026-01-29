@@ -188,25 +188,19 @@ gamma_result compute_ode_backward_error_bound(const int num_intervals,
   long double one_minus_zeta =
       compute_individual_bound_one_minus_zeta(7 * Ns - 6, gamma_cfg.confidence);
   /* compute the bounds 2.0\gamma_1 + \gamma_2 + \gamma_1\gamma_2*/
-  gamma_result gamma1 = get_gamma(1, gamma_cfg, one_minus_zeta);
-  gamma_result gamma2 = get_gamma(2, gamma_cfg, one_minus_zeta);
+  gamma_result gamma_one = get_gamma(1, gamma_cfg, one_minus_zeta);
+  gamma_result gamma_two = get_gamma(2, gamma_cfg, one_minus_zeta);
 
   gamma_result result;
-  result.gamma_det = 2.0 * gamma1.gamma_det + gamma2.gamma_det +
-                     gamma1.gamma_det * gamma2.gamma_det;
-  result.gamma_mprea = 2.0 * gamma1.gamma_mprea + gamma2.gamma_mprea +
-                       gamma1.gamma_mprea * gamma2.gamma_mprea;
-  result.gamma_vprea = 2.0 * gamma1.gamma_vprea + gamma2.gamma_vprea +
-                       gamma1.gamma_vprea * gamma2.gamma_vprea;
+
+  result = 2.0 * gamma_one + gamma_two + gamma_one * gamma_two;
 
   /* verbose */
   if (verbose == true) {
     std::cout << std::string(10, '-')
               << " ODE backward error bounds for number of intervals : "
               << num_intervals << " " << std::string(10, '-') << std::endl;
-    std::cout << "Deterministic: " << result.gamma_det << std::endl;
-    std::cout << "Mean-informed: " << result.gamma_mprea << std::endl;
-    std::cout << "Varinance-informed: " << result.gamma_vprea << std::endl;
+    print_gamma(result, true);
   }
   return result;
 }

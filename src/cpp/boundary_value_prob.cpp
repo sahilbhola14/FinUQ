@@ -224,8 +224,8 @@ void run_forward_error_qoi_experiment_fixed_interval(
   assert(bvp_params.theta_one.size() == bvp_params.theta_two.size() &&
          "inconsistent number of params");
   const int num_samples = bvp_params.theta_one.size();
-  std::vector<gamma_result> forward_error_bound_deltaP;
-  forward_error_bound_deltaP.reserve(num_samples);
+  std::vector<gamma_result> forward_error_bound_state_integral;
+  forward_error_bound_state_integral.reserve(num_samples);
 
   std::vector<T> h_sub_diag(Ns), h_main_diag(Ns), h_super_diag(Ns), h_rhs(Ns),
       h_state(Ns), h_state_integral(num_samples);
@@ -279,10 +279,14 @@ void run_forward_error_qoi_experiment_fixed_interval(
                                        bvp_cfg.gamma_cfg, i);
 
     /* compute the forward error bounds for the state integral */
-    forward_error_bound_deltaP.push_back(
+    forward_error_bound_state_integral.push_back(
         compute_bvp_state_integral_forward_error_bound(
             num_intervals, num_samples, h_sub_diag, h_main_diag, h_super_diag,
-            h_state, h_state_integral[i], bvp_cfg.gamma_cfg));
+            h_state, bvp_cfg.gamma_cfg, false));
+
+    // printf("state integral error : %.3e \n",
+    // std::abs(static_cast<double>(h_state_integral[i]) -
+    // h_state_integral_true[i]));
   }
 
   /* compute the qoi */
@@ -296,21 +300,17 @@ void run_forward_error_qoi_experiment_fixed_interval(
 
   /* compute the forward error in qoi */
   compute_bvp_qoi_forward_error(static_cast<double>(h_qoi), h_qoi_true,
-                                &result.qoi_forward_error);
+                                &result.qoi_forward_error, true);
 
   compute_bvp_qoi_forward_error(static_cast<double>(h_qoi_model), h_qoi_true,
-                                &result.qoi_forward_error_model);
+                                &result.qoi_forward_error_model, false);
 
   /* compute the forward error bound for the QoI */
-  gamma_result forward_error_bound_qoi;
-  for (int i = 0; i < num_samples; i++) {
-    forward_error_bound_qoi =
-        forward_error_bound_qoi + gamma_abs(forward_error_bound_deltaP[i]);
-  }
-  forward_error_bound_qoi =
-      static_cast<double>(1.0 / num_samples) * forward_error_bound_qoi;
+  gamma_result forward_error_bound_qoi = compute_bvp_qoi_forward_error_bound(
+      num_intervals, num_samples, h_state_integral,
+      forward_error_bound_state_integral, bvp_cfg.gamma_cfg, true);
 
-  /* update results with bounds */
+  // update results with bounds
   result.forward_error_bound = forward_error_bound_qoi;
 }
 
@@ -380,7 +380,8 @@ void run_forward_error_qoi_experiment(const bvp_config &bvp_cfg,
   /* initialize */
   // std::vector<int> num_intervals = {16,  32,   64,   128, 256, 512, 1024,
   // 2048, 4069};
-  std::vector<int> num_intervals = {4, 16, 32, 64};
+  std::vector<int> num_intervals = {128};
+  // std::vector<int> num_intervals = {128};
   std::vector<bvp_forward_error_result> results(num_intervals.size());
 
   /* random generator */
@@ -404,6 +405,11 @@ void run_forward_error_qoi_experiment(const bvp_config &bvp_cfg,
 
   /* sample the parameters */
   bvp_parameters bvp_params = sample_bvp_parameters(num_samples, gen);
+
+  // for (int i = 0; i < num_samples; i++){
+  //   bvp_params.theta_one[i] = 1.0;
+  //   bvp_params.theta_two[i] = 1.0;
+  // }
 
   /* run experiment for fixed interval */
   for (size_t i = 0; i < num_intervals.size(); i++) {
@@ -436,7 +442,7 @@ void run_forward_error_qoi_experiment(const bvp_config &bvp_cfg,
   std::ostringstream ss;
   ss << "forward_error_result_num_samples_" << num_samples;
   std::string filename = make_bvp_filename(ss.str(), bvp_cfg);
-  write_bvp_forward_error_results_csv(results, filename, true);
+  write_bvp_forward_error_results_csv(results, filename);
 }
 
 namespace bvp {
@@ -479,18 +485,18 @@ void run_all_forward_error_qoi_experiments(Precision prec,
   // beta shape parameter
   bvp_cfg.gamma_cfg.beta_dist_beta = 2.0;
   // alpha shape parameter
-  std::vector<double> beta_dist_alpha_vals = {1.6, 1.7, 1.8, 1.9, 2.0};
+  std::vector<double> beta_dist_alpha_vals = {1.3, 1.4, 1.5, 1.6, 1.7};
 
   // run uniform model
   bvp_cfg.gamma_cfg.bound_model = Uniform;
   run_forward_error_qoi_experiment(bvp_cfg, num_samples);
 
-  // run beta model
-  bvp_cfg.gamma_cfg.bound_model = Beta;
-  for (auto &alpha : beta_dist_alpha_vals) {
-    bvp_cfg.gamma_cfg.beta_dist_alpha = alpha;
-    run_forward_error_qoi_experiment(bvp_cfg, num_samples);
-  }
+  // // run beta model
+  // bvp_cfg.gamma_cfg.bound_model = Beta;
+  // for (auto &alpha : beta_dist_alpha_vals) {
+  //   bvp_cfg.gamma_cfg.beta_dist_alpha = alpha;
+  //   run_forward_error_qoi_experiment(bvp_cfg, num_samples);
+  // }
 }
 
 }  // namespace bvp
@@ -500,5 +506,5 @@ void run_all_ode_experiments(Precision prec) {
   // backward error in solving the tri-diagonal system
   /* bvp::run_all_backward_error_ode_sol_experiments(prec); */
   // forward error in obtainig the QoI
-  bvp::run_all_forward_error_qoi_experiments(prec, 10000);
+  bvp::run_all_forward_error_qoi_experiments(prec, 5000);
 }

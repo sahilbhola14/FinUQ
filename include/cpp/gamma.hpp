@@ -28,6 +28,9 @@ void compare_gamma(const gamma_config &gamma_cfg = gamma_config(), bool verbose 
 /* get gamma */
 gamma_result get_gamma(const int n, const gamma_config &gamma_cfg, const long double one_minus_zeta);
 
+// print
+void print_gamma(const gamma_result & gamma_res, bool flat=false);
+
 /* gamma operators */
 gamma_result operator+(const gamma_result &a, const gamma_result &b);
 gamma_result operator+(long double c, const gamma_result& g);
