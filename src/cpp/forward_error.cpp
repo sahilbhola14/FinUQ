@@ -139,8 +139,7 @@ std::vector<gamma_result> compute_bvp_state_forward_error_bound(
   // initialization
   const int Ns = num_intervals - 1;  // state size
   const int M = num_samples;         // number of monte carlo samples
-  const int number_of_bounds =
-      M + 8 * Ns - 6;  // number of bounds to be satisfied
+  const int number_of_bounds = M * (7 * Ns * Ns - 5 * Ns + 1);
   // compute individual bound one_minus_zeta
   long double one_minus_zeta = compute_individual_bound_one_minus_zeta(
       number_of_bounds, gamma_cfg.confidence);

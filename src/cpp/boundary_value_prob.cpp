@@ -387,7 +387,7 @@ void run_forward_error_qoi_experiment(const bvp_config &bvp_cfg,
   /* initialize */
   // std::vector<int> num_intervals = {16,  32,   64,   128, 256, 512, 1024,
   // 2048, 4069};
-  std::vector<int> num_intervals = {4, 16, 32, 64, 128};
+  std::vector<int> num_intervals = {4, 16, 32, 64};
   std::vector<bvp_forward_error_result> results(num_intervals.size() *
                                                 num_experiments);
 
@@ -495,7 +495,7 @@ void run_all_forward_error_qoi_experiments(Precision prec,
   // beta shape parameter
   bvp_cfg.gamma_cfg.beta_dist_beta = 2.0;
   // alpha shape parameter
-  std::vector<double> beta_dist_alpha_vals = {1.8};
+  std::vector<double> beta_dist_alpha_vals = {1.6};
 
   // run uniform model
   bvp_cfg.gamma_cfg.bound_model = Uniform;
@@ -514,8 +514,8 @@ void run_all_forward_error_qoi_experiments(Precision prec,
 /* run all experiments */
 void run_all_ode_experiments(Precision prec) {
   // initialization
-  const int num_samples = 50;      // number of Monte-carlo samples
-  const int num_experiments = 20;  // number of experiment trials
+  const int num_samples = 1000;   // number of Monte-carlo samples
+  const int num_experiments = 1;  // number of experiment trials
   // backward error in solving the tri-diagonal system
   /* bvp::run_all_backward_error_ode_sol_experiments(prec); */
   // forward error in obtainig the QoI

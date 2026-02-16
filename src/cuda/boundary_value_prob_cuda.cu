@@ -316,7 +316,7 @@ __global__ void state_integral_model_kernel(
     }
 
     // compute
-    sum = __dadd_rn(sum, __dmul_rn(state[i], rounding_error[0]));
+    sum = __dmul_rn(__dadd_rn(sum, state[i]), rounding_error[0]);
   }
 
   // normalize
@@ -327,7 +327,7 @@ __global__ void state_integral_model_kernel(
     rounding_error[j] = 1.0 + rounding_error[j];
   }
 
-  *state_integral = __dmul_rn(delta_x, __dmul_rn(sum, rounding_error[0]));
+  *state_integral = __dmul_rn(__dmul_rn(delta_x, sum), rounding_error[0]);
 }
 
 /* monte carlo kernel */
@@ -397,7 +397,7 @@ __global__ void monte_carlo_expectation_model_kernel(
     }
 
     // compute
-    sum = __dadd_rn(sum, __dmul_rn(integrand[i], rounding_error[0]));
+    sum = __dmul_rn(__dadd_rn(sum, integrand[i]), rounding_error[0]);
   }
 
   // normalize
