@@ -192,8 +192,8 @@ gamma_result compute_bvp_state_integral_forward_error_bound(
   // initialization
   const int Ns = num_intervals - 1;  // state size
   const int M = num_samples;         // number of monte carlo samples
-  const int number_of_bounds =
-      M + 8 * Ns - 6;  // number of bounds to be satisfied
+  // number of bounds to be satisfied
+  const int number_of_bounds = M * (7 * Ns * Ns - 5 * Ns + 1);
   const double delta_x = 1.0 / num_intervals;  // discretization
 
   // compute individual bound one_minus_zeta
@@ -258,8 +258,8 @@ gamma_result compute_bvp_qoi_forward_error_bound(
   // initialization
   const int Ns = num_intervals - 1;  // state size
   const int M = num_samples;         // number of monte carlo samples
-  const int number_of_bounds =
-      M + 8 * Ns - 6;  // number of bounds to be satisfied
+  // number of bounds to be satisfied
+  const int number_of_bounds = M * (7 * Ns * Ns - 5 * Ns + 1);
   const double delta_x = 1.0 / num_intervals;  // discretization
 
   // compute individual bound one_minus_zeta
