@@ -1,68 +1,109 @@
 <h1 align="center">FinUQ</h1>
-<h3 align="center">Beyond Zero-mean Assumptions: Variance-informed Probabilistic Rounding Error Analysis</h3>
+<h3 align="center">Beyond Zero-Mean Assumptions: Variance-Informed Probabilistic Rounding Error Analysis</h3>
+
 <p align="center">
-  <a href="https://arxiv.org/abs/2404.12556">📄 arXiv</a> |
-  <a href="#Overview">Overview</a> |
-  <a href="#Contributions">Contributions</a> |
-  <a href="#Experiments">Experiments</a> |
-  <a href="#Repository-Structure">Repository Structure</a> |
+  <a href="https://arxiv.org/abs/2404.12556">arXiv</a> |
+  <a href="#overview">Overview</a> |
+  <a href="#key-contributions">Key Contributions</a> |
+  <a href="#project-layout">Project Layout</a> |
+  <a href="#build-and-run">Build and Run</a> |
+  <a href="#experiments">Experiments</a>
 </p>
 
 ---
 
 ## Overview
 
-Modern computer hardware increasingly supports low- and mixed-precision arithmetic to improve computational efficiency.
-While these approaches offer substantial performance benefits, the introduce significant rounding erros that can significantly impact the reliability of numerical simulations and predictive models.
-This project develops a variance-informed probabilistic rounding error analysis for quantifying the uncertainty due to finite-precision arithmetic.
-The framework complements traditional sources of uncertainties and numerical errors, such as sampling uncertainty, parameteric uncertainty, and numerical discretization error, to enalbe reliable and efficient predictive modeling.
+`FinUQ` develops a probabilistic framework for quantifying floating-point rounding uncertainty in low- and mixed-precision computations.
 
-### Motivation
+Classical deterministic rounding-error bounds are often conservative and can scale poorly with operation count. This project instead models rounding errors as bounded random variables and uses distribution moments to derive tighter, confidence-calibrated uncertainty bounds that remain practical at scale.
 
-Classical deterministic rounding error analysis often yields overly conservative error bounds that scale poorly with problem size.
-In contrast, probabilistic approaches exploit statistical structure in rounding errors to obtain tighter and more realistic estimates.
-Building on this idea, we model rounding errors as **bounded, independent, and identically distributed random variables** and explicitly incorporate their **mean, variance, and bounds** into the analysis.
+The framework is designed to complement other uncertainty sources in scientific computing, including:
 
----
+- sampling uncertainty,
+- parametric uncertainty, and
+- discretization error.
 
-## Theoretical Contributions
+## Key Contributions
 
-This work highlights the following core contributions:
+1. **Explicit confidence-calibrated probabilistic bounds**
+   - Derives a corollary of Theorem 2.4 of Higham and Mary that recovers the $\sqrt{n}$ growth in $\tilde{\gamma}_n$.
+   - Provides a closed-form confidence parameter $\lambda$ in terms of unit roundoff and target confidence.
+   - Recovers the scaling $\lambda \propto (1-u)^{-1}$.
 
-1. **Explicit and confidence-calibrated probabilistic bounds**
-   - Derives a corollary of Theorem 2.4 of Higham and Mary that rigorously recovers the $\sqrt{n}$ growth in $\tilde{\gamma}_n$.
-   - Provides a closed-form expression for the confidence parameter $\lambda$, explicitly in terms of unit roundoff and target confidence.
-   - Recovers the scaling $\lambda \propto (1-u)^{-1}$, consistent with empirical findings in prior work.
-
-2. **Variance-informed probabilistic rounding error analysis**
-   - Introduces a new operation-count-dependent constant, $\hat{\gamma}_n$, that incorporates both first and second moments of the rounding error random variable.
-   - Enables sharper and more flexible quantification of floating-point uncertainty beyond zero-mean assumptions.
+2. **Variance-informed analysis beyond zero-mean assumptions**
+   - Introduces an operation-count-dependent constant $\hat{\gamma}_n$ that incorporates both first and second moments of rounding-error random variables.
+   - Supports flexible uncertainty quantification in the presence of systematic bias.
 
 3. **Moment-driven control of accumulation growth**
-   - Shows that growth of operation-count-dependent constants is driven by how the rounding-error distribution is characterized, not only by stochastic assumptions.
-   - Models bias directly in the log-domain to systematically control growth of $\hat{\gamma}_n$.
+   - Shows that accumulation growth depends on how the rounding-error distribution is characterized, not only on stochastic assumptions.
+   - Uses a log-domain bias model to systematically control growth in $\hat{\gamma}_n$.
 
----
+4. **GPU-scale low-precision validation**
+   - Validates bounds with CUDA experiments in `float` and `half` precision.
+   - Covers dot products, sparse matrix-vector products (SuiteSparse matrices), and stochastic ODE settings where floating-point uncertainty interacts with other error sources.
 
-## Experiments
-
-The framework is validated on the following problems:
-
-- Random vector dot products
-- Matrix-vector multiplication
-- Linear system solvers
-- Stochastic boundary value problems
-
-The results demonstrate that probabilistic bounds remain tight at scale and allow aggressive use of low-precision arithmetic without sacrificing predictive accuracy.
-
----
-
-## Repository Structure
+## Project Layout
 
 ```text
 .
-├── include/            # Mathematical derivations and proofs
-├── src/                # Numerical experiments and benchmarks
-├── lib/                # External libraries
-├── scripts/            # Reproducibility and experiment scripts
+├── CMakeLists.txt                # Build configuration
+├── include/
+│   ├── cpp/                      # C++ headers (theory + experiment interfaces)
+│   └── cuda/                     # CUDA headers and kernels
+├── src/
+│   ├── cpp/                      # C++ experiment drivers and models
+│   └── cuda/                     # CUDA implementations
+├── scripts/
+│   ├── dot_product/              # Dot-product postprocessing and plots
+│   ├── matrix_market/            # Sparse matvec experiments and plots
+│   ├── bvp/                      # ODE/BVP experiment utilities and plots
+│   ├── compare_gamma/            # Gamma comparison scripts
+│   ├── model_verification.py
+│   └── rounding_error_model.py
 └── README.md
+```
+
+## Build and Run
+
+### Prerequisites
+
+- CMake >= 3.10
+- CUDA toolkit (configured for CUDA 12.1 in `CMakeLists.txt`)
+- C++14 compiler
+- Eigen3
+
+### Build
+
+```bash
+cmake -S . -B build
+cmake --build build -j
+```
+
+This generates the executable `run` in `build/`.
+
+### Run Experiments
+
+```bash
+./build/run compare_gamma
+./build/run dot_product
+./build/run matrix_market
+./build/run ode
+```
+
+If no argument is provided, `main.cpp` defaults to the internal `testing` path.
+
+## Experiments
+
+The repository includes numerical studies for:
+
+- random dot products,
+- sparse matrix-vector products,
+- ODE/BVP-style stochastic settings, and
+- comparison of probabilistic growth constants.
+
+The experiments show that probabilistic bounds can remain tight in low precision while preserving predictive reliability.
+
+## Reference
+
+- ArXiv preprint: https://arxiv.org/abs/2404.12556
