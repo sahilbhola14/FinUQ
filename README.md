@@ -30,17 +30,17 @@ Building on this idea, we model rounding errors as **bounded, independent, and i
 This repository highlights the following core contributions:
 
 1. **Explicit and confidence-calibrated probabilistic bounds**
-   - Derives a corollary of Theorem 2.4 of Higham and Mary that rigorously recovers the \(\sqrt{n}\) growth in \(\tilde{\gamma}_n\).
-   - Provides a closed-form expression for the confidence parameter \(\lambda\), explicitly in terms of unit roundoff and target confidence.
-   - Recovers the scaling \(\lambda \propto (1-u)^{-1}\), consistent with empirical findings in prior work.
+   - Derives a corollary of Theorem 2.4 of Higham and Mary that rigorously recovers the $\sqrt{n}$ growth in $\tilde{\gamma}_n$.
+   - Provides a closed-form expression for the confidence parameter $\lambda$, explicitly in terms of unit roundoff and target confidence.
+   - Recovers the scaling $\lambda \propto (1-u)^{-1}$, consistent with empirical findings in prior work.
 
 2. **Variance-informed probabilistic rounding error analysis**
-   - Introduces a new operation-count-dependent constant, \(\hat{\gamma}_n\), that incorporates both first and second moments of the rounding error random variable.
+   - Introduces a new operation-count-dependent constant, $\hat{\gamma}_n$, that incorporates both first and second moments of the rounding error random variable.
    - Enables sharper and more flexible quantification of floating-point uncertainty beyond zero-mean assumptions.
 
 3. **Moment-driven control of accumulation growth**
    - Shows that growth of operation-count-dependent constants is driven by how the rounding-error distribution is characterized, not only by stochastic assumptions.
-   - Models bias directly in the log-domain to systematically control growth of \(\hat{\gamma}_n\).
+   - Models bias directly in the log-domain to systematically control growth of $\hat{\gamma}_n$.
 
 4. **GPU-scale numerical validation in low precision**
    - Validates the proposed bounds with CUDA experiments in single precision (`float`) and half precision (`half`) for:
