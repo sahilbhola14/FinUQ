@@ -162,6 +162,7 @@ void run_block_dot_product_backward_error_experiment_fixed_size(
     launch_block_dot_product_kernel<T>(n, h_a, h_b, &h_result,
                                        dot_product_cfg.prec,
                                        dot_product_cfg.block_dim);
+    std::cout << h_result << std::endl;
     //   launch_sequential_dot_product_kernel<double>(n, h_a_true, h_b_true,
     //                                                &h_result_true, Double);
     //   launch_sequential_dot_product_kernel<double>(n, h_a_true_abs,
@@ -562,11 +563,11 @@ void run_all_backward_error_experiments(Precision prec,
                                               1.95, 2.0};  // shape param. alpha
 
   const int mult_min =
-      2;                  // minimum multiplier (vector_size = mult * block_dim)
+      5000;               // minimum multiplier (vector_size = mult * block_dim)
   const int n_evals = 1;  // number of evaluations
   int mult_max;           // maximum multiplier (vector_size = mult * block_dim)
   if (prec == Single) {
-    mult_max = 1000;
+    mult_max = 5000;
   } else if (prec == Half) {
     mult_max = 100;
   }

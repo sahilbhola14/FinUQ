@@ -84,6 +84,43 @@ __global__ void block_dot_product_kernel(const int n, T *a, T *b, T *partial,
   }
 }
 
+/* partial reduction kernel */
+template <typename T>
+__global__ void reduce_partial_sum_kernel(const int n, const T *in, T *out,
+                                          Precision prec) {
+  int tid = threadIdx.x;
+  int gid = threadIdx.x + blockIdx.x * blockDim.x;
+
+  extern __shared__ unsigned char sdata_raw[];
+  T *sdata = reinterpret_cast<T *>(sdata_raw);
+
+  T sum = static_cast<T>(0.0);
+  if (gid < n) {
+    sum = in[gid];
+  }
+
+  sdata[tid] = sum;
+  __syncthreads();
+
+  for (unsigned int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
+    if (tid < stride) {
+      if (prec == Double) {
+        sdata[tid] = __dadd_rn(sdata[tid], sdata[tid + stride]);
+      } else if (prec == Single) {
+        sdata[tid] = __fadd_rn(sdata[tid], sdata[tid + stride]);
+      } else {
+        sdata[tid] = __hadd_rn(static_cast<half>(sdata[tid]),
+                               static_cast<half>(sdata[tid + stride]));
+      }
+    }
+    __syncthreads();
+  }
+
+  if (tid == 0) {
+    out[blockIdx.x] = sdata[0];
+  }
+}
+
 __global__ void sequential_dot_product_model_kernel(
     const int n, double *a, double *b, double *result, Precision prec,
     BoundModel bound_model, const double beta_dist_alpha,
@@ -181,10 +218,38 @@ void launch_block_dot_product_kernel(const int n, const std::vector<T> &h_a,
   block_dot_product_kernel<<<gridDim, blockDim, blockDim.x * sizeof(T)>>>(
       n, d_a, d_b, d_partial, prec);
   cudaCheck(cudaGetLastError());
-  // /* device to host */
-  // cudaCheck(cudaMemcpy(h_result, d_result, sizeof(T),
-  // cudaMemcpyDeviceToHost));
-  // /* free */
+  cudaCheck(cudaDeviceSynchronize());
+
+  // Reduce partial sums to one scalar, possibly across multiple passes.
+  int partial_size = static_cast<int>(gridDim.x);
+  T *d_curr = d_partial;
+  T *d_next = nullptr;
+
+  while (partial_size > 1) {
+    int reduce_grid = get_grid_dim(partial_size, block_dim);
+    cudaCheck(cudaMalloc((void **)&d_next, reduce_grid * sizeof(T)));
+    reduce_partial_sum_kernel<<<reduce_grid, blockDim,
+                                blockDim.x * sizeof(T)>>>(partial_size, d_curr,
+                                                          d_next, prec);
+    cudaCheck(cudaGetLastError());
+    cudaCheck(cudaDeviceSynchronize());
+
+    if (d_curr != d_partial) {
+      cudaCheck(cudaFree(d_curr));
+    }
+    d_curr = d_next;
+    d_next = nullptr;
+    partial_size = reduce_grid;
+  }
+
+  cudaCheck(cudaMemcpy(d_result, d_curr, sizeof(T), cudaMemcpyDeviceToDevice));
+  cudaCheck(cudaMemcpy(h_result, d_result, sizeof(T), cudaMemcpyDeviceToHost));
+
+  if (d_curr != d_partial) {
+    cudaCheck(cudaFree(d_curr));
+  }
+
+  /* free */
   cudaCheck(cudaFree(d_a));
   cudaCheck(cudaFree(d_b));
   cudaCheck(cudaFree(d_partial));
