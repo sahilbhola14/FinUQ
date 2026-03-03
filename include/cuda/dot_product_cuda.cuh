@@ -13,6 +13,12 @@ void launch_sequential_dot_product_kernel(const int n,
                                           const std::vector<T> &h_b,
                                           T *h_result, Precision prec,
                                           bool verbose = false);
+template <typename T>
+void launch_block_dot_product_kernel(const int n, const std::vector<T> &h_a,
+                                     const std::vector<T> &h_b, T *h_result,
+                                     Precision prec, const int block_dim,
+                                     bool verbose = false);
+
 void launch_sequential_dot_product_model_kernel(
     const int n, const std::vector<double> &h_a, const std::vector<double> &h_b,
     double *h_result, Precision prec, const gamma_config &gamma_cfg,

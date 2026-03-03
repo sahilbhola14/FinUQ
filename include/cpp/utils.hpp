@@ -75,7 +75,8 @@ template <typename T>
 void absolute_vector(const std::vector<T> &source, std::vector<T> &target);
 vector_stats get_vector_stats(const std::vector<double>& v, bool verbose=false);
 std::vector<int> make_logspace(int n_min, int n_max, int num_points);
-std::vector<double> make_linspace(double start, double end, std::size_t num_points);
+template <typename T>
+std::vector<T> make_linspace(T start, T end, std::size_t num_points);
 /* matrix utils */
 std::vector<Matrix<double>> load_matrices_bin(const std::string& filename);
 std::vector<Matrix<double>> get_matrix_market_data(std::string filename="square_matrices.bin");

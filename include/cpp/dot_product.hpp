@@ -10,6 +10,7 @@ struct dot_product_config {
   Distribution dist=Normal; // distribution for the random vectors
   int num_experiments = 100; // number of experiments
   gamma_config gamma_cfg; // bounds config
+  int block_dim = 256; // block dimension for (block) dot product
 };
 
 /* /1* dot product experiment *1/ */
