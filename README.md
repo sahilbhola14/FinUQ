@@ -25,9 +25,9 @@ Building on this idea, we model rounding errors as **bounded, independent, and i
 
 ---
 
-## Contributions
+## Theoretical Contributions
 
-This repository highlights the following core contributions:
+This work highlights the following core contributions:
 
 1. **Explicit and confidence-calibrated probabilistic bounds**
    - Derives a corollary of Theorem 2.4 of Higham and Mary that rigorously recovers the $\sqrt{n}$ growth in $\tilde{\gamma}_n$.
@@ -41,12 +41,6 @@ This repository highlights the following core contributions:
 3. **Moment-driven control of accumulation growth**
    - Shows that growth of operation-count-dependent constants is driven by how the rounding-error distribution is characterized, not only by stochastic assumptions.
    - Models bias directly in the log-domain to systematically control growth of $\hat{\gamma}_n$.
-
-4. **GPU-scale numerical validation in low precision**
-   - Validates the proposed bounds with CUDA experiments in single precision (`float`) and half precision (`half`) for:
-     - dot products,
-     - sparse matrix-vector multiplication using SuiteSparse matrices, and
-     - a stochastic ODE where floating-point uncertainty interacts with discretization, sampling, and parameter uncertainties.
 
 ---
 
