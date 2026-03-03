@@ -1,5 +1,5 @@
 <h1 align="center">FinUQ</h1>
-<h3 align="center">A Variance-Informed Probabilistic Framework for Quantifying Computational Uncertainty Due to Finite-Precision Arithmetic</h3>
+<h3 align="center">Beyond Zero-mean Assumptions: Variance-informed Probabilistic Rounding Error Analysis</h3>
 <p align="center">
   <a href="https://arxiv.org/abs/2404.12556">📄 arXiv</a> |
   <a href="#Overview">Overview</a> |
