@@ -1,0 +1,80 @@
+# journal.mplstyle
+
+# Fonts
+font.family: sans-serif
+#font.serif: Computer Modern Roman
+# font.serif: Times New Roman, Times, Computer Modern Roman
+font.size: 20
+text.usetex: True
+text.latex.preamble: \usepackage{amsmath,amssymb}
+
+
+# Axes
+axes.grid: True
+axes.grid.which: both
+axes.labelsize: 20
+axes.titlesize: 15
+axes.linewidth: 1.0
+axes.labelpad: 10  # spacing between label and axis
+
+# Ticks
+xtick.labelsize: 18
+ytick.labelsize: 18
+xtick.direction: in
+ytick.direction: in
+xtick.top: True
+ytick.right: True
+xtick.major.width: 0.4
+ytick.major.width: 0.4
+xtick.minor.visible: True
+ytick.minor.visible: True
+xtick.minor.width: 0.3
+ytick.minor.width: 0.3
+xtick.major.size: 3
+ytick.major.size: 3
+xtick.minor.size: 1.5
+ytick.minor.size: 1.5
+xtick.major.pad: 8
+ytick.major.pad: 8
+
+# Lines and markers
+lines.linewidth: 2.5
+lines.markersize: 10
+
+# Legend
+legend.fontsize: 15
+legend.frameon: True
+legend.framealpha: 1
+legend.loc: best
+
+# Figure
+figure.figsize: 3.4, 2.5  # fits one-column journal layout
+figure.dpi: 600
+figure.autolayout: True
+
+# Savefig
+savefig.dpi: 600
+savefig.bbox: tight
+savefig.pad_inches: 0.05
+
+# Grid
+grid.linewidth: 0.25
+grid.linestyle: :
+grid.alpha: 0.5
+
+# Set Colormap
+image.cmap: jet  # or 'plasma', 'inferno', 'magma', 'jet', etc
+
+# Colors (optional: grayscale or colorblind-friendly palettes)
+# axes.prop_cycle: cycler('color', ['#000000', '#444444', '#888888', '#BBBBBB'])
+# axes.prop_cycle: cycler(
+#     color=[
+#         '#000000',  # black
+#         '#D55E00',  # vermillion
+#         '#6A51A3',  # indigo
+#         '#009E73',  # bluish-green
+#         '#56B4E9',  # sky blue
+#         '#E69F00',  # orange
+#         '#CC79A7'   # reddish purple
+#     ]
+# )
