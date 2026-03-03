@@ -7,6 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy import interpolate
 import argparse
+from matplotlib.ticker import LogLocator
 
 plt.style.use("../journal.mplstyle")
 parser = argparse.ArgumentParser(description="dot product plotting config")
@@ -24,7 +25,7 @@ LINESTYLES = ["solid", "dashed", "dotted", "dashdot"]
 
 parser.add_argument(
     "--dist",
-    type=list,
+    nargs="+",
     choices=dist_options,
     default=["ZeroOne", "MinusOnePlusOne"],
     help="Plotting distribution",
@@ -41,7 +42,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--alpha",
-    type=list,
+    nargs="+",
     default=[1.6, 1.7, 1.8],
     help="Beta bound model alpha value for each confidence",
 )
@@ -105,9 +106,9 @@ def get_backward_error_data(model, dist, alpha=None, beta=None):
     return df
 
 
-def get_forward_error_data(model="uniform"):
+def get_forward_error_data(model, dist, alpha=None, beta=None):
     # get filename
-    filename = get_filename("forward", model)
+    filename = get_filename("forward", model, dist, alpha, beta)
     # load dataframe
     df = pd.read_csv(filename)
     return df
@@ -140,78 +141,7 @@ def empirical_cdf(samples):
         x_sorted, cdf_values, kind="next", fill_value=(0, 1), bounds_error=False
     )
 
-    return cdf_func, x_sorted, cdf_values
-
-
-def plot_forward_error_cdf():
-    # uniform data
-    df_uniform = get_forward_error_data(model="uniform")
-    # beta model
-    df_beta = get_forward_error_data(model="beta")
-    # get cdfs
-    F_forward_error = empirical_cdf(df_uniform["forward_error"])
-
-    F_forward_error_uniform_model = empirical_cdf(df_uniform["forward_error_model"])
-    F_forward_error_beta_model = empirical_cdf(df_beta["forward_error_model"])
-
-    F_forward_error_gamma_det = empirical_cdf(df_uniform["gamma_det"])
-    F_forward_error_gamma_mprea = empirical_cdf(df_uniform["gamma_mprea"])
-
-    F_forward_error_gamma_vprea_uniform = empirical_cdf(df_uniform["gamma_vprea"])
-    F_forward_error_gamma_vprea_beta = empirical_cdf(df_beta["gamma_vprea"])
-
-    # plot
-    fig, ax = plt.subplots(1, 1, figsize=(6, 4), layout="compressed")
-    ax.plot(
-        F_forward_error[1], F_forward_error[2], label=r"$e_{fwd}^{true}$", color="k"
-    )
-    ax.plot(
-        F_forward_error_uniform_model[1],
-        F_forward_error_uniform_model[2],
-        label=r"$e_{fwd}^{\mathcal{U}-model}$",
-        color="b",
-        linestyle="--",
-    )
-    ax.plot(
-        F_forward_error_beta_model[1],
-        F_forward_error_beta_model[2],
-        label=r"$e_{fwd}^{\beta-model}$",
-        color="m",
-        linestyle="--",
-    )
-    ax.plot(
-        F_forward_error_gamma_det[1],
-        F_forward_error_gamma_det[2],
-        label=r"DREA",
-        color="g",
-    )
-    ax.plot(
-        F_forward_error_gamma_mprea[1],
-        F_forward_error_gamma_mprea[2],
-        label=r"MPREA",
-        color="r",
-    )
-    ax.plot(
-        F_forward_error_gamma_vprea_uniform[1],
-        F_forward_error_gamma_vprea_uniform[2],
-        label=r"VPREA ($\mathcal{U}$-model)",
-        color="b",
-    )
-    ax.plot(
-        F_forward_error_gamma_vprea_beta[1],
-        F_forward_error_gamma_vprea_beta[2],
-        label=r"VPREA ($\beta$-model)",
-        color="m",
-    )
-    ax.set_xscale("log")
-    ax.set_xlabel(r"$e_{fwd}$")
-    ax.set_ylabel(r"$F_{e_{fwd}}(e_{fwd})$")
-    ax.legend()
-
-    savefig_name = get_savefig_name("forward")
-    # plt.savefig(savefig_name)
-    plt.savefig("forward_test.png")
-    print(f"forward error figure saved to: {savefig_name}")
+    return {"function": cdf_func, "x": x_sorted, "F": cdf_values}
 
 
 def pretty_dist(dist):
@@ -240,7 +170,7 @@ def plot_backward_error_given_data_distribution(dist, ax):
     ax.plot(
         n,
         backward_error_mean,
-        label=r"$e_{bwd}^{mean}$",
+        label=r"$\varepsilon_{bwd}^{mean}$",
         color="k",
         linestyle="-",
         marker="X",
@@ -248,7 +178,7 @@ def plot_backward_error_given_data_distribution(dist, ax):
     ax.plot(
         n,
         backward_error_max,
-        label=r"$e_{bwd}^{max}$",
+        label=r"$\varepsilon_{bwd}^{max}$",
         color="k",
         linestyle="--",
         marker="s",
@@ -274,13 +204,23 @@ def plot_backward_error_given_data_distribution(dist, ax):
     ax.set_xscale("log")
     ax.set_yscale("log")
     ax.set_xlabel(r"Vector size, $n$")
-    ax.set_ylabel(r"$e_{bwd}$")
+    ax.set_ylabel(r"$\varepsilon_{bwd}$")
     if args.prec.lower() == "single":
         # ax.set_xlim(left=10, right=10**6)
-        ax.set_xlim(left=10)
-        ax.set_ylim(bottom=1e-8)
+        # ax.set_xlim(left=10)
+        ax.set_ylim(bottom=1e-8, top=1e2)
     elif args.prec.lower() == "half":
-        ax.set_xlim(left=10, right=10**5)
+        pass
+        # ax.set_xlim(left=10, right=10**5)
+    # Major ticks at 10^k
+    ax.xaxis.set_major_locator(LogLocator(base=10))
+    ax.yaxis.set_major_locator(LogLocator(base=10))
+
+    # ONE minor tick per decade
+    ax.xaxis.set_minor_locator(LogLocator(base=10, subs=[10**0.5]))
+    ax.yaxis.set_minor_locator(LogLocator(base=10, subs=[10**0.5]))
+    ax.minorticks_on()
+
     return ax
 
 
@@ -288,7 +228,7 @@ def plot_backward_error():
     fig, axs = plt.subplots(
         1,
         len(args.dist),
-        figsize=(6 * len(args.dist), 5),
+        figsize=(6.2 * len(args.dist), 5.5),
         sharex=True,
         sharey=True,
         layout="compressed",
@@ -297,9 +237,111 @@ def plot_backward_error():
         plot_backward_error_given_data_distribution(args.dist[ii], ax=ax)
         ax.label_outer()
         if ii == 0:
-            ax.legend(ncol=2, loc="lower right")
+            ax.legend(ncol=1, loc="best")
 
     savename = get_savefig_name(experiment="backward")
+    plt.savefig(savename)
+
+
+def plot_forward_error_cdf_given_data_distribution(dist, ax, alpha_plot=1.6):
+    print(f"Plotting forward error cdf for alpha: {alpha_plot}")
+    # uniform data
+    df_uniform = get_forward_error_data(model="uniform", dist=dist)
+    # n = df_uniform["n"]
+    forward_error = df_uniform["forward_error"]
+    forward_error_model_u = df_uniform["forward_error_model"]
+    gamma_det = df_uniform["gamma_det"]
+    gamma_mprea = df_uniform["gamma_mprea"]
+    gamma_vprea_u = df_uniform["gamma_vprea"]
+
+    df_beta = get_forward_error_data(
+        model="beta", dist=dist, alpha=alpha_plot, beta=args.beta
+    )
+    forward_error_model_beta = df_beta["forward_error_model"]
+    gamma_vprea_beta = df_beta["gamma_vprea"]
+
+    # compute the CDF
+    forward_error_cdf = empirical_cdf(forward_error)
+    forward_error_model_u_cdf = empirical_cdf(forward_error_model_u)
+    forward_error_model_beta_cdf = empirical_cdf(forward_error_model_beta)
+    gamma_det_cdf = empirical_cdf(gamma_det)
+    gamma_mprea_cdf = empirical_cdf(gamma_mprea)
+    gamma_vprea_u_cdf = empirical_cdf(gamma_vprea_u)
+    gamma_vprea_beta_cdf = empirical_cdf(gamma_vprea_beta)
+
+    # plot
+    ax.plot(
+        forward_error_cdf["x"],
+        forward_error_cdf["F"],
+        label=r"$\varepsilon_{fwd}^{true}$",
+        color="k",
+    )
+    ax.plot(
+        forward_error_model_u_cdf["x"],
+        forward_error_model_u_cdf["F"],
+        label=r"$\varepsilon_{fwd}^{\mathcal{U}-model}$",
+        color="b",
+        linestyle="--",
+    )
+    ax.plot(
+        forward_error_model_beta_cdf["x"],
+        forward_error_model_beta_cdf["F"],
+        label=r"$\varepsilon_{fwd}^{\beta-model}$",
+        color="goldenrod",
+        linestyle="--",
+    )
+    ax.plot(
+        gamma_det_cdf["x"],
+        gamma_det_cdf["F"],
+        label=r"DREA",
+        color=COLORS["DREA"],
+    )
+    ax.plot(
+        gamma_mprea_cdf["x"],
+        gamma_mprea_cdf["F"],
+        label=r"MPREA",
+        color=COLORS["MPREA"],
+    )
+    ax.plot(
+        gamma_vprea_u_cdf["x"],
+        gamma_vprea_u_cdf["F"],
+        label=r"VPREA ($\mathcal{U}$-model)",
+        color=COLORS["VPREA_U"],
+    )
+    ax.plot(
+        gamma_vprea_beta_cdf["x"],
+        gamma_vprea_beta_cdf["F"],
+        label=rf"VPREA ($\beta$-model; $\alpha$={alpha_plot:.2f})",
+        color=COLORS["VPREA_beta"],
+    )
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel(r"$\varepsilon_{fwd}$")
+    ax.set_ylabel(r"$F_{\varepsilon_{fwd}}(\varepsilon_{fwd})$")
+    ax.set_xlim(left=1e-3)
+    return ax
+
+
+def plot_forward_error_cdf():
+    fig, axs = plt.subplots(
+        1,
+        len(args.dist),
+        figsize=(7 * len(args.dist), 4),
+        sharex=True,
+        sharey=True,
+        layout="compressed",
+    )
+    if len(args.dist) == 1:
+        axs = [axs]
+    for ii, ax in enumerate(axs):
+        plot_forward_error_cdf_given_data_distribution(
+            args.dist[ii], ax=ax, alpha_plot=1.6
+        )
+        ax.label_outer()
+        if ii == 0:
+            ax.legend(loc="best")
+
+    savename = get_savefig_name(experiment="forward")
     plt.savefig(savename)
 
 
