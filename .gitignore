@@ -14,8 +14,9 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+# lib
 lib64/
+data/
 parts/
 sdist/
 var/
@@ -130,3 +131,8 @@ dmypy.json
 
 # Undo directories
 undodir/
+
+# data
+*.csv
+*.png
+*.bin

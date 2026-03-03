@@ -1,24 +1,36 @@
 #include <iostream>
+#include <vector>
 
-#include "dotProduct.cuh"
+#include "boundary_value_prob.hpp"
+#include "definition.hpp"
+#include "dot_product.hpp"
 #include "gamma.hpp"
-#include "matVecMult.cuh"
-#include "ode.cuh"
+#include "matrix_vector.hpp"
+#include "utils.hpp"
 
-int main() {
-  // Compare Gamma [Figure 1]
-  /* compareGamma(2, Float, "gamma_zeta_0.9_fp32.txt", 2, 13, 0.9); */
-  /* compareGamma(2, Float, "gamma_zeta_0.99_fp32.txt", 2, 13, 0.99); */
-  /* compareGamma(2, Half, "gamma_zeta_0.9_fp16.txt", 2, 13, 0.9); */
-  /* compareGamma(2, Half, "gamma_zeta_0.99_fp16.txt", 2, 13, 0.99); */
+int main(int argc, char **argv) {
+  /* std::string experiment = "compare_gamma"; */
+  std::string experiment = "testing";
+  if (argc > 1) {
+    experiment = argv[1];
+  }
 
-  // Dot Product [Figure 2]
-  /* launchDotProductExperiment(2<<5, 1, 15); */
-  /* launchDotProductExperiment(2<<10, 1, 1); */
-  // Matrix-Vector Product
-  /* launchMatVecMultExperiment(2<<5, 1, 9); */
-  /* launchMatVecMultExperiment(2<<10, 1, 1); */
-  // Stochastic ODE
-  launchStochasticODEExperiment(2 << 1, 1, 1);
+  // Experiments
+  if (experiment == "compare_gamma") {
+    run_all_compare_gamma_experiments(Single);
+    run_all_compare_gamma_experiments(Half);
+  } else if (experiment == "dot_product") {
+    run_all_dot_product_experiments(Single);
+    run_all_dot_product_experiments(Half);
+  } else if (experiment == "matrix_market") {
+    run_all_matrix_vector_product_experiments(Single);
+    run_all_matrix_vector_product_experiments(Half);
+  } else if (experiment == "ode") {
+    run_all_ode_experiments(Single);
+    run_all_ode_experiments(Half);
+  } else if (experiment == "testing") {
+    run_all_ode_experiments(Single);
+    run_all_ode_experiments(Half);
+  }
   return 0;
 }

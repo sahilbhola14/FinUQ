@@ -1,125 +1,292 @@
+
 #include "gamma.hpp"
 
+#include <cassert>
 #include <cmath>
-#include <fstream>
 #include <iomanip>
-#include <limits>
-#include <stdexcept>
+#include <iostream>
+#include <sstream>
+#include <vector>
 
+#include "prob_model.hpp"
+#include "rounding_error_model.cuh"
 #include "utils.hpp"
 
-double getLogDistMean(double urd, double kappa) {
-  double numerator, denominator;
-  numerator = (2 * urd * (-2 + kappa) -
-               (-1 + urd) * (-2 + kappa + urd * kappa) * log(1 - urd) +
-               (1 + urd) * (2 + (-1 + urd) * kappa) * log(1 + urd));
-  denominator = 4 * urd;
-  return numerator / denominator;
+double compute_determinsitic_gamma(int n, Precision prec) {
+  /* compute the unit roundoff */
+  double urd = compute_unit_roundoff(prec);
+  /* compute gamma value */
+  double gamma = (n * urd) / (1.0 - n * urd);
+  if ((gamma > 1.0) || (n * urd > 1.0)) {
+    return 1.0;
+  } else {
+    return gamma;
+  }
 }
 
-double getLogDistVar(double urd, double kappa) {
-  /* Define logarithm functions */
-  double log1_minus_a = log(1 - urd);
-  double log1_plus_a = log(1 + urd);
+long double compute_hoeffding_gamma(int n, Precision prec,
+                                    const long double one_minus_zeta) {
+  /* initialization */
+  long double nL = static_cast<long double>(n);
+  /* assert statements */
+  assert((one_minus_zeta < 1.0L) && "one minus zeta must be < 1.0");
+  /* compute the unit roundoff */
+  double urd = compute_unit_roundoff(prec);
+  long double urdL = static_cast<long double>(urd);
 
-  /* Compute individual terms */
-  double term1 = 2 * urd * (-2 + kappa);
-  double term2 = (-1 + urd) * (-2 + kappa + urd * kappa) * log1_minus_a;
-  double term3 = (1 + urd) * (2 + (-1 + urd) * kappa) * log1_plus_a;
+  /* compute the lambda parameter */
+  long double lambda =
+      (1.0L / (1.0L - urdL)) *
+      std::sqrt(2.0L * (std::log(2.0L) - std::log(one_minus_zeta)));
 
-  double numerator1 = term1 - term2 + term3;
-  double numerator1_squared = pow(numerator1, 2);
+  /* compute the bound */
+  long double bound = urdL / (1.0L - urdL);
+  /* compute the positive root of the quadratic */
+  long double t_plus =
+      bound *
+      std::sqrt(2.0L * nL * (std::log(2.0L) - std::log(one_minus_zeta)));
+  /* compute the gamma value */
+  long double gamma =
+      std::exp(t_plus + (nL * std::pow(urdL, 2.0L) / (1.0L - urdL))) - 1.0L;
 
-  double term4 = urd * (8 - 6 * kappa);
-  double term5 = (-1 + urd) * (-4 + (3 + urd) * kappa) * log1_minus_a;
-  double term6 = (-1 + urd) * (-2 + kappa + urd * kappa) * pow(log1_minus_a, 2);
-  double term7 =
-      (1 + urd) * log1_plus_a *
-      (-4 - (-3 + urd) * kappa + (2 + (-1 + urd) * kappa) * log1_plus_a);
+  if (gamma > 1.0L) {
+    return 1.0L;
+  } else {
+    return gamma;
+  }
+}
 
-  double numerator2 = term4 + term5 - term6 + term7;
+double compute_bernstein_gamma(int n, Precision prec,
+                               const long double one_minus_zeta,
+                               BoundModel bound_model = Uniform,
+                               double beta_dist_alpha = 4.0,
+                               double beta_dist_beta = 2.0) {
+  /* initialization */
+  long double nL = static_cast<long double>(n);
+  /* assert statements */
+  assert((one_minus_zeta < 1.0L) && "one minus zeta must be < 1.0");
 
-  /* Final result */
-  double result =
-      -(1 / (16 * pow(urd, 2))) * (numerator1_squared - 4 * urd * numerator2);
+  /* utils */
+  log1pdeltastats stats;
+  long double logc = std::log(one_minus_zeta) - std::log(2.0L);
+
+  /* compute the statistics of log(1+delta) distribution; */
+  stats =
+      get_log1pdelta_stats(prec, bound_model, beta_dist_alpha, beta_dist_beta);
+  /* compute the positive root of the quadratic */
+  long double a_coeff = 1.0L;
+  long double b_coeff = (2.0L / 3.0L) * stats.bound * logc;
+  long double c_coeff = 2.0L * nL * stats.var * logc;
+  long double t_plus = (-b_coeff + std::sqrt(std::pow(b_coeff, 2.0L) -
+                                             4.0L * a_coeff * c_coeff)) /
+                       (2.0L * a_coeff);
+  /* compute the gamma value */
+  long double gamma = std::exp(t_plus + (nL * std::abs(stats.mean))) - 1.0L;
+  if (gamma > 1.0L) {
+    return 1.0L;
+  } else {
+    return gamma;
+  }
+}
+
+/* gamma filename */
+std::string make_gamma_filename(const gamma_config &cfg) {
+  std::ostringstream ss;
+  ss << "gamma_" << to_string(cfg.prec) << "_prec"
+     << "_confidence_" << std::fixed << std::setprecision(3) << cfg.confidence
+     << "_" << to_string(cfg.bound_model);
+
+  if (cfg.bound_model == Beta) {
+    ss << "_a_" << cfg.beta_dist_alpha << "_b_" << cfg.beta_dist_beta;
+  }
+
+  ss << ".csv";
+
+  return ss.str();
+}
+
+/* get gamma value */
+gamma_result get_gamma(const int n, const gamma_config &gamma_cfg,
+                       const long double one_minus_zeta) {
+  /* initialization */
+  double gamma_det, gamma_mprea, gamma_vprea;
+  gamma_result result;
+  /* assert statements */
+  assert(one_minus_zeta > 0.0L &&
+         "Invalid one minus zeta must be strictly positive.\n");
+  /* number of arithmetic operators */
+  result.n = n;
+  /* determinisitic gamma */
+  result.gamma_det = compute_determinsitic_gamma(n, gamma_cfg.prec);
+  /* probabilistic gamma (mean informed model) */
+  result.gamma_mprea =
+      compute_hoeffding_gamma(n, gamma_cfg.prec, one_minus_zeta);
+  /* probabilistic gamma (variance-informed) */
+  result.gamma_vprea = compute_bernstein_gamma(
+      n, gamma_cfg.prec, one_minus_zeta, gamma_cfg.bound_model,
+      gamma_cfg.beta_dist_alpha, gamma_cfg.beta_dist_beta);
   return result;
 }
 
-double getLogDistBound(double urd, double kappa) { return log(1 + urd); }
+/* compare gamma */
+void compare_gamma(const gamma_config &gamma_cfg, bool verbose) {
+  /* initialization */
+  double gamma_det, gamma_mprea, gamma_vprea;
+  /* std::vector<int> n_values = {1, 5, 10,     100,     1000,     10000, */
+  /*                              100000, 1000000, 10000000, 50000000,
+   * 100000000}; */
+  std::vector<int> n_values = make_logspace(1, 100000000, 100);
+  std::vector<gamma_result> results;
+  results.reserve(n_values.size());
 
-double getGamma(int N, Precision prec, BoundType btype, double confidence) {
-  double urd = computeUnitRoundOff(prec);
-  double gamma, kappa;
-  kappa = 0.0;  // kappa = 0 means that relative error is moded as uniform
-                // distribution
+  /* compute one one_minus_zeta with single bound to be satisfied*/
+  long double one_minus_zeta =
+      compute_individual_bound_one_minus_zeta(1, gamma_cfg.confidence);
 
-  if (btype == Deterministic) {
-    if (N * urd < 1.0) {
-      gamma = (N * urd) / (1.0 - N * urd);
-    } else {
-      gamma = std::numeric_limits<double>::infinity();
-    }
-  } else if (btype == Hoeffding) {
-    double lambda =
-        (1.0 / (1.0 - urd)) * sqrt(-2 * log((1 - confidence) / 2.0));
-    double t = lambda * sqrt(N) * urd;
-    gamma = exp(t + (N * urd * urd) / (1.0 - urd)) - 1.0;
-  } else if (btype == Bernstein) {
-    /* double mu = (-2.0 * urd + (-1.0 + urd) * log(1.0 - urd) + */
-    /*              (1.0 + urd) * log(1.0 + urd)) / */
-    /*             (2.0 * urd); */
-    /* double kappa = -1.0 + pow(urd, 2); */
-    /* double c = log(1.0 + urd); */
-    /* double var = */
-    /*     (4 * pow(urd, 2) + kappa * (pow(log(1.0 - urd), 2) - */
-    /*                                 2.0 * log(1.0 - urd) * log(1.0 + urd) +
-     */
-    /*                                 pow(log(1.0 + urd), 2))) / */
-    /*     (4 * pow(urd, 2)); */
-    double mu = getLogDistMean(urd, kappa);
-    double var = getLogDistVar(urd, kappa);
-    double c = getLogDistBound(urd, kappa);
-    double log_term = log((1 - confidence) / 2.0);
-    /* std::cout << prec << " " << kappa << " "<<   mu << " " << var << " " <<
-     * std::endl; */
-    double t = (1.0 / 3.0) * (-c * log_term + sqrt(pow(c * log_term, 2) -
-                                                   18.0 * N * log_term * var));
-    gamma = exp(t + N * abs(mu)) - 1.0;
-  } else {
-    std::invalid_argument("Invalid bound type");
+  /* check the mean sign (for variance-informed model) */
+  check_mean_rounding_error_sign(gamma_cfg.prec, gamma_cfg.bound_model,
+                                 gamma_cfg.beta_dist_alpha,
+                                 gamma_cfg.beta_dist_beta);
+
+  /* compute */
+  for (int n : n_values) {
+    gamma_result r;
+    /* update vector size */
+    r.n = n;
+    /* determinisitic gamma */
+    r.gamma_det = compute_determinsitic_gamma(n, gamma_cfg.prec);
+    /* probabilistic gamma (mean informed model) */
+    r.gamma_mprea = compute_hoeffding_gamma(n, gamma_cfg.prec, one_minus_zeta);
+    /* probabilistic gamma (variance-informed) */
+    r.gamma_vprea = compute_bernstein_gamma(
+        n, gamma_cfg.prec, one_minus_zeta, gamma_cfg.bound_model,
+        gamma_cfg.beta_dist_alpha, gamma_cfg.beta_dist_beta);
+    /* update the results */
+    results.push_back(r);
   }
-  return gamma;
+
+  /* print */
+  if (verbose == true) {
+    std::cout << std::left << std::setw(12) << "n" << std::setw(18)
+              << "gamma_det" << std::setw(18) << "gamma_mprea" << std::setw(18)
+              << "gamma_vprea"
+              << "\n";
+
+    std::cout << std::string(66, '-') << "\n";
+    std::cout << std::scientific << std::setprecision(6);
+
+    for (const auto &r : results) {
+      std::cout << std::left << std::setw(12) << r.n << std::setw(18)
+                << r.gamma_det << std::setw(18) << r.gamma_mprea
+                << std::setw(18) << r.gamma_vprea << "\n";
+    }
+  }
+
+  /* save */
+  std::string filename = make_gamma_filename(gamma_cfg);
+  write_gamma_results_csv(results, filename, verbose);
 }
 
-void compareGamma(int N_lower, Precision prec, std::string filename,
-                  int bit_shift, int max_shift, double confidence) {
-  int N = N_lower;
-  double gamma_deterministic, gamma_hoeffding, gamma_bernstein;
-  const int width_int = 6;
-  const int width_double = 15;
-  std::ofstream outfile(filename);
-  if (!outfile) {
-    std::cerr << "Error opening file: " << filename << std::endl;
-    return;
-  }
-  outfile << "Description: Comparison of gamma for a given confidence ("
-          << confidence << ")" << std::endl;
-  outfile
-      << "Variables: N, gamma_deterministic, gamma_hoeffding, gamma_berinstein"
-      << std::endl;
+/* operator for gamma */
+gamma_result operator+(const gamma_result &a, const gamma_result &b) {
+  return gamma_result{a.n + b.n, a.gamma_det + b.gamma_det,
+                      a.gamma_mprea + b.gamma_mprea,
+                      a.gamma_vprea + b.gamma_vprea};
+}
 
-  for (int i = 0; i < max_shift; i++) {
-    /* printf("--------\n"); */
-    /* printf("N: %d\n", N); */
-    gamma_deterministic = getGamma(N, prec, Deterministic, confidence);
-    gamma_hoeffding = getGamma(N, prec, Hoeffding, confidence);
-    gamma_bernstein = getGamma(N, prec, Bernstein, confidence);
-    outfile << std::setw(width_int) << N << "," << std::setw(width_double)
-            << std::scientific << std::setprecision(8) << gamma_deterministic
-            << "," << std::setw(width_double) << gamma_hoeffding << ","
-            << std::setw(width_double) << gamma_bernstein << std::endl;
-    N = N << bit_shift;
+gamma_result operator+(long double c, const gamma_result &g) {
+  return gamma_result{g.n, c + g.gamma_det, c + g.gamma_mprea,
+                      c + g.gamma_vprea};
+}
+
+gamma_result operator*(long double c, const gamma_result &g) {
+  return gamma_result{g.n, c * g.gamma_det, c * g.gamma_mprea,
+                      c * g.gamma_vprea};
+}
+
+gamma_result operator*(const gamma_result &a, const gamma_result &b) {
+  return gamma_result{a.n * b.n, a.gamma_det * b.gamma_det,
+                      a.gamma_mprea * b.gamma_mprea,
+                      a.gamma_vprea * b.gamma_vprea};
+}
+
+gamma_result gamma_abs(const gamma_result &g) {
+  return gamma_result{
+      g.n,
+      std::abs(g.gamma_det),
+      std::abs(g.gamma_mprea),
+      std::abs(g.gamma_vprea),
+  };
+}
+
+/* experiments */
+void run_all_compare_gamma_experiments(Precision prec) {
+  /* configuration */
+  gamma_config gamma_cfg;
+  gamma_cfg.prec = prec;
+  /* vary confidence for uniform model*/
+  gamma_cfg.bound_model = Uniform;
+  gamma_cfg.confidence = 0.9;
+  compare_gamma(gamma_cfg);
+  gamma_cfg.confidence = 0.95;
+  compare_gamma(gamma_cfg);
+  gamma_cfg.confidence = 0.99;
+  compare_gamma(gamma_cfg);
+  /* vary confidence for beta model (alpha = 1.9, beta=2.0)*/
+  gamma_cfg.bound_model = Beta;
+  gamma_cfg.beta_dist_alpha = 1.9;
+  gamma_cfg.beta_dist_beta = 2.00;
+  gamma_cfg.confidence = 0.9;
+  compare_gamma(gamma_cfg);
+  gamma_cfg.confidence = 0.95;
+  compare_gamma(gamma_cfg);
+  gamma_cfg.confidence = 0.99;
+  compare_gamma(gamma_cfg);
+  /* vary confidence for beta model (alpha = 1.95, beta=2.0)*/
+  gamma_cfg.bound_model = Beta;
+  gamma_cfg.beta_dist_alpha = 1.95;
+  gamma_cfg.beta_dist_beta = 2.00;
+  gamma_cfg.confidence = 0.9;
+  compare_gamma(gamma_cfg);
+  gamma_cfg.confidence = 0.95;
+  compare_gamma(gamma_cfg);
+  gamma_cfg.confidence = 0.99;
+  compare_gamma(gamma_cfg);
+  /* vary confidence for beta model (alpha = 1.97, beta=2.0)*/
+  gamma_cfg.bound_model = Beta;
+  gamma_cfg.beta_dist_alpha = 1.97;
+  gamma_cfg.beta_dist_beta = 2.00;
+  gamma_cfg.confidence = 0.9;
+  compare_gamma(gamma_cfg);
+  gamma_cfg.confidence = 0.95;
+  compare_gamma(gamma_cfg);
+  gamma_cfg.confidence = 0.99;
+  compare_gamma(gamma_cfg);
+  /* vary confidence for beta model (alpha = 2.0, beta=2.0)*/
+  gamma_cfg.bound_model = Beta;
+  gamma_cfg.beta_dist_alpha = 2.0;
+  gamma_cfg.beta_dist_beta = 2.00;
+  gamma_cfg.confidence = 0.9;
+  compare_gamma(gamma_cfg);
+  gamma_cfg.confidence = 0.95;
+  compare_gamma(gamma_cfg);
+  gamma_cfg.confidence = 0.99;
+  compare_gamma(gamma_cfg);
+}
+
+// printing
+void print_gamma(const gamma_result &gamma_res, bool flat) {
+  if (flat == true) {
+    printf("Deterministic: %.3e Mean-informed: %.3e Varinance-informed: %.3e\n",
+           static_cast<double>(gamma_res.gamma_det),
+           static_cast<double>(gamma_res.gamma_mprea),
+           static_cast<double>(gamma_res.gamma_vprea));
+  } else {
+    std::cout << "Deterministic: " << std::scientific << std::setprecision(3)
+              << gamma_res.gamma_det << std::endl;
+    std::cout << "Mean-informed: " << std::scientific << std::setprecision(3)
+              << gamma_res.gamma_mprea << std::endl;
+    std::cout << "Varinance-informed: " << std::setprecision(3)
+              << gamma_res.gamma_vprea << std::endl;
   }
-  std::cout << "Data written to : " << filename << std::endl;
-  outfile.close();
 }
