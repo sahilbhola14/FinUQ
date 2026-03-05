@@ -13,7 +13,7 @@
 #include "utils.hpp"
 
 /*
- * compute the dot-product backward error.
+ * compute the (sequential) dot-product backward error.
  *
  * @param result           Result of the computation: <a, b>
  * @param result_true      True result computed in double precision: <a_true,
@@ -30,7 +30,23 @@ void compute_sequential_dot_product_backward_error(double result,
 }
 
 /*
- * compute the dot-product backward error bound.
+ * compute the (block) dot-product backward error.
+ *
+ * @param result           Result of the computation: <a, b>
+ * @param result_true      True result computed in double precision: <a_true,
+ * b_true>
+ * @param result_true_abs  True result computed in double precision using
+ * absolute values: <|a_true|, |b_true|>
+ */
+void compute_block_dot_product_backward_error(double result, double result_true,
+                                              double result_true_abs,
+                                              double *backward_error) {
+  /* equation 4.1 in [1] */
+  *backward_error = std::abs(result - result_true) / result_true_abs;
+}
+
+/*
+ * compute the (block) dot-product backward error bound.
  *
  * @param gamma_cfg   Configuration of the bounds
  */

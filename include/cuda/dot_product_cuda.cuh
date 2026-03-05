@@ -16,7 +16,7 @@ void launch_sequential_dot_product_kernel(const int n,
 template <typename T>
 void launch_block_dot_product_kernel(const int n, const std::vector<T> &h_a,
                                      const std::vector<T> &h_b, T *h_result,
-                                     Precision prec, const int block_dim,
+                                     Precision prec, const int tile_size,
                                      bool verbose = false);
 
 void launch_sequential_dot_product_model_kernel(
