@@ -19,7 +19,7 @@ void compute_sequential_dot_product_backward_error(double result, double result_
 void compute_block_dot_product_backward_error(double result, double result_true, double result_true_abs, double *backward_error);
 
 gamma_result compute_sequential_dot_product_backward_error_bound(const int vector_size, const gamma_config &gamma_cfg, bool verbose=false);;
-// gamma_result compute_block_dot_product_backward_error_bound(const int vector_size, const gamma_config &gamma_cfg, bool verbose=false);;
+gamma_result compute_block_dot_product_backward_error_bound(const int vector_size, const gamma_config &gamma_cfg, const int tile_size, bool verbose=false);
 
 /* matrix-vector product backward error */
 void compute_matvec_product_backward_error(const std::vector<double> &result, const std::vector<double> &result_true, const std::vector<double> &result_true_abs, double *backward_error);

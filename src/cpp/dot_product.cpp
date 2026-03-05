@@ -162,34 +162,31 @@ void run_block_dot_product_backward_error_experiment_fixed_size(
     launch_block_dot_product_kernel<T>(n, h_a, h_b, &h_result,
                                        dot_product_cfg.prec,
                                        dot_product_cfg.tile_size);
-    printf("%f\n", h_result);
-    // launch_block_dot_product_kernel<double>(n, h_a_true, h_b_true,
-    //                                                &h_result_true, Double,
-    //                                                dot_product_cfg.block_dim);
-    // launch_block_dot_product_kernel<double>(n, h_a_true_abs, h_b_true_abs,
-    //                                                &h_result_true_abs,
-    //                                                Double,
-    //                                                dot_product_cfg.block_dim);
-    // /* compute the backward error */
-    // compute_block_dot_product_backward_error(
-    //       static_cast<double>(h_result), h_result_true, h_result_true_abs,
-    //       &backward_error[i]);
-    // std::cout << backward_error[i] << std::endl;
+    launch_block_dot_product_kernel<double>(n, h_a_true, h_b_true,
+                                            &h_result_true, Double,
+                                            dot_product_cfg.tile_size);
+    launch_block_dot_product_kernel<double>(n, h_a_true_abs, h_b_true_abs,
+                                            &h_result_true_abs, Double,
+                                            dot_product_cfg.tile_size);
+    /* compute the backward error */
+    compute_block_dot_product_backward_error(static_cast<double>(h_result),
+                                             h_result_true, h_result_true_abs,
+                                             &backward_error[i]);
   }
 
-  // /* compute the backward error statistics */
-  // backward_error_stats = get_vector_stats(backward_error);
+  /* compute the backward error statistics */
+  backward_error_stats = get_vector_stats(backward_error);
 
-  // /* compute the backward error bound */
-  // backward_error_bound = compute_block_dot_product_backward_error_bound(
-  //     n, dot_product_cfg.gamma_cfg);
+  /* compute the backward error bound */
+  backward_error_bound = compute_block_dot_product_backward_error_bound(
+      n, dot_product_cfg.gamma_cfg, dot_product_cfg.tile_size);
 
-  // /* update result */
-  // result.n = n;
-  // result.backward_error_min = backward_error_stats.min;
-  // result.backward_error_max = backward_error_stats.max;
-  // result.backward_error_mean = backward_error_stats.mean;
-  // result.backward_error_bound = backward_error_bound;
+  /* update result */
+  result.n = n;
+  result.backward_error_min = backward_error_stats.min;
+  result.backward_error_max = backward_error_stats.max;
+  result.backward_error_mean = backward_error_stats.mean;
+  result.backward_error_bound = backward_error_bound;
 }
 
 /*
@@ -565,7 +562,7 @@ void run_all_backward_error_experiments(Precision prec,
   }
 
   /* data: U(0,1) */
-  dot_product_cfg.dist = Ones;
+  dot_product_cfg.dist = ZeroOne;
 
   dot_product_cfg.gamma_cfg.bound_model = Uniform;
 
