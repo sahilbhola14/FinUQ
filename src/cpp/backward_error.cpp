@@ -79,13 +79,19 @@ gamma_result compute_sequential_dot_product_backward_error_bound(
 gamma_result compute_block_dot_product_backward_error_bound(
     const int vector_size, const gamma_config &gamma_cfg, const int tile_size,
     bool verbose) {
-  /* compute individual bound confidence*/
+  assert(vector_size > 0 && "vector_size must be positive");
+  assert(tile_size > 0 && "tile_size must be positive");
+
+  /* compute individual bound confidence */
+  const double ratio =
+      static_cast<double>(vector_size) / static_cast<double>(tile_size);
   int number_of_bounds =
-      tile_size + static_cast<int>(std::ceil(log2(vector_size / tile_size)));
+      tile_size + static_cast<int>(std::ceil(std::log2(ratio)));
+  if (number_of_bounds < 1) number_of_bounds = 1;
 
   long double one_minus_zeta = compute_individual_bound_one_minus_zeta(
       number_of_bounds, gamma_cfg.confidence);
-  /* compute the bounds \gamma_{number_of_bounds}*/
+  /* compute the bounds \gamma_{number_of_bounds} */
   gamma_result result = get_gamma(number_of_bounds, gamma_cfg, one_minus_zeta);
   /* verbose */
   if (verbose == true) {
