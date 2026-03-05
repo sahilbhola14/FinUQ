@@ -598,9 +598,9 @@ void run_all_backward_error_experiments(Precision prec,
 void run_all_dot_product_experiments(Precision prec) {
   /* sequential */
   // run all backward error experiments
-  sequential_dot_product::run_all_backward_error_experiments(prec);
+  // sequential_dot_product::run_all_backward_error_experiments(prec);
   // run all forward error experiments
-  sequential_dot_product::run_all_forward_error_experiments(prec);
+  // sequential_dot_product::run_all_forward_error_experiments(prec);
 
   /* block */
   // run all backward error experiments

@@ -30,6 +30,7 @@ int main(int argc, char **argv) {
     run_all_ode_experiments(Half);
   } else if (experiment == "testing") {
     run_all_dot_product_experiments(Single);
+    run_all_dot_product_experiments(Half);
   }
   return 0;
 }

@@ -85,14 +85,14 @@ gamma_result compute_block_dot_product_backward_error_bound(
   /* compute individual bound confidence */
   const double ratio =
       static_cast<double>(vector_size) / static_cast<double>(tile_size);
-  int number_of_bounds =
-      tile_size + static_cast<int>(std::ceil(std::log2(ratio)));
-  if (number_of_bounds < 1) number_of_bounds = 1;
+  int gamma_factor = tile_size + static_cast<int>(std::ceil(std::log2(ratio)));
+
+  if (gamma_factor < 1) gamma_factor = 1;
 
   long double one_minus_zeta = compute_individual_bound_one_minus_zeta(
-      number_of_bounds, gamma_cfg.confidence);
-  /* compute the bounds \gamma_{number_of_bounds} */
-  gamma_result result = get_gamma(number_of_bounds, gamma_cfg, one_minus_zeta);
+      vector_size, gamma_cfg.confidence);
+  /* compute the bounds \gamma_{gamma_factor} */
+  gamma_result result = get_gamma(gamma_factor, gamma_cfg, one_minus_zeta);
   /* verbose */
   if (verbose == true) {
     std::cout << std::string(10, '-')
