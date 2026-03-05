@@ -371,8 +371,9 @@ void run_block_dot_product_backward_error_experiment(
   }
 
   /* save */
-  std::string filename =
-      make_dot_product_filename("backward_error_result_block", dot_product_cfg);
+  std::ostringstream ss;
+  ss << "backward_error_result_block_tile_size_" << dot_product_cfg.tile_size;
+  std::string filename = make_dot_product_filename(ss.str(), dot_product_cfg);
   write_backward_error_results_csv(results, filename);
 }
 
