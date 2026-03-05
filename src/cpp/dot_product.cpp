@@ -66,7 +66,7 @@ std::string make_dot_product_filename(const std::string prefix,
  * run (sequential) dot product backward error experiment for fixed size
  */
 template <typename T>
-void run_dot_product_backward_error_experiment_fixed_size(
+void run_sequential_dot_product_backward_error_experiment_fixed_size(
     const int n, const dot_product_config &dot_product_cfg,
     backward_error_result &result, const int seed = 42) {
   /* initialize */
@@ -193,7 +193,7 @@ void run_block_dot_product_backward_error_experiment_fixed_size(
  * run (sequential) dot product forward error experiment for fixed size
  */
 template <typename T>
-void run_dot_product_forward_error_experiment_fixed_size(
+void run_sequential_dot_product_forward_error_experiment_fixed_size(
     const int n, const dot_product_config &dot_product_cfg,
     forward_error_result &result, const int seed = 42) {
   /* initialize */
@@ -282,17 +282,17 @@ void run_sequential_dot_product_backward_error_experiment(
   for (size_t i = 0; i < vector_sizes.size(); i++) {
     switch (dot_product_cfg.prec) {
       case Double: {
-        run_dot_product_backward_error_experiment_fixed_size<double>(
+        run_sequential_dot_product_backward_error_experiment_fixed_size<double>(
             vector_sizes[i], dot_product_cfg, results[i]);
         break;
       }
       case Single: {
-        run_dot_product_backward_error_experiment_fixed_size<float>(
+        run_sequential_dot_product_backward_error_experiment_fixed_size<float>(
             vector_sizes[i], dot_product_cfg, results[i]);
         break;
       }
       case Half: {
-        run_dot_product_backward_error_experiment_fixed_size<half>(
+        run_sequential_dot_product_backward_error_experiment_fixed_size<half>(
             vector_sizes[i], dot_product_cfg, results[i]);
         break;
       }
@@ -350,8 +350,8 @@ void run_block_dot_product_backward_error_experiment(
   for (size_t i = 0; i < vector_sizes.size(); i++) {
     switch (dot_product_cfg.prec) {
       case Double: {
-        // run_dot_product_backward_error_experiment_fixed_size<double>(
-        //     vector_sizes[i], dot_product_cfg, results[i]);
+        run_block_dot_product_backward_error_experiment_fixed_size<double>(
+            vector_sizes[i], dot_product_cfg, results[i]);
         break;
       }
       case Single: {
@@ -360,8 +360,8 @@ void run_block_dot_product_backward_error_experiment(
         break;
       }
       case Half: {
-        // run_dot_product_backward_error_experiment_fixed_size<half>(
-        //     vector_sizes[i], dot_product_cfg, results[i]);
+        run_block_dot_product_backward_error_experiment_fixed_size<half>(
+            vector_sizes[i], dot_product_cfg, results[i]);
         break;
       }
       default: {
@@ -370,14 +370,14 @@ void run_block_dot_product_backward_error_experiment(
     }
   }
 
-  // /* save */
-  // std::string filename =
-  //     make_dot_product_filename("backward_error_result", dot_product_cfg);
-  // write_backward_error_results_csv(results, filename);
+  /* save */
+  std::string filename =
+      make_dot_product_filename("backward_error_result_block", dot_product_cfg);
+  write_backward_error_results_csv(results, filename);
 }
 
 /* run (sequential) dot product forward error experiment */
-void run_dot_product_forward_error_experiment(
+void run_sequential_dot_product_forward_error_experiment(
     const int vector_size, const dot_product_config &dot_product_cfg) {
   /* initialization */
   forward_error_result results;
@@ -401,17 +401,17 @@ void run_dot_product_forward_error_experiment(
 
   switch (dot_product_cfg.prec) {
     case Double: {
-      run_dot_product_forward_error_experiment_fixed_size<double>(
+      run_sequential_dot_product_forward_error_experiment_fixed_size<double>(
           vector_size, dot_product_cfg, results);
       break;
     }
     case Single: {
-      run_dot_product_forward_error_experiment_fixed_size<float>(
+      run_sequential_dot_product_forward_error_experiment_fixed_size<float>(
           vector_size, dot_product_cfg, results);
       break;
     }
     case Half: {
-      run_dot_product_forward_error_experiment_fixed_size<half>(
+      run_sequential_dot_product_forward_error_experiment_fixed_size<half>(
           vector_size, dot_product_cfg, results);
       break;
     }
@@ -449,10 +449,8 @@ void run_all_backward_error_experiments(Precision prec,
   int n_max;               // maximum vector size
   if (prec == Single) {
     n_max = 50000000;
-    /* n_max = 100; */
   } else if (prec == Half) {
     n_max = 100000;
-    /* n_max = 100; */
   }
 
   /* data: U(0,1) */
@@ -511,24 +509,28 @@ void run_all_forward_error_experiments(Precision prec,
   dot_product_cfg.dist = ZeroOne;
 
   dot_product_cfg.gamma_cfg.bound_model = Uniform;
-  run_dot_product_forward_error_experiment(vector_size, dot_product_cfg);
+  run_sequential_dot_product_forward_error_experiment(vector_size,
+                                                      dot_product_cfg);
 
   dot_product_cfg.gamma_cfg.bound_model = Beta;
   for (auto &alpha : beta_dist_alpha_vals) {
     dot_product_cfg.gamma_cfg.beta_dist_alpha = alpha;
-    run_dot_product_forward_error_experiment(vector_size, dot_product_cfg);
+    run_sequential_dot_product_forward_error_experiment(vector_size,
+                                                        dot_product_cfg);
   }
 
   /* data: U(-1,1) */
   dot_product_cfg.dist = MinusOnePlusOne;
 
   dot_product_cfg.gamma_cfg.bound_model = Uniform;
-  run_dot_product_forward_error_experiment(vector_size, dot_product_cfg);
+  run_sequential_dot_product_forward_error_experiment(vector_size,
+                                                      dot_product_cfg);
 
   dot_product_cfg.gamma_cfg.bound_model = Beta;
   for (auto &alpha : beta_dist_alpha_vals) {
     dot_product_cfg.gamma_cfg.beta_dist_alpha = alpha;
-    run_dot_product_forward_error_experiment(vector_size, dot_product_cfg);
+    run_sequential_dot_product_forward_error_experiment(vector_size,
+                                                        dot_product_cfg);
   }
 }
 }  // namespace sequential_dot_product
@@ -550,15 +552,13 @@ void run_all_backward_error_experiments(Precision prec,
   std::vector<double> beta_dist_alpha_vals = {1.6,  1.7, 1.8, 1.9,
                                               1.95, 2.0};  // shape param. alpha
 
-  const int n_min = 1000;  // minimum vector size
-  const int n_evals = 1;   // number of evaluations
+  const int n_min = 10;    // minimum vector size
+  const int n_evals = 10;  // number of evaluations
   int n_max;               // maximum vector size
   if (prec == Single) {
-    n_max = 500000000;
-    // n_max = 100;
+    n_max = 50000000;
   } else if (prec == Half) {
-    // n_max = 100000;
-    n_max = 100;
+    n_max = 100000;
   }
 
   /* data: U(0,1) */
@@ -569,39 +569,39 @@ void run_all_backward_error_experiments(Precision prec,
   run_block_dot_product_backward_error_experiment(dot_product_cfg, n_min, n_max,
                                                   n_evals);
 
-  // dot_product_cfg.gamma_cfg.bound_model = Beta;
-  // for (auto &alpha : beta_dist_alpha_vals) {
-  //   dot_product_cfg.gamma_cfg.beta_dist_alpha = alpha;
-  //   run_dot_product_backward_error_experiment(dot_product_cfg, n_min, n_max,
-  //                                             n_evals);
-  // }
+  dot_product_cfg.gamma_cfg.bound_model = Beta;
+  for (auto &alpha : beta_dist_alpha_vals) {
+    dot_product_cfg.gamma_cfg.beta_dist_alpha = alpha;
+    run_block_dot_product_backward_error_experiment(dot_product_cfg, n_min,
+                                                    n_max, n_evals);
+  }
 
-  // /* data: U(-1,1) */
-  // dot_product_cfg.dist = MinusOnePlusOne;
+  /* data: U(-1,1) */
+  dot_product_cfg.dist = MinusOnePlusOne;
 
-  // dot_product_cfg.gamma_cfg.bound_model = Uniform;
-  // run_dot_product_backward_error_experiment(dot_product_cfg, n_min, n_max,
-  //                                           n_evals);
+  dot_product_cfg.gamma_cfg.bound_model = Uniform;
+  run_block_dot_product_backward_error_experiment(dot_product_cfg, n_min, n_max,
+                                                  n_evals);
 
-  // dot_product_cfg.gamma_cfg.bound_model = Beta;
-  // for (auto &alpha : beta_dist_alpha_vals) {
-  //   dot_product_cfg.gamma_cfg.beta_dist_alpha = alpha;
-  //   run_dot_product_backward_error_experiment(dot_product_cfg, n_min, n_max,
-  //                                             n_evals);
-  // }
+  dot_product_cfg.gamma_cfg.bound_model = Beta;
+  for (auto &alpha : beta_dist_alpha_vals) {
+    dot_product_cfg.gamma_cfg.beta_dist_alpha = alpha;
+    run_block_dot_product_backward_error_experiment(dot_product_cfg, n_min,
+                                                    n_max, n_evals);
+  }
 }
 
 }  // namespace block_dot_product
 
 /* run all experiments */
 void run_all_dot_product_experiments(Precision prec) {
-  // sequential
-  /* run all backward error experiments */
-  /* sequential_dot_product::run_all_backward_error_experiments(prec); */
-  /* run all forward error experiments */
-  // sequential_dot_product::run_all_forward_error_experiments(prec);
-
-  // block
+  /* sequential */
   // run all backward error experiments
-  block_dot_product::run_all_backward_error_experiments(prec, 1);
+  sequential_dot_product::run_all_backward_error_experiments(prec);
+  // run all forward error experiments
+  sequential_dot_product::run_all_forward_error_experiments(prec);
+
+  /* block */
+  // run all backward error experiments
+  block_dot_product::run_all_backward_error_experiments(prec);
 }
