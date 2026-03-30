@@ -18,7 +18,7 @@ struct poisson_config {
   int X_res = 5; // Number of points in x-direction
   int Y_res = 6; // Number of points in y-direction
   double etol = 1e-6; // Error tolerance
-  int max_iter = 5000; // Maximum number of iterations
+  int max_iter = 100; // Maximum number of iterations
   Precision prec = Single; // precision for the solve
   int num_experiments = 100; // number of experiments (number of times RHS is sampled)
   gamma_config gamma_cfg; // bounds config

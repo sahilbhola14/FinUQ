@@ -51,7 +51,7 @@ void run_jacobi_experiments_fixed_discretization(
     // run the jacobi solver(s)
     launch_jacobi_solver<T>(poisson_rhs_cfg, h_coeff, h_state_initial,
                             poisson_cfg.prec, poisson_cfg.etol,
-                            poisson_cfg.max_iter);
+                            poisson_cfg.max_iter, true);
   }
 }
 
