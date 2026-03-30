@@ -1,6 +1,10 @@
 #ifndef POISSON_CUDA_CUH
 #define POISSON_CUDA_CUH
 
+#include <vector>
+
+#include "definition.hpp"
+
 // allow __host__ __device__ to compile under g++ as well
 #ifndef __CUDACC__
 #define __host__
@@ -27,5 +31,13 @@ __host__ __device__ void eval_rhs(const poisson_rhs_config<T> &cfg,
     rhs[i] -= cfg.inv_dy_sq;
   }
 }
+
+// Jacobi solve
+template <typename T>
+void launch_jacobi_solver(const poisson_rhs_config<T> &poisson_rhs_cfg,
+                          std::vector<T> &h_coeff,
+                          std::vector<T> &h_state_initial, Precision prec,
+                          const double etol, const int max_iter,
+                          bool verbose = false);
 
 #endif

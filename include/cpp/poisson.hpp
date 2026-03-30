@@ -76,7 +76,7 @@ class Poisson {
 
   int state_dim() const { return get_state_dim(); }
 
-  std::vector<T> initialize_state() const {
+  std::vector<T> get_initial_state() const {
     return std::vector<T>(get_state_dim(), static_cast<T>(1.0));
   }
 

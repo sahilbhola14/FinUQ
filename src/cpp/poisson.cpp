@@ -45,7 +45,13 @@ void run_jacobi_experiments_fixed_discretization(
   for (int i = 0; i < poisson_cfg.num_experiments; i++) {
     // initialize the poisson object
     Poisson<T> poisson(poisson_cfg, zeta_vals[i]);
-    std::vector<T> dummy_state(12, static_cast<T>(0.0));
+    poisson_rhs_config<T> poisson_rhs_cfg = poisson.get_rhs_config();
+    std::vector<T> h_coeff = poisson.get_coefficient_matrix();
+    std::vector<T> h_state_initial = poisson.get_initial_state();
+    // run the jacobi solver(s)
+    launch_jacobi_solver<T>(poisson_rhs_cfg, h_coeff, h_state_initial,
+                            poisson_cfg.prec, poisson_cfg.etol,
+                            poisson_cfg.max_iter);
   }
 }
 
