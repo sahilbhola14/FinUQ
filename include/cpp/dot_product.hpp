@@ -10,7 +10,7 @@ struct dot_product_config {
   Distribution dist=Normal; // distribution for the random vectors
   int num_experiments = 100; // number of experiments
   gamma_config gamma_cfg; // bounds config
-  int tile_size = 32; // tile size (data processed per thread)
+  int tile_size = 64; // tile size (data processed per thread)
 };
 
 /* /1* dot product experiment *1/ */
