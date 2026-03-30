@@ -1,7 +1,10 @@
 #include <cuda_fp16.h>
 
 #include <cmath>
+#include <fstream>
+#include <iomanip>
 #include <iostream>
+#include <sstream>
 
 #include "poisson.hpp"
 #include "poisson_cuda.cuh"
@@ -120,13 +123,39 @@ void launch_jacobi_solver(const poisson_rhs_config<T> &poisson_rhs_cfg,
   std::vector<T> h_state_new(state_dim);
   double h_error = 2.0 * etol;  // ensure at least one iteration
 
-  for (int k = 0; k < max_iter && h_error > etol; k++) {
+  int k = 0;
+  for (; k < max_iter && h_error > etol; k++) {
     launch_jacobi_solver_single_step(h_coeff, h_state, h_state_new,
                                      poisson_rhs_cfg, h_error, prec);
     if (verbose && k % 10 == 0) {
       printf("Iter %d | error: %e\n", k, h_error);
     }
     std::swap(h_state, h_state_new);
+  }
+
+  // save solution to csv: columns = i_x, i_y, value
+  const int Nx = poisson_rhs_cfg.Nx;
+  const int Ny = state_dim / Nx;
+  std::ostringstream ss;
+  ss << "poisson_solution_" << to_string(prec) << "_prec"
+     << "_zeta_" << std::fixed << std::setprecision(6)
+     << static_cast<double>(poisson_rhs_cfg.zeta) << ".csv";
+  std::ofstream file(ss.str());
+  if (!file.is_open()) {
+    std::cerr << "Error: could not open file " << ss.str() << "\n";
+    return;
+  }
+  file << "i_x,i_y,value\n";
+  for (int idx = 0; idx < state_dim; idx++) {
+    int i_x = idx % Nx;
+    int i_y = idx / Nx;
+    file << i_x << "," << i_y << "," << std::scientific << std::setprecision(10)
+         << static_cast<double>(h_state[idx]) << "\n";
+  }
+  file.close();
+  if (verbose) {
+    std::cout << "solution saved to " << ss.str() << " (converged in " << k
+              << " iters, error=" << h_error << ")\n";
   }
 }
 

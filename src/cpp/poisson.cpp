@@ -41,6 +41,7 @@ void run_jacobi_experiments_fixed_discretization(
   std::vector<T> zeta_vals(poisson_cfg.num_experiments);
   std::mt19937 gen(/*seed=*/42);
   sample_uniform_distribution(zeta_vals, 0.0, 1.0, gen);
+
   // run the experiment
   for (int i = 0; i < poisson_cfg.num_experiments; i++) {
     // initialize the poisson object
