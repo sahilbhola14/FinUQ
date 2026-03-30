@@ -45,7 +45,7 @@ void run_jacobi_experiments_fixed_discretization(
   for (int i = 0; i < poisson_cfg.num_experiments; i++) {
     // initialize the poisson object
     Poisson<T> poisson(poisson_cfg, zeta_vals[i]);
-    poisson.print_coefficient_matrix();
+    std::vector<T> dummy_state(12, static_cast<T>(0.0));
   }
 }
 

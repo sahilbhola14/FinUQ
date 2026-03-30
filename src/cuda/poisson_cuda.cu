@@ -1,4 +1,3 @@
-#include <cuda_fp16.h>
+#include "poisson_cuda.cu"
 
-#include "poisson.hpp"
-#include "poisson_cuda.cuh"
+// evaluate the rhs (device)

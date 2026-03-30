@@ -3,6 +3,7 @@
 
 #include "definition.hpp"
 #include "gamma.hpp"
+#include "poisson_cuda.cuh"
 
 #include <cmath>
 #include <iomanip>
@@ -13,9 +14,9 @@
 // configuration
 struct poisson_config {
   // int X_res = 33; // Number of points in x-direction
-  // int Y_res = 64; // Number of points in x-direction
+  // int Y_res = 64; // Number of points in y-direction
   int X_res = 5; // Number of points in x-direction
-  int Y_res = 6; // Number of points in x-direction
+  int Y_res = 6; // Number of points in y-direction
   double etol = 1e-6; // Error tolerance
   int max_iter = 5000; // Maximum number of iterations
   Precision prec = Single; // precision for the solve
@@ -52,6 +53,15 @@ class Poisson {
   T get_horizontal_offdiagonal_coefficient() const { return get_inv_dx_sq(); }
   T get_vertical_offdiagonal_coefficent() const { return get_inv_dy_sq(); }
 
+  // rhs[i] = -zeta * state[i], plus top boundary condition contribution
+  std::vector<T> eval_rhs_host(const std::vector<T> &state) const {
+    const int n = get_state_dim();
+    std::vector<T> rhs(n);
+    poisson_rhs_config<T> poisson_rhs_cfg = get_rhs_config();
+    eval_rhs(poisson_rhs_cfg, state.data(), rhs.data());
+    return rhs;
+  }
+
  public:
   const int Nx;   // number of internal points in x direction
   const int Ny;   // number of internal points in y direction
@@ -70,20 +80,10 @@ class Poisson {
     return std::vector<T>(get_state_dim(), static_cast<T>(1.0));
   }
 
-  // rhs[i] = -zeta * state[i], plus top boundary condition contribution
-  std::vector<T> eval_rhs(const std::vector<T> &state) const {
-    const int n = get_state_dim();
-    std::vector<T> rhs(n);
-    for (int i = 0; i < n; ++i) {
-      rhs[i] = -zeta * state[i];
-    }
-    // apply top boundary condition
-    T inv_dy_sq = get_inv_dx_sq();
-    for (int i = 0; i < Nx; ++i) {
-      rhs[i] -= inv_dy_sq;
-    }
-    return rhs;
+  poisson_rhs_config<T> get_rhs_config() const {
+    return {zeta, get_inv_dy_sq(), Nx, get_state_dim()};
   }
+
 
   std::vector<T> get_coefficient_matrix() const {
     T diag_coeff              = get_diagonal_coefficient();
@@ -123,13 +123,13 @@ class Poisson {
   }
 
   void print_rhs(const std::vector<T> &state) const {
-    for (auto &a : eval_rhs(state)) {
-      std::cout << a << std::endl;
+    for (auto &a : eval_rhs_host(state)) {
+      std::cout << static_cast<double>(a) << std::endl;
     }
   }
 };
 
-// poisson equation solver
+// Poisson equation solver
 void run_poisson_equation_experiments(Precision prec);
 
 #endif
