@@ -1,141 +1,115 @@
 #include "poisson.hpp"
 
-#include <cmath>
-#include <iomanip>
-#include <iostream>
+#include <cassert>
 #include <random>
-#include <vector>
 
-// Poisson class
+#include "distribution.hpp"
+#include "prob_model.hpp"
+#include "utils.hpp"
+
+/* print poisson config */
+void print_poisson_config(const poisson_config &poisson_cfg) {
+  std::cout << "Compute precision: " << to_string(poisson_cfg.prec)
+            << std::endl;
+  std::cout << "X-resolution: " << poisson_cfg.X_res << std::endl;
+  std::cout << "Y-resolution: " << poisson_cfg.Y_res << std::endl;
+  std::cout << "Max iterations: " << poisson_cfg.max_iter << std::endl;
+  std::cout << "Error tolerance: " << poisson_cfg.etol << std::endl;
+  std::cout << "Number of experiments: " << poisson_cfg.num_experiments
+            << std::endl;
+  std::cout << "Bound model: " << to_string(poisson_cfg.gamma_cfg.bound_model)
+            << std::endl;
+  if (poisson_cfg.gamma_cfg.bound_model == Beta) {
+    std::cout << "Beta bound model alpha value: "
+              << poisson_cfg.gamma_cfg.beta_dist_alpha << std::endl;
+    std::cout << "Beta bound model beta value: "
+              << poisson_cfg.gamma_cfg.beta_dist_beta << std::endl;
+    check_mean_rounding_error_sign(poisson_cfg.prec,
+                                   poisson_cfg.gamma_cfg.bound_model,
+                                   poisson_cfg.gamma_cfg.beta_dist_alpha,
+                                   poisson_cfg.gamma_cfg.beta_dist_beta);
+  }
+  std::cout << "Bound confidence: " << std::setprecision(4)
+            << poisson_cfg.gamma_cfg.confidence << std::endl;
+}
+
+// jacobi experiments (fixed discretization)
 template <typename T>
-class Poisson {
- private:
-  // state dim
-  int get_state_dim() const { return Nx * Ny; }
-
-  // x resolution: dx
-  double get_x_resolution() const { return 1.0 / (Nx + 1); }
-
-  // y resolution: dy
-  double get_y_resolution() const { return 1.0 / (Ny + 1); }
-
-  //  1 / (dx * dx)
-  T get_inv_dx_sq() const {
-    double dx = get_x_resolution();
-    return static_cast<T>(1.0 / (dx * dx));
+void run_jacobi_experiments_fixed_discretization(
+    const poisson_config &poisson_cfg) {
+  // sample the zeta values
+  std::vector<T> zeta_vals(poisson_cfg.num_experiments);
+  std::mt19937 gen(/*seed=*/42);
+  sample_uniform_distribution(zeta_vals, 0.0, 1.0, gen);
+  // run the experiment
+  for (int i = 0; i < poisson_cfg.num_experiments; i++) {
+    // initialize the poisson object
+    Poisson<T> poisson(poisson_cfg, zeta_vals[i]);
+    poisson.print_coefficient_matrix();
   }
+}
 
-  //  1 / (dy * dy)
-  T get_inv_dy_sq() const {
-    double dy = get_y_resolution();
-    return static_cast<T>(1.0 / (dy * dy));
+// jacobi experiments
+void run_jacobi_experiments(const poisson_config &poisson_cfg) {
+  // initialization
+  if (poisson_cfg.X_res <= 2 || poisson_cfg.Y_res <= 2) {
+    throw std::invalid_argument("X_res and Y_res must be greater that 2");
   }
+  // print the header
+  std::cout << std::string(50, '=') << std::endl;
+  std::cout << std::string(10, '-')
+            << " Jacobi solver for Poisson equation config "
+            << std::string(10, '-') << std::endl;
+  print_poisson_config(poisson_cfg);
+  std::cout << std::string(50, '=') << std::endl;
+  /* assert statements */
+  assert(poisson_cfg.prec == poisson_cfg.gamma_cfg.prec &&
+         "Bound precision and compute precision must be the same");
 
-  // diagonal elements: -2 * (inv_dx_sq + inv_dy_sq)
-  T get_diagonal_coefficient() const {
-    T inv_dx_sq = get_inv_dx_sq();
-    T inv_dy_sq = get_inv_dy_sq();
-    return -2.0 * (inv_dx_sq + inv_dy_sq);
-  }
-
-  // horizontal adjacent offdiagonals: inv_dx_sq
-  T get_horizontal_offdiagonal_coefficient() const { return get_inv_dx_sq(); }
-
-  // vertical adjacent offdiagonals: inv_dy_sq
-  T get_vertical_offdiagonal_coefficent() const { return get_inv_dy_sq(); }
-
- public:
-  const int Nx;  // number of internal points in x direction
-  const int Ny;  // number of internal points in y direction
-
-  // constructor
-  Poisson(const poisson_config &cfg, const int seed)
-      : Nx(cfg.X_res - 2), Ny(cfg.Y_res - 2), gen(seed) {}
-
-  // initial state (all ones)
-  std::vector<T> initialize_state() const {
-    std::vector<T> state(get_state_dim(), static_cast<T>(1.0));
-    return state;
-  }
-
-  // rhs = -alpha * state, alpha ~ U(0, 1)
-  std::vector<T> eval_rhs(const std::vector<T> &state) const {
-    // std::uniform_real_distribution<double> uniform(0.0, 1.0);
-    // const T alpha = static_cast<T>(uniform(gen));
-    // std::vector<T> rhs(state.size());
-    // for (int i = 0; i < static_cast<int>(state.size()); ++i) {
-    //   rhs[i] = -alpha * state[i];
-    // }
-    std::vector<T> rhs(get_state_dim(), static_cast<T>(0.0));
-    return rhs;
-  }
-
-  // coeff matrix
-  std::vector<T> get_coefficient_matrix() const {
-    // coeffients
-    T diag_coeff = get_diagonal_coefficient();
-    T horizontal_offdiag_coeff = get_horizontal_offdiagonal_coefficient();
-    T vertical_offdiag_coeff = get_vertical_offdiagonal_coefficent();
-    // initialize
-    const int state_dim = get_state_dim();
-    int diag_idx;
-    std::vector<T> coeff(state_dim * state_dim, static_cast<T>(0.0));
-    // allocate
-    for (int i = 0; i < state_dim; i++) {
-      // diagonal idx
-      diag_idx = i * state_dim + i;
-      // diag
-      coeff[diag_idx] = diag_coeff;
-      // horizontal offdiag (sub)
-      if (i > 0) coeff[diag_idx - 1] = horizontal_offdiag_coeff;
-      // horizontal offdiag (sup)
-      if (i < state_dim - 1) coeff[diag_idx + 1] = horizontal_offdiag_coeff;
-      // vertical offdiag (sub)
-      if (i > Nx - 1) coeff[diag_idx - Nx] = vertical_offdiag_coeff;
-      // vertical offdiag (sup)
-      if (i < state_dim - Nx) coeff[diag_idx + Nx] = vertical_offdiag_coeff;
+  // run the experiment
+  switch (poisson_cfg.prec) {
+    case Double: {
+      run_jacobi_experiments_fixed_discretization<double>(poisson_cfg);
+      break;
     }
-
-    // enforce left boundary
-    for (int i = Nx; i < state_dim; i += Nx) {
-      diag_idx = i * state_dim + i;
-      coeff[diag_idx - 1] = static_cast<T>(0.0);
+    case Single: {
+      run_jacobi_experiments_fixed_discretization<float>(poisson_cfg);
+      break;
     }
-
-    // enforce right boundary
-    for (int i = Nx - 1; i < state_dim; i += Nx) {
-      diag_idx = i * state_dim + i;
-      coeff[diag_idx + 1] = static_cast<T>(0.0);
+    case Half: {
+      run_jacobi_experiments_fixed_discretization<half>(poisson_cfg);
+      break;
     }
-
-    return coeff;
-  }
-
-  void print_coefficient_matrix() const {
-    const int n = get_state_dim();
-    std::vector<T> coeff = get_coefficient_matrix();
-    std::cout << std::scientific << std::setprecision(4);
-    for (int i = 0; i < n; ++i) {
-      for (int j = 0; j < n; ++j) {
-        std::cout << std::setw(14) << static_cast<double>(coeff[i * n + j]);
-      }
-      std::cout << std::endl;
+    default: {
+      throw std::invalid_argument("invalid precision");
     }
   }
+}
 
- private:
-  mutable std::mt19937 gen;  // seeded once at construction
-};
+// jacobi experiments all experiments
+void run_all_jacobi_experiments(Precision prec,
+                                const int num_experiments = 100) {
+  // configuration
+  poisson_config poisson_cfg;
+  poisson_cfg.prec = prec;
+  poisson_cfg.num_experiments = num_experiments;
+  poisson_cfg.gamma_cfg.confidence = 0.99;  // overall confidence
+  // beta shape parameter
+  poisson_cfg.gamma_cfg.beta_dist_beta = 2.0;
+  // alpha shape parameter
+  std::vector<double> beta_dist_alpha_vals = {1.8, 1.9,
+                                              2.0};  // shape param. alpha
+  // run the experiment (Uniform rounding error model)
+  poisson_cfg.gamma_cfg.bound_model = Uniform;
+  run_jacobi_experiments(poisson_cfg);
 
-/* poisson equation experiments
- * 1. runs Jacobi in a given precision
- * 2. runs block jacobi in mixed precision (single + half)
- */
+  // for (auto &alpha: beta_dist_alpha_vals){
+  //   poisson_cfg.gamma_cfg.beta_dist_alpha = alpha;
+  //   run_jacobi_experiments(poisson_cfg);
+  // }
+}
+
+// poisson equation experiments
 void run_poisson_equation_experiments(Precision prec) {
-  poisson_config cfg;
-  cfg.prec = prec;
-  Poisson<double> poisson(cfg, /*seed=*/42);
-  std::vector<double> s = poisson.initialize_state();
-  std::vector<double> r = poisson.eval_rhs(s);
-  poisson.print_coefficient_matrix();
+  run_all_jacobi_experiments(prec, 1);
 }

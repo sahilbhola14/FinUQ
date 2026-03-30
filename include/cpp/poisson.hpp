@@ -3,7 +3,12 @@
 
 #include "definition.hpp"
 #include "gamma.hpp"
+
+#include <cmath>
+#include <iomanip>
 #include <iostream>
+#include <stdexcept>
+#include <vector>
 
 // configuration
 struct poisson_config {
@@ -18,6 +23,110 @@ struct poisson_config {
   gamma_config gamma_cfg; // bounds config
   int block_jacobi_tile_size = 64; // block jacobi tile size
   int matvect_tile_size = 64; // tile size for the matrix vector product
+};
+
+// Poisson class
+template <typename T>
+class Poisson {
+ private:
+  int get_state_dim() const { return Nx * Ny; }
+  double get_x_resolution() const { return 1.0 / (Nx + 1); }
+  double get_y_resolution() const { return 1.0 / (Ny + 1); }
+
+  T get_inv_dx_sq() const {
+    double dx = get_x_resolution();
+    return static_cast<T>(1.0 / (dx * dx));
+  }
+
+  T get_inv_dy_sq() const {
+    double dy = get_y_resolution();
+    return static_cast<T>(1.0 / (dy * dy));
+  }
+
+  T get_diagonal_coefficient() const {
+    T inv_dx_sq = get_inv_dx_sq();
+    T inv_dy_sq = get_inv_dy_sq();
+    return static_cast<T>(-2.0) * (inv_dx_sq + inv_dy_sq);
+  }
+
+  T get_horizontal_offdiagonal_coefficient() const { return get_inv_dx_sq(); }
+  T get_vertical_offdiagonal_coefficent() const { return get_inv_dy_sq(); }
+
+ public:
+  const int Nx;   // number of internal points in x direction
+  const int Ny;   // number of internal points in y direction
+  const T zeta;   // zeta value for the rhs
+
+  Poisson(const poisson_config &cfg, const T zeta)
+      : Nx(cfg.X_res - 2), Ny(cfg.Y_res - 2), zeta(zeta) {
+    if (zeta <= static_cast<T>(0.0)) {
+      throw std::invalid_argument("zeta must be greater than 0");
+    }
+  }
+
+  int state_dim() const { return get_state_dim(); }
+
+  std::vector<T> initialize_state() const {
+    return std::vector<T>(get_state_dim(), static_cast<T>(1.0));
+  }
+
+  // rhs[i] = -zeta * state[i], plus top boundary condition contribution
+  std::vector<T> eval_rhs(const std::vector<T> &state) const {
+    const int n = get_state_dim();
+    std::vector<T> rhs(n);
+    for (int i = 0; i < n; ++i) {
+      rhs[i] = -zeta * state[i];
+    }
+    // apply top boundary condition
+    T inv_dy_sq = get_inv_dx_sq();
+    for (int i = 0; i < Nx; ++i) {
+      rhs[i] -= inv_dy_sq;
+    }
+    return rhs;
+  }
+
+  std::vector<T> get_coefficient_matrix() const {
+    T diag_coeff              = get_diagonal_coefficient();
+    T horizontal_offdiag_coeff = get_horizontal_offdiagonal_coefficient();
+    T vertical_offdiag_coeff   = get_vertical_offdiagonal_coefficent();
+    const int n = get_state_dim();
+    std::vector<T> coeff(n * n, static_cast<T>(0.0));
+    for (int i = 0; i < n; i++) {
+      int d = i * n + i;
+      coeff[d] = diag_coeff;
+      if (i > 0)     coeff[d - 1] = horizontal_offdiag_coeff;
+      if (i < n - 1) coeff[d + 1] = horizontal_offdiag_coeff;
+      if (i > Nx - 1)    coeff[d - Nx] = vertical_offdiag_coeff;
+      if (i < n - Nx)    coeff[d + Nx] = vertical_offdiag_coeff;
+    }
+    // enforce left boundary (zero out wrap-around off-diagonals)
+    for (int i = Nx; i < n; i += Nx) {
+      coeff[i * n + i - 1] = static_cast<T>(0.0);
+    }
+    // enforce right boundary
+    for (int i = Nx - 1; i < n; i += Nx) {
+      coeff[i * n + i + 1] = static_cast<T>(0.0);
+    }
+    return coeff;
+  }
+
+  void print_coefficient_matrix() const {
+    const int n = get_state_dim();
+    std::vector<T> coeff = get_coefficient_matrix();
+    std::cout << std::scientific << std::setprecision(4);
+    for (int i = 0; i < n; ++i) {
+      for (int j = 0; j < n; ++j) {
+        std::cout << std::setw(14) << static_cast<double>(coeff[i * n + j]);
+      }
+      std::cout << std::endl;
+    }
+  }
+
+  void print_rhs(const std::vector<T> &state) const {
+    for (auto &a : eval_rhs(state)) {
+      std::cout << a << std::endl;
+    }
+  }
 };
 
 // poisson equation solver
