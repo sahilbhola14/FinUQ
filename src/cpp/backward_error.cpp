@@ -6,6 +6,7 @@
  */
 #include "backward_error.hpp"
 
+#include <cassert>
 #include <cmath>
 #include <iostream>
 
@@ -13,7 +14,7 @@
 #include "utils.hpp"
 
 /*
- * compute the dot-product backward error.
+ * compute the (sequential) dot-product backward error.
  *
  * @param result           Result of the computation: <a, b>
  * @param result_true      True result computed in double precision: <a_true,
@@ -30,7 +31,23 @@ void compute_sequential_dot_product_backward_error(double result,
 }
 
 /*
- * compute the dot-product backward error bound.
+ * compute the (block) dot-product backward error.
+ *
+ * @param result           Result of the computation: <a, b>
+ * @param result_true      True result computed in double precision: <a_true,
+ * b_true>
+ * @param result_true_abs  True result computed in double precision using
+ * absolute values: <|a_true|, |b_true|>
+ */
+void compute_block_dot_product_backward_error(double result, double result_true,
+                                              double result_true_abs,
+                                              double *backward_error) {
+  /* equation 4.1 in [1] */
+  *backward_error = std::abs(result - result_true) / result_true_abs;
+}
+
+/*
+ * compute the (sequential) dot-product backward error bound.
  *
  * @param gamma_cfg   Configuration of the bounds
  */
@@ -42,6 +59,40 @@ gamma_result compute_sequential_dot_product_backward_error_bound(
       vector_size, gamma_cfg.confidence);
   /* compute the bounds \gamma_{vector_size}*/
   gamma_result result = get_gamma(vector_size, gamma_cfg, one_minus_zeta);
+  /* verbose */
+  if (verbose == true) {
+    std::cout << std::string(10, '-')
+              << " Dot product backward error bounds for vector size : "
+              << vector_size << " " << std::string(10, '-') << std::endl;
+    std::cout << "Deterministic: " << result.gamma_det << std::endl;
+    std::cout << "Mean-informed: " << result.gamma_mprea << std::endl;
+    std::cout << "Varinance-informed: " << result.gamma_vprea << std::endl;
+  }
+  return result;
+}
+
+/*
+ * compute the (block) dot-product backward error bound.
+ *
+ * @param gamma_cfg   Configuration of the bounds
+ */
+gamma_result compute_block_dot_product_backward_error_bound(
+    const int vector_size, const gamma_config &gamma_cfg, const int tile_size,
+    bool verbose) {
+  assert(vector_size > 0 && "vector_size must be positive");
+  assert(tile_size > 0 && "tile_size must be positive");
+
+  /* compute individual bound confidence */
+  const double ratio =
+      static_cast<double>(vector_size) / static_cast<double>(tile_size);
+  int gamma_factor = tile_size + static_cast<int>(std::ceil(std::log2(ratio)));
+
+  if (gamma_factor < 1) gamma_factor = 1;
+
+  long double one_minus_zeta = compute_individual_bound_one_minus_zeta(
+      vector_size, gamma_cfg.confidence);
+  /* compute the bounds \gamma_{gamma_factor} */
+  gamma_result result = get_gamma(gamma_factor, gamma_cfg, one_minus_zeta);
   /* verbose */
   if (verbose == true) {
     std::cout << std::string(10, '-')

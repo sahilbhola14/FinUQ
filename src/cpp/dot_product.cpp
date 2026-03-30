@@ -3,6 +3,7 @@
 #include <cuda.h>
 #include <cuda_fp16.h>
 
+#include <algorithm>
 #include <cassert>
 #include <iomanip>
 #include <iostream>
@@ -62,10 +63,10 @@ std::string make_dot_product_filename(const std::string prefix,
 }
 
 /*
- * run dot product backward error experiment for fixed size
+ * run (sequential) dot product backward error experiment for fixed size
  */
 template <typename T>
-void run_dot_product_backward_error_experiment_fixed_size(
+void run_sequential_dot_product_backward_error_experiment_fixed_size(
     const int n, const dot_product_config &dot_product_cfg,
     backward_error_result &result, const int seed = 42) {
   /* initialize */
@@ -124,10 +125,75 @@ void run_dot_product_backward_error_experiment_fixed_size(
 }
 
 /*
- * run dot product forward error experiment for fixed size
+ * run (block) dot product backward error experiment for fixed size
  */
 template <typename T>
-void run_dot_product_forward_error_experiment_fixed_size(
+void run_block_dot_product_backward_error_experiment_fixed_size(
+    const int n, const dot_product_config &dot_product_cfg,
+    backward_error_result &result, const int seed = 42) {
+  /* initialize */
+  std::vector<T> h_a(n), h_b(n);
+  std::vector<double> h_a_true(n), h_b_true(n);
+  std::vector<double> h_a_true_abs(n), h_b_true_abs(n);
+  std::vector<double> backward_error(dot_product_cfg.num_experiments);
+  T h_result;
+  double h_result_true, h_result_true_abs;
+  gamma_result backward_error_bound;
+  vector_stats backward_error_stats;
+  /* random state */
+  std::mt19937 gen(seed);
+
+  /* run the experiment */
+  for (int i = 0; i < dot_product_cfg.num_experiments; i++) {
+    if (i % 10 == 0) {
+      printf("Running backward error experiment : %d/%d for vector size: %d\n",
+             i + 1, dot_product_cfg.num_experiments, n);
+    }
+    /* sample the vector */
+    sample_random_vector(h_a, dot_product_cfg.prec, dot_product_cfg.dist,
+                         gen);  // a vector
+    sample_random_vector(h_b, dot_product_cfg.prec, dot_product_cfg.dist,
+                         gen);                             // b vector
+    convert_vector_to_double(h_a, h_a_true);               // a true vector
+    convert_vector_to_double(h_b, h_b_true);               // b true vector
+    convert_vector_to_absolute_double(h_a, h_a_true_abs);  // |a| true vector
+    convert_vector_to_absolute_double(h_b, h_b_true_abs);  // |b| true vector
+    /* run the dot product(s) */
+    launch_block_dot_product_kernel<T>(n, h_a, h_b, &h_result,
+                                       dot_product_cfg.prec,
+                                       dot_product_cfg.tile_size);
+    launch_block_dot_product_kernel<double>(n, h_a_true, h_b_true,
+                                            &h_result_true, Double,
+                                            dot_product_cfg.tile_size);
+    launch_block_dot_product_kernel<double>(n, h_a_true_abs, h_b_true_abs,
+                                            &h_result_true_abs, Double,
+                                            dot_product_cfg.tile_size);
+    /* compute the backward error */
+    compute_block_dot_product_backward_error(static_cast<double>(h_result),
+                                             h_result_true, h_result_true_abs,
+                                             &backward_error[i]);
+  }
+
+  /* compute the backward error statistics */
+  backward_error_stats = get_vector_stats(backward_error);
+
+  /* compute the backward error bound */
+  backward_error_bound = compute_block_dot_product_backward_error_bound(
+      n, dot_product_cfg.gamma_cfg, dot_product_cfg.tile_size);
+
+  /* update result */
+  result.n = n;
+  result.backward_error_min = backward_error_stats.min;
+  result.backward_error_max = backward_error_stats.max;
+  result.backward_error_mean = backward_error_stats.mean;
+  result.backward_error_bound = backward_error_bound;
+}
+
+/*
+ * run (sequential) dot product forward error experiment for fixed size
+ */
+template <typename T>
+void run_sequential_dot_product_forward_error_experiment_fixed_size(
     const int n, const dot_product_config &dot_product_cfg,
     forward_error_result &result, const int seed = 42) {
   /* initialize */
@@ -177,14 +243,24 @@ void run_dot_product_forward_error_experiment_fixed_size(
   }
 }
 
-/* run dot product backward error experiment */
-void run_dot_product_backward_error_experiment(
+/* run (sequential) dot product backward error experiment */
+void run_sequential_dot_product_backward_error_experiment(
     const dot_product_config &dot_product_cfg, const int n_min, const int n_max,
     const int n_evals = 10) {
   /* intialization */
-  std::vector<int> vector_sizes = make_logspace(n_min, n_max, n_evals);
-  /* std::vector<int> vector_sizes = {10,     100,    1000,    10000, 100000,
-   * 500000, 1000000}; */
+  if (n_min < 1 || n_max < n_min) {
+    throw std::invalid_argument("invalid vector size");
+  }
+  if (n_evals <= 0) {
+    throw std::invalid_argument("n_evals must be positive");
+  }
+
+  std::vector<int> vector_sizes;
+  if (n_evals == 1) {
+    vector_sizes = {n_min};
+  } else {
+    vector_sizes = make_logspace(n_min, n_max, n_evals);
+  }
   std::vector<backward_error_result> results(vector_sizes.size());
 
   /* print header */
@@ -206,17 +282,17 @@ void run_dot_product_backward_error_experiment(
   for (size_t i = 0; i < vector_sizes.size(); i++) {
     switch (dot_product_cfg.prec) {
       case Double: {
-        run_dot_product_backward_error_experiment_fixed_size<double>(
+        run_sequential_dot_product_backward_error_experiment_fixed_size<double>(
             vector_sizes[i], dot_product_cfg, results[i]);
         break;
       }
       case Single: {
-        run_dot_product_backward_error_experiment_fixed_size<float>(
+        run_sequential_dot_product_backward_error_experiment_fixed_size<float>(
             vector_sizes[i], dot_product_cfg, results[i]);
         break;
       }
       case Half: {
-        run_dot_product_backward_error_experiment_fixed_size<half>(
+        run_sequential_dot_product_backward_error_experiment_fixed_size<half>(
             vector_sizes[i], dot_product_cfg, results[i]);
         break;
       }
@@ -232,8 +308,77 @@ void run_dot_product_backward_error_experiment(
   write_backward_error_results_csv(results, filename);
 }
 
-/* run dot product forward error experiment */
-void run_dot_product_forward_error_experiment(
+// run (block) dot product backward error experiment
+void run_block_dot_product_backward_error_experiment(
+    const dot_product_config &dot_product_cfg, const int n_min, const int n_max,
+    const int n_evals) {
+  /* intialization */
+  if (dot_product_cfg.tile_size <= 0) {
+    throw std::invalid_argument("tile_size must be positive");
+  }
+  if (n_min < 1 || n_max < n_min) {
+    throw std::invalid_argument("invalid vector size");
+  }
+  if (n_evals <= 0) {
+    throw std::invalid_argument("n_evals must be positive");
+  }
+  std::vector<int> vector_sizes;
+  if (n_evals == 1) {
+    vector_sizes = {n_min};
+  } else {
+    vector_sizes = make_logspace(n_min, n_max, n_evals);
+  }
+  std::vector<backward_error_result> results(vector_sizes.size());
+
+  /* print header */
+  std::cout << std::string(50, '=') << std::endl;
+  std::cout << std::string(10, '-')
+            << " Dot product backward error analysis config "
+            << std::string(10, '-') << std::endl;
+  print_dot_product_config(dot_product_cfg);
+  std::cout << "Tile size: " << dot_product_cfg.tile_size << std::endl;
+  std::cout << "Vector sizes: ";
+  for (const auto &v : vector_sizes) std::cout << v << ", ";
+  std::cout << std::endl;
+  std::cout << std::string(50, '=') << std::endl;
+
+  /* assert statements */
+  assert(dot_product_cfg.prec == dot_product_cfg.gamma_cfg.prec &&
+         "Bound precision and compute precision must be the same");
+
+  /* run experiment for fixed vector size */
+  for (size_t i = 0; i < vector_sizes.size(); i++) {
+    switch (dot_product_cfg.prec) {
+      case Double: {
+        run_block_dot_product_backward_error_experiment_fixed_size<double>(
+            vector_sizes[i], dot_product_cfg, results[i]);
+        break;
+      }
+      case Single: {
+        run_block_dot_product_backward_error_experiment_fixed_size<float>(
+            vector_sizes[i], dot_product_cfg, results[i]);
+        break;
+      }
+      case Half: {
+        run_block_dot_product_backward_error_experiment_fixed_size<half>(
+            vector_sizes[i], dot_product_cfg, results[i]);
+        break;
+      }
+      default: {
+        throw std::invalid_argument("invalid precision");
+      }
+    }
+  }
+
+  /* save */
+  std::ostringstream ss;
+  ss << "backward_error_result_block_tile_size_" << dot_product_cfg.tile_size;
+  std::string filename = make_dot_product_filename(ss.str(), dot_product_cfg);
+  write_backward_error_results_csv(results, filename);
+}
+
+/* run (sequential) dot product forward error experiment */
+void run_sequential_dot_product_forward_error_experiment(
     const int vector_size, const dot_product_config &dot_product_cfg) {
   /* initialization */
   forward_error_result results;
@@ -257,17 +402,17 @@ void run_dot_product_forward_error_experiment(
 
   switch (dot_product_cfg.prec) {
     case Double: {
-      run_dot_product_forward_error_experiment_fixed_size<double>(
+      run_sequential_dot_product_forward_error_experiment_fixed_size<double>(
           vector_size, dot_product_cfg, results);
       break;
     }
     case Single: {
-      run_dot_product_forward_error_experiment_fixed_size<float>(
+      run_sequential_dot_product_forward_error_experiment_fixed_size<float>(
           vector_size, dot_product_cfg, results);
       break;
     }
     case Half: {
-      run_dot_product_forward_error_experiment_fixed_size<half>(
+      run_sequential_dot_product_forward_error_experiment_fixed_size<half>(
           vector_size, dot_product_cfg, results);
       break;
     }
@@ -283,8 +428,8 @@ void run_dot_product_forward_error_experiment(
   write_forward_error_results_csv(results, filename);
 }
 
-/* namespace dot product*/
-namespace dot_product {
+/* namespace (sequential) dot product*/
+namespace sequential_dot_product {
 /* backward error all experiments */
 void run_all_backward_error_experiments(Precision prec,
                                         const int num_experiments = 100) {
@@ -305,40 +450,39 @@ void run_all_backward_error_experiments(Precision prec,
   int n_max;               // maximum vector size
   if (prec == Single) {
     n_max = 50000000;
-    /* n_max = 100; */
   } else if (prec == Half) {
     n_max = 100000;
-    /* n_max = 100; */
   }
 
   /* data: U(0,1) */
   dot_product_cfg.dist = ZeroOne;
 
   dot_product_cfg.gamma_cfg.bound_model = Uniform;
-  run_dot_product_backward_error_experiment(dot_product_cfg, n_min, n_max,
-                                            n_evals);
+  run_sequential_dot_product_backward_error_experiment(dot_product_cfg, n_min,
+                                                       n_max, n_evals);
 
   dot_product_cfg.gamma_cfg.bound_model = Beta;
   for (auto &alpha : beta_dist_alpha_vals) {
     dot_product_cfg.gamma_cfg.beta_dist_alpha = alpha;
-    run_dot_product_backward_error_experiment(dot_product_cfg, n_min, n_max,
-                                              n_evals);
+    run_sequential_dot_product_backward_error_experiment(dot_product_cfg, n_min,
+                                                         n_max, n_evals);
   }
 
   /* data: U(-1,1) */
   dot_product_cfg.dist = MinusOnePlusOne;
 
   dot_product_cfg.gamma_cfg.bound_model = Uniform;
-  run_dot_product_backward_error_experiment(dot_product_cfg, n_min, n_max,
-                                            n_evals);
+  run_sequential_dot_product_backward_error_experiment(dot_product_cfg, n_min,
+                                                       n_max, n_evals);
 
   dot_product_cfg.gamma_cfg.bound_model = Beta;
   for (auto &alpha : beta_dist_alpha_vals) {
     dot_product_cfg.gamma_cfg.beta_dist_alpha = alpha;
-    run_dot_product_backward_error_experiment(dot_product_cfg, n_min, n_max,
-                                              n_evals);
+    run_sequential_dot_product_backward_error_experiment(dot_product_cfg, n_min,
+                                                         n_max, n_evals);
   }
 }
+
 /* forward error all experiments */
 void run_all_forward_error_experiments(Precision prec,
                                        const int num_experiments = 10000) {
@@ -366,33 +510,99 @@ void run_all_forward_error_experiments(Precision prec,
   dot_product_cfg.dist = ZeroOne;
 
   dot_product_cfg.gamma_cfg.bound_model = Uniform;
-  run_dot_product_forward_error_experiment(vector_size, dot_product_cfg);
+  run_sequential_dot_product_forward_error_experiment(vector_size,
+                                                      dot_product_cfg);
 
   dot_product_cfg.gamma_cfg.bound_model = Beta;
   for (auto &alpha : beta_dist_alpha_vals) {
     dot_product_cfg.gamma_cfg.beta_dist_alpha = alpha;
-    run_dot_product_forward_error_experiment(vector_size, dot_product_cfg);
+    run_sequential_dot_product_forward_error_experiment(vector_size,
+                                                        dot_product_cfg);
   }
 
   /* data: U(-1,1) */
   dot_product_cfg.dist = MinusOnePlusOne;
 
   dot_product_cfg.gamma_cfg.bound_model = Uniform;
-  run_dot_product_forward_error_experiment(vector_size, dot_product_cfg);
+  run_sequential_dot_product_forward_error_experiment(vector_size,
+                                                      dot_product_cfg);
 
   dot_product_cfg.gamma_cfg.bound_model = Beta;
   for (auto &alpha : beta_dist_alpha_vals) {
     dot_product_cfg.gamma_cfg.beta_dist_alpha = alpha;
-    run_dot_product_forward_error_experiment(vector_size, dot_product_cfg);
+    run_sequential_dot_product_forward_error_experiment(vector_size,
+                                                        dot_product_cfg);
+  }
+}
+}  // namespace sequential_dot_product
+
+// namespace (block) dot product
+namespace block_dot_product {
+/* backward error all experiments */
+void run_all_backward_error_experiments(Precision prec,
+                                        const int num_experiments = 100) {
+  /* configuration */
+  dot_product_config dot_product_cfg;
+  dot_product_cfg.prec = prec;                        // sampling precision
+  dot_product_cfg.gamma_cfg.prec = prec;              // bound precision
+  dot_product_cfg.num_experiments = num_experiments;  // number of experiments
+  dot_product_cfg.gamma_cfg.confidence = 0.99;        // overall confidence
+  // beta shape parameter
+  dot_product_cfg.gamma_cfg.beta_dist_beta = 2.0;
+  // alpha shape parameter
+  std::vector<double> beta_dist_alpha_vals = {1.6,  1.7, 1.8, 1.9,
+                                              1.95, 2.0};  // shape param. alpha
+
+  const int n_min = 10;    // minimum vector size
+  const int n_evals = 10;  // number of evaluations
+  int n_max;               // maximum vector size
+  if (prec == Single) {
+    n_max = 50000000;
+  } else if (prec == Half) {
+    n_max = 100000;
+  }
+
+  /* data: U(0,1) */
+  dot_product_cfg.dist = ZeroOne;
+
+  dot_product_cfg.gamma_cfg.bound_model = Uniform;
+
+  run_block_dot_product_backward_error_experiment(dot_product_cfg, n_min, n_max,
+                                                  n_evals);
+
+  dot_product_cfg.gamma_cfg.bound_model = Beta;
+  for (auto &alpha : beta_dist_alpha_vals) {
+    dot_product_cfg.gamma_cfg.beta_dist_alpha = alpha;
+    run_block_dot_product_backward_error_experiment(dot_product_cfg, n_min,
+                                                    n_max, n_evals);
+  }
+
+  /* data: U(-1,1) */
+  dot_product_cfg.dist = MinusOnePlusOne;
+
+  dot_product_cfg.gamma_cfg.bound_model = Uniform;
+  run_block_dot_product_backward_error_experiment(dot_product_cfg, n_min, n_max,
+                                                  n_evals);
+
+  dot_product_cfg.gamma_cfg.bound_model = Beta;
+  for (auto &alpha : beta_dist_alpha_vals) {
+    dot_product_cfg.gamma_cfg.beta_dist_alpha = alpha;
+    run_block_dot_product_backward_error_experiment(dot_product_cfg, n_min,
+                                                    n_max, n_evals);
   }
 }
 
-}  // namespace dot_product
+}  // namespace block_dot_product
 
 /* run all experiments */
 void run_all_dot_product_experiments(Precision prec) {
-  /* run all backward error experiments */
-  /* dot_product::run_all_backward_error_experiments(prec); */
-  /* run all forward error experiments */
-  dot_product::run_all_forward_error_experiments(prec);
+  /* sequential */
+  // run all backward error experiments
+  // sequential_dot_product::run_all_backward_error_experiments(prec);
+  // run all forward error experiments
+  // sequential_dot_product::run_all_forward_error_experiments(prec);
+
+  /* block */
+  // run all backward error experiments
+  block_dot_product::run_all_backward_error_experiments(prec);
 }

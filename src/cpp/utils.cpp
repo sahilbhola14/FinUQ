@@ -238,8 +238,8 @@ std::vector<int> make_logspace(int n_min, int n_max, int num_points) {
 }
 
 /* make linspace */
-std::vector<double> make_linspace(double start, double end,
-                                  std::size_t num_points) {
+template <typename T>
+std::vector<T> make_linspace(T start, T end, std::size_t num_points) {
   if (num_points == 0) {
     return {};
   }
@@ -247,11 +247,11 @@ std::vector<double> make_linspace(double start, double end,
     return {start};
   }
 
-  std::vector<double> result(num_points);
-  double step = (end - start) / static_cast<double>(num_points - 1);
+  std::vector<T> result(num_points);
+  T step = (end - start) / static_cast<T>(num_points - 1);
 
   for (std::size_t i = 0; i < num_points; ++i) {
-    result[i] = start + step * static_cast<double>(i);
+    result[i] = start + step * static_cast<T>(i);
   }
 
   return result;
@@ -355,3 +355,6 @@ template void copy_matrix_and_convert_precision<float>(
     const Matrix<double> &source, Matrix<float> &target);
 template void copy_matrix_and_convert_precision<half>(
     const Matrix<double> &source, Matrix<half> &target);
+
+template std::vector<double> make_linspace(double, double, std::size_t);
+template std::vector<int> make_linspace(int, int, std::size_t);
