@@ -54,22 +54,10 @@ void run_jacobi_experiments_fixed_discretization(
     std::vector<T> h_l(poisson_rhs_cfg.state_dim * poisson_rhs_cfg.state_dim,
                        static_cast<T>(0.0));
 
-    poisson.print_coefficient_matrix();
-    // std::vector<T> dumm_state(poisson_rhs_cfg.state_dim,
-    // static_cast<T>(0.0)); poisson.print_rhs(dumm_state);
-
     launch_cholesky_decomposition_kernel(poisson_rhs_cfg.state_dim, h_coeff,
                                          h_l, poisson_cfg.prec);
 
-    // compute_and_print_llt(poisson_rhs_cfg.state_dim, h_l);
-
-    // std::vector<double> llt = compute_llt(poisson_rhs_cfg.state_dim, h_l);
-    // double error = 0.0;
-    // const int state_dim = poisson_rhs_cfg.state_dim;
-    // for (int i = 0; i < state_dim * state_dim; i++) {
-    // error += std::pow(llt[i] - static_cast<double>(h_coeff[i]), 2);
-    // }
-    // std::cout << "error: " << error << std::endl;
+    compute_cholesky_error(poisson_rhs_cfg.state_dim, h_coeff, h_l);
 
     // compute_vanilla_cholesky(poisson_rhs_cfg.state_dim, h_coeff, h_l);
 
@@ -124,6 +112,7 @@ void run_all_jacobi_experiments(Precision prec,
   poisson_config poisson_cfg;
   poisson_cfg.prec = prec;
   poisson_cfg.num_experiments = num_experiments;
+  poisson_cfg.gamma_cfg.prec = prec;        // bound precision
   poisson_cfg.gamma_cfg.confidence = 0.99;  // overall confidence
   // beta shape parameter
   poisson_cfg.gamma_cfg.beta_dist_beta = 2.0;

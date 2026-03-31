@@ -23,6 +23,26 @@ std::vector<double> compute_llt(const int N, std::vector<T> &h_l) {
   return llt;
 }
 
+// Compute Frobenius norm of A - L*L^T
+template <typename T>
+void compute_cholesky_error(const int N, std::vector<T> &h_a,
+                            std::vector<T> &h_l) {
+  double error = 0.0;
+  for (int r = 0; r < N; r++) {
+    for (int c = 0; c < N; c++) {
+      double llt_rc = 0.0;
+      for (int k = 0; k < N; k++) {
+        llt_rc += static_cast<double>(h_l[r * N + k]) *
+                  static_cast<double>(h_l[c * N + k]);
+      }
+      double diff = static_cast<double>(h_a[r * N + c]) - llt_rc;
+      error += diff * diff;
+    }
+  }
+  std::cout << "Cholesky error (Frobenius norm): " << std::sqrt(error)
+            << std::endl;
+}
+
 // Compute L * L^T and print the result
 template <typename T>
 void compute_and_print_llt(const int N, std::vector<T> &h_l) {
@@ -185,6 +205,13 @@ void launch_cholesky_decomposition_kernel(const int N, std::vector<T> &h_a,
   // Free
   cudaFree(d_a);
 }
+
+template void compute_cholesky_error<double>(const int, std::vector<double> &,
+                                             std::vector<double> &);
+template void compute_cholesky_error<float>(const int, std::vector<float> &,
+                                            std::vector<float> &);
+template void compute_cholesky_error<half>(const int, std::vector<half> &,
+                                           std::vector<half> &);
 
 template std::vector<double> compute_llt<double>(const int,
                                                  std::vector<double> &);
