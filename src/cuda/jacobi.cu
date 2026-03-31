@@ -6,8 +6,8 @@
 #include <iostream>
 #include <sstream>
 
+#include "jacobi.cuh"
 #include "poisson.hpp"
-#include "poisson_cuda.cuh"
 #include "utils.hpp"
 #include "utils_cuda.cuh"
 

@@ -1,5 +1,5 @@
-#ifndef POISSON_CUDA_CUH
-#define POISSON_CUDA_CUH
+#ifndef JACOBI_CUH
+#define JACOBI_CUH
 
 #include <vector>
 

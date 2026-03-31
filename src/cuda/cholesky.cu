@@ -336,6 +336,7 @@ void launch_cholesky_solve_kernel(const int N, const std::vector<T> &h_l,
   launch_backward_solve_kernel(N, h_l, h_y, h_result, prec);
 }
 
+// Template initialziations
 template void launch_backward_solve_kernel<double>(const int,
                                                    const std::vector<double> &,
                                                    const std::vector<double> &,

@@ -3,7 +3,7 @@
 
 #include "definition.hpp"
 #include "gamma.hpp"
-#include "poisson_cuda.cuh"
+#include "jacobi.cuh"
 
 #include <cmath>
 #include <iomanip>
