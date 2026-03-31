@@ -132,9 +132,11 @@ void launch_jacobi_solver(const poisson_rhs_config<T> &poisson_rhs_cfg,
     std::swap(h_state, h_state_new);
   }
 
+  // Note: due to swapping, after the convergence: h_state is the final answer.
+
   // save solution to csv: columns = i_x, i_y, value
   const int Nx = poisson_rhs_cfg.Nx;
-  const int Ny = state_dim / Nx;
+  // const int Ny = state_dim / Nx;
   std::ostringstream ss;
   ss << "poisson_solution_" << to_string(prec) << "_prec"
      << "_zeta_" << std::fixed << std::setprecision(6)

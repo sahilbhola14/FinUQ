@@ -12,6 +12,7 @@
 #include <vector>
 
 // configuration
+// Notes: (X_res, Y_res) = (5, 6), (10, 18), (18, 18), (18, 32), (34, 66)
 struct poisson_config {
   // int X_res = 33; // Number of points in x-direction
   // int Y_res = 64; // Number of points in y-direction
@@ -22,8 +23,8 @@ struct poisson_config {
   Precision prec = Single; // precision for the solve
   int num_experiments = 100; // number of experiments (number of times RHS is sampled)
   gamma_config gamma_cfg; // bounds config
-  int block_jacobi_tile_size = 64; // block jacobi tile size
-  int matvect_tile_size = 64; // tile size for the matrix vector product
+  int blk_jacobi_tile_size = 64; // block jacobi tile size
+  int blk_jacobi_matvect_tile_size = 64; // tile size for the matrix vector product
 };
 
 // Poisson class

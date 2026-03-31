@@ -54,13 +54,33 @@ void run_jacobi_experiments_fixed_discretization(
     std::vector<T> h_l(poisson_rhs_cfg.state_dim * poisson_rhs_cfg.state_dim,
                        static_cast<T>(0.0));
 
-    launch_cholesky_decomposition_kernel(poisson_rhs_cfg.state_dim, h_coeff,
-                                         h_l, poisson_cfg.prec);
+    // run the jacobi solver(s)
+    launch_jacobi_solver<T>(poisson_rhs_cfg, h_coeff, h_state_initial,
+                            poisson_cfg.prec, poisson_cfg.etol,
+                            poisson_cfg.max_iter, true);
+  }
+}
 
-    compute_cholesky_error(poisson_rhs_cfg.state_dim, h_coeff, h_l);
+// Block jacobi experiments (fixed discretization)
+template <typename T>
+void run_block_jacobi_experiments_fixed_discretization(
+    const poisson_config &poisson_cfg) {
+  // sample the zeta values
+  std::vector<T> zeta_vals(poisson_cfg.num_experiments);
+  std::mt19937 gen(/*seed=*/42);
+  sample_uniform_distribution(zeta_vals, 0.0, 1.0, gen);
 
-    // compute_vanilla_cholesky(poisson_rhs_cfg.state_dim, h_coeff, h_l);
+  // run the experiment
+  for (int i = 0; i < poisson_cfg.num_experiments; i++) {
+    // initialize the poisson object
+    Poisson<T> poisson(poisson_cfg, zeta_vals[i]);
+    poisson_rhs_config<T> poisson_rhs_cfg = poisson.get_rhs_config();
+    std::vector<T> h_coeff = poisson.get_coefficient_matrix();
+    std::vector<T> h_state_initial = poisson.get_initial_state();
 
+    std::vector<T> h_l(poisson_rhs_cfg.state_dim * poisson_rhs_cfg.state_dim,
+                       static_cast<T>(0.0));
+    printf("Heheh");
     // // run the jacobi solver(s)
     // launch_jacobi_solver<T>(poisson_rhs_cfg, h_coeff, h_state_initial,
     //                         poisson_cfg.prec, poisson_cfg.etol,
@@ -105,6 +125,60 @@ void run_jacobi_experiments(const poisson_config &poisson_cfg) {
   }
 }
 
+// block jacobi experiments
+void run_block_jacobi_experiments(const poisson_config &poisson_cfg) {
+  // initialization
+  if (poisson_cfg.X_res <= 2 || poisson_cfg.Y_res <= 2) {
+    throw std::invalid_argument("X_res and Y_res must be greater that 2");
+  }
+  if (((poisson_cfg.X_res - 2) * (poisson_cfg.Y_res - 2)) %
+          poisson_cfg.blk_jacobi_tile_size !=
+      0) {
+    const int coeff_size = (poisson_cfg.X_res - 2) * (poisson_cfg.Y_res - 2);
+    std::cout << "[DEBUG] Coeff size = " << coeff_size
+              << ", Tile size = " << poisson_cfg.blk_jacobi_tile_size
+              << ", Remainder = "
+              << (coeff_size % poisson_cfg.blk_jacobi_tile_size) << std::endl;
+    throw std::invalid_argument(
+        "Coefficient matrix size: not divisible by tile size (Required for "
+        "Block Jacobi)");
+  }
+
+  // print the header
+  std::cout << std::string(50, '=') << std::endl;
+  std::cout << std::string(10, '-')
+            << " Block Jacobi solver for Poisson equation config "
+            << std::string(10, '-') << std::endl;
+  print_poisson_config(poisson_cfg);
+  std::cout << "Block Jacobi Tile size: " << poisson_cfg.blk_jacobi_tile_size
+            << std::endl;
+  std::cout << "Block Jacobi Mat-vec Tile size: "
+            << poisson_cfg.blk_jacobi_matvect_tile_size << std::endl;
+  std::cout << std::string(50, '=') << std::endl;
+  /* assert statements */
+  assert(poisson_cfg.prec == poisson_cfg.gamma_cfg.prec &&
+         "Bound precision and compute precision must be the same");
+
+  // run the experiment
+  switch (poisson_cfg.prec) {
+    case Double: {
+      run_block_jacobi_experiments_fixed_discretization<double>(poisson_cfg);
+      break;
+    }
+    case Single: {
+      run_block_jacobi_experiments_fixed_discretization<float>(poisson_cfg);
+      break;
+    }
+    case Half: {
+      run_block_jacobi_experiments_fixed_discretization<half>(poisson_cfg);
+      break;
+    }
+    default: {
+      throw std::invalid_argument("invalid precision");
+    }
+  }
+}
+
 // jacobi experiments all experiments
 void run_all_jacobi_experiments(Precision prec,
                                 const int num_experiments = 100) {
@@ -129,7 +203,40 @@ void run_all_jacobi_experiments(Precision prec,
   // }
 }
 
+// Block jacobi experiments all experiments
+void run_all_block_jacobi_experiments(Precision prec,
+                                      const int num_experiments = 100) {
+  // configuration
+  poisson_config poisson_cfg;
+  poisson_cfg.prec = prec;
+  poisson_cfg.num_experiments = num_experiments;
+  poisson_cfg.gamma_cfg.prec = prec;        // bound precision
+  poisson_cfg.gamma_cfg.confidence = 0.99;  // overall confidence
+  // std::vector <int> block_jacobi_tile_sizes = {4, 8, 16, 32};
+  std::vector<int> block_jacobi_tile_sizes = {4};
+
+  // beta shape parameter
+  poisson_cfg.gamma_cfg.beta_dist_beta = 2.0;
+  // alpha shape parameter
+  std::vector<double> beta_dist_alpha_vals = {1.8, 1.9,
+                                              2.0};  // shape param. alpha
+
+  // run the experiment (Uniform rounding error model)
+  for (auto &tile_size : block_jacobi_tile_sizes) {
+    poisson_cfg.gamma_cfg.bound_model = Uniform;
+    poisson_cfg.blk_jacobi_tile_size = tile_size;
+
+    run_block_jacobi_experiments(poisson_cfg);
+  }
+
+  // for (auto &alpha: beta_dist_alpha_vals){
+  //   poisson_cfg.gamma_cfg.beta_dist_alpha = alpha;
+  //   run_jacobi_experiments(poisson_cfg);
+  // }
+}
+
 // poisson equation experiments
 void run_poisson_equation_experiments(Precision prec) {
-  run_all_jacobi_experiments(prec, 1);
+  // run_all_jacobi_experiments(prec, 1);
+  run_all_block_jacobi_experiments(prec, 1);
 }
