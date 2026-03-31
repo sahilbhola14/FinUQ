@@ -21,6 +21,7 @@ struct poisson_config {
   double etol = 1e-6; // Error tolerance
   int max_iter = 5000; // Maximum number of iterations
   Precision prec = Single; // precision for the solve
+  Precision prec_cholesky = Single; // precision for cholesky in block jacobi
   int num_experiments = 100; // number of experiments (number of times RHS is sampled)
   gamma_config gamma_cfg; // bounds config
   int blk_jacobi_tile_size = 64; // block jacobi tile size

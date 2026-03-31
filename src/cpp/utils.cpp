@@ -342,6 +342,20 @@ template void convert_vector_to_double<float>(const std::vector<float> &,
                                               std::vector<double> &);
 template void convert_vector_to_double<half>(const std::vector<half> &,
                                              std::vector<double> &);
+template void convert_vector_to_float<double>(const std::vector<double> &,
+                                              std::vector<float> &);
+template void convert_vector_to_float<float>(const std::vector<float> &,
+                                             std::vector<float> &);
+template void convert_vector_to_float<half>(const std::vector<half> &,
+                                            std::vector<float> &);
+
+template void convert_vector_to_half<double>(const std::vector<double> &,
+                                             std::vector<half> &);
+template void convert_vector_to_half<float>(const std::vector<float> &,
+                                            std::vector<half> &);
+template void convert_vector_to_half<half>(const std::vector<half> &,
+                                           std::vector<half> &);
+
 template void convert_vector_to_absolute_double<double>(
     const std::vector<double> &, std::vector<double> &);
 template void convert_vector_to_absolute_double<float>(
