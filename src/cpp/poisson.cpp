@@ -3,6 +3,7 @@
 #include <cassert>
 #include <random>
 
+#include "block_jacobi.cuh"
 #include "cholesky.cuh"
 #include "distribution.hpp"
 #include "prob_model.hpp"
@@ -59,72 +60,6 @@ void run_jacobi_experiments_fixed_discretization(
   }
 }
 
-// Cholesky per Tile
-// Returns one Matrix<T> per block-diagonal tile, each storing the
-// lower-triangular L
-template <typename T>
-std::vector<Matrix<T>> compute_cholesky_per_jacobi_tile(
-    const std::vector<T> &h_a, const poisson_config &poisson_cfg) {
-  const int state_dim = (poisson_cfg.X_res - 2) * (poisson_cfg.Y_res - 2);
-  const int tile_size = poisson_cfg.blk_jacobi_tile_size;
-  const int num_tiles = state_dim / tile_size;
-
-  std::vector<Matrix<T>> chol_factors(num_tiles);
-
-  for (int t = 0; t < num_tiles; t++) {
-    const int tile_start = t * tile_size;
-
-    // (1) extract the tile_size x tile_size block-diagonal block
-    std::vector<T> tile(tile_size * tile_size);
-    for (int r = 0; r < tile_size; r++) {
-      for (int c = 0; c < tile_size; c++) {
-        tile[r * tile_size + c] =
-            h_a[(tile_start + r) * state_dim + (tile_start + c)];
-      }
-    }
-
-    // (2) compute Cholesky in prec_cholesky precision, result cast back to T
-    const int tile_elems = tile_size * tile_size;
-    std::vector<T> l(tile_elems, static_cast<T>(0.0));
-
-    switch (poisson_cfg.prec_cholesky) {
-      case Double: {
-        std::vector<double> tile_d(tile_elems), l_d(tile_elems, 0.0);
-        convert_vector_to_double(tile, tile_d);
-        launch_cholesky_decomposition_kernel(tile_size, tile_d, l_d, Double);
-        for (int k = 0; k < tile_elems; k++) l[k] = static_cast<T>(l_d[k]);
-        break;
-      }
-      case Single: {
-        std::vector<float> tile_f(tile_elems), l_f(tile_elems, 0.0f);
-        convert_vector_to_float(tile, tile_f);
-        launch_cholesky_decomposition_kernel(tile_size, tile_f, l_f, Single);
-        for (int k = 0; k < tile_elems; k++) l[k] = static_cast<T>(l_f[k]);
-        break;
-      }
-      case Half: {
-        std::vector<half> tile_h(tile_elems),
-            l_h(tile_elems, static_cast<half>(0.0f));
-        convert_vector_to_half(tile, tile_h);
-        launch_cholesky_decomposition_kernel(tile_size, tile_h, l_h, Half);
-        for (int k = 0; k < tile_elems; k++) l[k] = static_cast<T>(l_h[k]);
-        break;
-      }
-      default:
-        throw std::invalid_argument("invalid prec_cholesky");
-    }
-
-    // (3) store in Matrix struct (same precision as h_a); nnz =
-    // lower-triangular entries
-    chol_factors[t].rows = tile_size;
-    chol_factors[t].cols = tile_size;
-    chol_factors[t].nnz = (tile_size * (tile_size + 1)) / 2;
-    chol_factors[t].data = std::move(l);
-  }
-
-  return chol_factors;
-}
-
 // Block jacobi experiments (fixed discretization)
 template <typename T>
 void run_block_jacobi_experiments_fixed_discretization(
@@ -143,9 +78,12 @@ void run_block_jacobi_experiments_fixed_discretization(
     std::vector<T> h_coeff = poisson.get_coefficient_matrix();
     // initial state
     std::vector<T> h_state_initial = poisson.get_initial_state();
-    // cholesky decomp
-    std::vector<Matrix<T>> chol_factors =
-        compute_cholesky_per_jacobi_tile(h_coeff, poisson_cfg);
+    // // cholesky decomp
+    // std::vector<Matrix<T>> chol_factors =
+    //     compute_cholesky_per_jacobi_tile(h_coeff, poisson_cfg);
+
+    launch_block_jacobi_solver(poisson_rhs_cfg, h_coeff, h_state_initial,
+                               poisson_cfg, true);
 
     // // print chol_factors
     // std::cout << std::scientific << std::setprecision(4);
