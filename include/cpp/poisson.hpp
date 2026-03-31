@@ -13,10 +13,10 @@
 
 // configuration
 struct poisson_config {
-  int X_res = 33; // Number of points in x-direction
-  int Y_res = 64; // Number of points in y-direction
-  // int X_res = 5; // Number of points in x-direction
-  // int Y_res = 6; // Number of points in y-direction
+  // int X_res = 33; // Number of points in x-direction
+  // int Y_res = 64; // Number of points in y-direction
+  int X_res = 5; // Number of points in x-direction
+  int Y_res = 6; // Number of points in y-direction
   double etol = 1e-6; // Error tolerance
   int max_iter = 5000; // Maximum number of iterations
   Precision prec = Single; // precision for the solve

@@ -3,6 +3,7 @@
 #include <cassert>
 #include <random>
 
+#include "cholesky.cuh"
 #include "distribution.hpp"
 #include "prob_model.hpp"
 #include "utils.hpp"
@@ -49,10 +50,15 @@ void run_jacobi_experiments_fixed_discretization(
     poisson_rhs_config<T> poisson_rhs_cfg = poisson.get_rhs_config();
     std::vector<T> h_coeff = poisson.get_coefficient_matrix();
     std::vector<T> h_state_initial = poisson.get_initial_state();
-    // run the jacobi solver(s)
-    launch_jacobi_solver<T>(poisson_rhs_cfg, h_coeff, h_state_initial,
-                            poisson_cfg.prec, poisson_cfg.etol,
-                            poisson_cfg.max_iter, true);
+    std::vector<T> h_l(poisson_rhs_cfg.state_dim * poisson_rhs_cfg.state_dim,
+                       static_cast<T>(0.0));
+    launch_cholesky_decomposition_kernel(poisson_rhs_cfg.state_dim, h_coeff,
+                                         h_l, poisson_cfg.prec);
+
+    // // run the jacobi solver(s)
+    // launch_jacobi_solver<T>(poisson_rhs_cfg, h_coeff, h_state_initial,
+    //                         poisson_cfg.prec, poisson_cfg.etol,
+    //                         poisson_cfg.max_iter, true);
   }
 }
 

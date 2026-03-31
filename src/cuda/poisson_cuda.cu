@@ -92,7 +92,6 @@ void launch_jacobi_solver_single_step(
 
   launch_jacobi_solver_single_step_kernel<<<gridDim, blockDim>>>(
       state_dim, d_coeff, d_state, d_rhs, d_state_new, prec);
-  cudaDeviceSynchronize();
   cudaCheck(cudaGetLastError());
   // copy Device to Host
   cudaCheck(cudaMemcpy(h_state_new.data(), d_state_new, size,
