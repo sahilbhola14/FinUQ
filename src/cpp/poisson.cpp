@@ -50,10 +50,28 @@ void run_jacobi_experiments_fixed_discretization(
     poisson_rhs_config<T> poisson_rhs_cfg = poisson.get_rhs_config();
     std::vector<T> h_coeff = poisson.get_coefficient_matrix();
     std::vector<T> h_state_initial = poisson.get_initial_state();
+
     std::vector<T> h_l(poisson_rhs_cfg.state_dim * poisson_rhs_cfg.state_dim,
                        static_cast<T>(0.0));
+
+    poisson.print_coefficient_matrix();
+    // std::vector<T> dumm_state(poisson_rhs_cfg.state_dim,
+    // static_cast<T>(0.0)); poisson.print_rhs(dumm_state);
+
     launch_cholesky_decomposition_kernel(poisson_rhs_cfg.state_dim, h_coeff,
                                          h_l, poisson_cfg.prec);
+
+    // compute_and_print_llt(poisson_rhs_cfg.state_dim, h_l);
+
+    // std::vector<double> llt = compute_llt(poisson_rhs_cfg.state_dim, h_l);
+    // double error = 0.0;
+    // const int state_dim = poisson_rhs_cfg.state_dim;
+    // for (int i = 0; i < state_dim * state_dim; i++) {
+    // error += std::pow(llt[i] - static_cast<double>(h_coeff[i]), 2);
+    // }
+    // std::cout << "error: " << error << std::endl;
+
+    // compute_vanilla_cholesky(poisson_rhs_cfg.state_dim, h_coeff, h_l);
 
     // // run the jacobi solver(s)
     // launch_jacobi_solver<T>(poisson_rhs_cfg, h_coeff, h_state_initial,

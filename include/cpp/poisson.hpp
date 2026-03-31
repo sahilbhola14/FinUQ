@@ -19,7 +19,7 @@ struct poisson_config {
   int Y_res = 6; // Number of points in y-direction
   double etol = 1e-6; // Error tolerance
   int max_iter = 5000; // Maximum number of iterations
-  Precision prec = Single; // precision for the solve
+  Precision prec = Half; // precision for the solve
   int num_experiments = 100; // number of experiments (number of times RHS is sampled)
   gamma_config gamma_cfg; // bounds config
   int block_jacobi_tile_size = 64; // block jacobi tile size
@@ -47,13 +47,19 @@ class Poisson {
   T get_diagonal_coefficient() const {
     T inv_dx_sq = get_inv_dx_sq();
     T inv_dy_sq = get_inv_dy_sq();
-    return static_cast<T>(-2.0) * (inv_dx_sq + inv_dy_sq);
+    return static_cast<T>(2.0) * (inv_dx_sq + inv_dy_sq);
   }
 
-  T get_horizontal_offdiagonal_coefficient() const { return get_inv_dx_sq(); }
-  T get_vertical_offdiagonal_coefficent() const { return get_inv_dy_sq(); }
+  T get_horizontal_offdiagonal_coefficient() const {
+    T inv_dx_sq = get_inv_dx_sq();
+    return static_cast<T>(-1.0) * inv_dx_sq;
+  }
+  T get_vertical_offdiagonal_coefficent() const {
+    T inv_dy_sq = get_inv_dy_sq();
+    return static_cast<T>(-1.0) * inv_dy_sq;
+  }
 
-  // rhs[i] = -zeta * state[i], plus top boundary condition contribution
+  // rhs eval plus top boundary condition contribution
   std::vector<T> eval_rhs_host(const std::vector<T> &state) const {
     const int n = get_state_dim();
     std::vector<T> rhs(n);

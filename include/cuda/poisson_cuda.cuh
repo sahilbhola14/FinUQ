@@ -24,12 +24,14 @@ struct poisson_rhs_config {
 template <typename T>
 __host__ __device__ void eval_rhs(const poisson_rhs_config<T> &cfg,
                                   const T *state, T *rhs) {
+  // original rhs
   for (int i = 0; i < cfg.state_dim; i++) {
     // rhs[i] = -cfg.zeta * state[i];
     rhs[i] = static_cast<T>(0.0);
   }
+  // apply top boundary condition
   for (int i = 0; i < cfg.Nx; i++) {
-    rhs[i] -= cfg.inv_dy_sq;
+    rhs[i] += cfg.inv_dy_sq;
   }
 }
 
