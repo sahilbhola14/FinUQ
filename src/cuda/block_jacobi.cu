@@ -386,11 +386,13 @@ void launch_block_jacobi_solver(const poisson_rhs_config<T> &poisson_rhs_cfg,
       compute_cholesky_per_jacobi_tile(h_coeff, poisson_cfg);
 
   // (2): block jacobi iteration
+  std::vector<double> error_history;
   int k = 0;
   for (; k < max_iter && h_error > etol; k++) {
     launch_block_jacobi_solver_single_step(h_coeff, cholesky_factors, h_state,
                                            h_state_new, poisson_rhs_cfg,
                                            h_error, poisson_cfg);
+    error_history.push_back(h_error);
 
     if (verbose && k % 10 == 0) {
       printf("Iter %d | error: %e\n", k, h_error);
@@ -420,9 +422,28 @@ void launch_block_jacobi_solver(const poisson_rhs_config<T> &poisson_rhs_cfg,
          << static_cast<double>(h_state[idx]) << "\n";
   }
   file.close();
+
+  // save error history to csv: columns = iter, error
+  std::ostringstream ss_err;
+  ss_err << "poisson_convergence_" << to_string(poisson_cfg.prec) << "_prec"
+         << "_chol_" << to_string(poisson_cfg.prec_cholesky) << "_zeta_"
+         << std::fixed << std::setprecision(6)
+         << static_cast<double>(poisson_rhs_cfg.zeta) << ".csv";
+  std::ofstream err_file(ss_err.str());
+  if (!err_file.is_open()) {
+    std::cerr << "Error: could not open file " << ss_err.str() << "\n";
+    return;
+  }
+  err_file << "iter,error\n";
+  for (int i = 0; i < static_cast<int>(error_history.size()); i++)
+    err_file << i << "," << std::scientific << std::setprecision(10)
+             << error_history[i] << "\n";
+  err_file.close();
+
   if (verbose) {
     std::cout << "solution saved to " << ss.str() << " (converged in " << k
               << " iters, error=" << h_error << ")\n";
+    std::cout << "convergence saved to " << ss_err.str() << "\n";
   }
 }
 
