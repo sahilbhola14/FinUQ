@@ -127,6 +127,82 @@ __global__ void block_jacobi_rhs_kernel(const int N, const T *coeff,
   }
 }
 
+// block jacobi update step kernel
+template <typename T>
+__global__ void block_jacobi_update_step_kernel(const int num_tiles,
+                                                const int tile_size,
+                                                const T *chol, const T *rhs,
+                                                const T *state, T *state_new,
+                                                Precision prec) {
+  // initialzie
+  extern __shared__ char smem_raw[];
+  T *smem = reinterpret_cast<T *>(smem_raw);
+  T *y = smem + threadIdx.x * 2 * tile_size;  // begining of y sol
+  T *c = y + tile_size;                       // begining of the correction c
+
+  const int t = blockIdx.x * blockDim.x + threadIdx.x;  // tile idx
+  if (t >= num_tiles) return;                           // boundary check
+
+  const int tile_start = t * tile_size;  // basically global row start
+  const T *L =
+      chol + t * tile_size * tile_size;  // start of the cholesky factor
+
+  // forward solve: L * y = rhs_tile
+  for (int i = 0; i < tile_size; i++) {
+    T sum = static_cast<T>(0.0);
+    if (prec == Double) {
+      for (int j = 0; j < i; j++)
+        sum = __dadd_rn(sum, __dmul_rn(L[i * tile_size + j], y[j]));
+      y[i] =
+          __ddiv_rn(__dsub_rn(rhs[tile_start + i], sum), L[i * tile_size + i]);
+    } else if (prec == Single) {
+      for (int j = 0; j < i; j++)
+        sum = __fadd_rn(sum, __fmul_rn(L[i * tile_size + j], y[j]));
+      y[i] =
+          __fdiv_rn(__fsub_rn(rhs[tile_start + i], sum), L[i * tile_size + i]);
+    } else if (prec == Half) {
+      for (int j = 0; j < i; j++)
+        sum = __hadd_rn(sum, __hmul_rn(L[i * tile_size + j], y[j]));
+      y[i] = __hdiv(__hsub_rn(rhs[tile_start + i], sum), L[i * tile_size + i]);
+    } else {
+      printf("<Cuda Error>: Invalid precision\n");
+    }
+  }
+
+  // backward solve: L^T * c = y
+  for (int i = tile_size - 1; i >= 0; i--) {
+    T sum = static_cast<T>(0.0);
+    if (prec == Double) {
+      for (int j = i + 1; j < tile_size; j++)
+        sum = __dadd_rn(sum, __dmul_rn(L[j * tile_size + i], c[j]));
+      c[i] = __ddiv_rn(__dsub_rn(y[i], sum), L[i * tile_size + i]);
+    } else if (prec == Single) {
+      for (int j = i + 1; j < tile_size; j++)
+        sum = __fadd_rn(sum, __fmul_rn(L[j * tile_size + i], c[j]));
+      c[i] = __fdiv_rn(__fsub_rn(y[i], sum), L[i * tile_size + i]);
+    } else if (prec == Half) {
+      for (int j = i + 1; j < tile_size; j++)
+        sum = __hadd_rn(sum, __hmul_rn(L[j * tile_size + i], c[j]));
+      c[i] = __hdiv(__hsub_rn(y[i], sum), L[i * tile_size + i]);
+    } else {
+      printf("<Cuda Error>: Invalid precision\n");
+    }
+  }
+
+  // state update: state_new = state + c
+  for (int k = 0; k < tile_size; k++) {
+    if (prec == Double) {
+      state_new[tile_start + k] = __dadd_rn(state[tile_start + k], c[k]);
+    } else if (prec == Single) {
+      state_new[tile_start + k] = __fadd_rn(state[tile_start + k], c[k]);
+    } else if (prec == Half) {
+      state_new[tile_start + k] = __hadd_rn(state[tile_start + k], c[k]);
+    } else {
+      printf("<Cuda Error>: Invalid precision\n");
+    }
+  }
+}
+
 // compute b - A*x^k for the rhs of the update form of block jacobi
 template <typename T>
 void launch_block_jacobi_rhs(const int N, const std::vector<T> &h_coeff,
@@ -168,7 +244,7 @@ void launch_block_jacobi_rhs(const int N, const std::vector<T> &h_coeff,
 // 2. update x^k+1 = x^k + c, where c is the solution from the linear system
 // solve
 template <typename T>
-void launch_block_jacobi_update_step(
+void launch_block_jacobi_sequential_update_step(
     const int N, const std::vector<Matrix<T>> &cholesky_factors,
     const std::vector<T> &h_rhs, const std::vector<T> &h_state,
     std::vector<T> &h_state_new, const int blk_jacobi_tile_size,
@@ -195,6 +271,63 @@ void launch_block_jacobi_update_step(
           static_cast<T>(static_cast<double>(h_state[tile_start + k]) +
                          static_cast<double>(c_tile[k]));
   }
+}
+
+// Block Jacobi update step
+// 1. perform the linear system solve for small blocks
+// 2. update x^k+1 = x^k + c, where c is the solution from the linear system
+// solve
+template <typename T>
+void launch_block_jacobi_update_step(
+    const int N, const std::vector<Matrix<T>> &cholesky_factors,
+    const std::vector<T> &h_rhs, const std::vector<T> &h_state,
+    std::vector<T> &h_state_new, const int blk_jacobi_tile_size,
+    Precision prec) {
+  // initialization
+  const int num_tiles = cholesky_factors.size();
+  const int tile_size = blk_jacobi_tile_size;
+  const int chol_stride = tile_size * tile_size;
+  T *d_chol, *d_rhs, *d_state, *d_state_new;
+
+  // flatten cholesky factors into continuous host array
+  std::vector<T> h_chol_flat(num_tiles * chol_stride);
+  for (int t = 0; t < num_tiles; t++) {
+    std::copy(cholesky_factors[t].data.begin(), cholesky_factors[t].data.end(),
+              h_chol_flat.begin() + t * chol_stride);
+  }
+  // memory allocattion
+  cudaCheck(cudaMalloc((void **)&d_chol, num_tiles * chol_stride * sizeof(T)));
+  cudaCheck(cudaMalloc((void **)&d_rhs, N * sizeof(T)));
+  cudaCheck(cudaMalloc((void **)&d_state, N * sizeof(T)));
+  cudaCheck(cudaMalloc((void **)&d_state_new, N * sizeof(T)));
+  // host to device
+  cudaCheck(cudaMemcpy(d_chol, h_chol_flat.data(),
+                       num_tiles * chol_stride * sizeof(T),
+                       cudaMemcpyHostToDevice));
+  cudaCheck(
+      cudaMemcpy(d_rhs, h_rhs.data(), N * sizeof(T), cudaMemcpyHostToDevice));
+  cudaCheck(cudaMemcpy(d_state, h_state.data(), N * sizeof(T),
+                       cudaMemcpyHostToDevice));
+
+  // kernel parameters
+  dim3 blockDim = 64;
+  dim3 gridDim =
+      get_grid_dim(num_tiles, blockDim.x);  // each thread work on one block
+  // each thread has its own 2 * tile_size
+  size_t smem_size = blockDim.x * 2 * tile_size * sizeof(T);
+  // kernel launch
+  block_jacobi_update_step_kernel<<<gridDim, blockDim, smem_size>>>(
+      num_tiles, tile_size, d_chol, d_rhs, d_state, d_state_new, prec);
+  cudaCheck(cudaGetLastError());
+  // device -> host
+  cudaCheck(cudaMemcpy(h_state_new.data(), d_state_new, N * sizeof(T),
+                       cudaMemcpyDeviceToHost));
+
+  // Free
+  cudaFree(d_chol);
+  cudaFree(d_rhs);
+  cudaFree(d_state);
+  cudaFree(d_state_new);
 }
 
 // Block Jacobi (single iteration)
