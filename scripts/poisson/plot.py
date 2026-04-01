@@ -1,7 +1,7 @@
 """
 Contour plot of Poisson equation solution from launch_jacobi_solver CSV output.
 CSV format: i_x, i_y, value
-Filename:   poisson_solution_<prec>_prec_zeta_<zeta>.csv
+Filename:   poisson_solution_<prec>_prec_chol_<prec_cholesky>_zeta_<zeta>.csv
 Author: Sahil Bhola, University of Michigan, 2026
 """
 import argparse
@@ -24,6 +24,12 @@ parser.add_argument(
     help="Precision used in the solver",
 )
 parser.add_argument(
+    "--prec_cholesky",
+    choices=prec_options,
+    default="double",
+    help="Precision used for Cholesky decomposition",
+)
+parser.add_argument(
     "--zeta",
     type=float,
     default=None,
@@ -44,17 +50,21 @@ parser.add_argument(
 args = parser.parse_args()
 
 
-def get_filename(prec: str, zeta: float) -> str:
-    return f"poisson_solution_{prec}_prec_zeta_{zeta:.6f}.csv"
+def get_filename(prec: str, prec_cholesky: str, zeta: float) -> str:
+    return f"poisson_solution_{prec}_prec_chol_{prec_cholesky}_zeta_{zeta:.6f}.csv"
 
 
-def find_csv_files(prec: str, zeta: float | None, data_dir: str) -> list[str]:
+def find_csv_files(
+    prec: str, prec_cholesky: str, zeta: float | None, data_dir: str
+) -> list[str]:
     if zeta is not None:
-        path = os.path.join(data_dir, get_filename(prec, zeta))
+        path = os.path.join(data_dir, get_filename(prec, prec_cholesky, zeta))
         if not os.path.exists(path):
             raise FileNotFoundError(f"CSV not found: {path}")
         return [path]
-    pattern = os.path.join(data_dir, f"poisson_solution_{prec}_prec_zeta_*.csv")
+    pattern = os.path.join(
+        data_dir, f"poisson_solution_{prec}_prec_chol_{prec_cholesky}_zeta_*.csv"
+    )
     files = sorted(glob.glob(pattern))
     if not files:
         raise FileNotFoundError(f"No CSVs matched: {pattern}")
@@ -82,12 +92,14 @@ def plot_contour(path: str, ax: plt.Axes) -> None:
     ax.contour(X, Y, grid, levels=args.levels, colors="k", linewidths=0.4, alpha=0.4)
     plt.colorbar(cf, ax=ax, label=r"$u(x,y)$")
 
-    # parse zeta from filename for the title
+    # parse prec, prec_cholesky, zeta from filename for the title
     base = os.path.basename(path)
     zeta_str = base.split("zeta_")[-1].replace(".csv", "")
     prec_str = base.split("_prec_")[0].split("solution_")[-1]
+    chol_str = base.split("_chol_")[-1].split("_zeta_")[0]
     ax.set_title(
-        rf"Poisson solution  |  {prec_str}  |  $\zeta={zeta_str}$", fontsize=14
+        rf"Poisson solution  |  {prec_str}  |  chol: {chol_str}  |  $\zeta={zeta_str}$",
+        fontsize=14,
     )
     ax.set_xlabel(r"$x$", fontsize=13)
     ax.set_ylabel(r"$y$", fontsize=13)
@@ -96,7 +108,7 @@ def plot_contour(path: str, ax: plt.Axes) -> None:
 
 
 def main() -> None:
-    files = find_csv_files(args.prec, args.zeta, args.data_dir)
+    files = find_csv_files(args.prec, args.prec_cholesky, args.zeta, args.data_dir)
     n = len(files)
     ncols = min(n, 3)
     nrows = (n + ncols - 1) // ncols
@@ -117,7 +129,7 @@ def main() -> None:
         r, c = divmod(idx, ncols)
         axs[r, c].set_visible(False)
 
-    savename = f"poisson_contour_{args.prec}_prec.png"
+    savename = f"poisson_contour_{args.prec}_prec_chol_{args.prec_cholesky}.png"
     plt.savefig(savename, dpi=150)
     print(f"Saved: {savename}")
 

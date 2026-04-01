@@ -404,7 +404,8 @@ void launch_block_jacobi_solver(const poisson_rhs_config<T> &poisson_rhs_cfg,
   // const int Ny = state_dim / Nx;
   std::ostringstream ss;
   ss << "poisson_solution_" << to_string(poisson_cfg.prec) << "_prec"
-     << "_zeta_" << std::fixed << std::setprecision(6)
+     << "_chol_" << to_string(poisson_cfg.prec_cholesky) << "_zeta_"
+     << std::fixed << std::setprecision(6)
      << static_cast<double>(poisson_rhs_cfg.zeta) << ".csv";
   std::ofstream file(ss.str());
   if (!file.is_open()) {

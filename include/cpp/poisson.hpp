@@ -138,6 +138,6 @@ class Poisson {
 };
 
 // Poisson equation solver
-void run_poisson_equation_experiments(Precision prec);
+void run_poisson_equation_experiments(Precision prec, Precision prec_cholesky);
 
 #endif

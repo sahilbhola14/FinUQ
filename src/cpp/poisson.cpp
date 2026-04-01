@@ -161,6 +161,12 @@ void run_block_jacobi_experiments(const poisson_config &poisson_cfg) {
         "Block Jacobi)");
   }
 
+  // Cholesky must be performed at the same or lower precision than the solver
+  // (lower precision = larger urd, i.e. higher enum value)
+  assert(poisson_cfg.prec_cholesky >= poisson_cfg.prec &&
+         "Cholesky precision must have urd >= solver precision urd "
+         "(prec_cholesky must be <= precision of prec)");
+
   // print the header
   std::cout << std::string(50, '=') << std::endl;
   std::cout << std::string(10, '-')
@@ -221,14 +227,13 @@ void run_all_jacobi_experiments(Precision prec,
 }
 
 // Block jacobi experiments all experiments
-void run_all_block_jacobi_experiments(Precision prec,
+void run_all_block_jacobi_experiments(Precision prec, Precision prec_cholesky,
                                       const int num_experiments = 100) {
   // configuration
   poisson_config poisson_cfg;
 
   poisson_cfg.prec = prec;
-  poisson_cfg.prec_cholesky =
-      prec;  // TODO: for mixed-precision, make it smaller
+  poisson_cfg.prec_cholesky = prec_cholesky;
 
   poisson_cfg.num_experiments = num_experiments;
   poisson_cfg.gamma_cfg.prec = prec;        // bound precision
@@ -257,7 +262,7 @@ void run_all_block_jacobi_experiments(Precision prec,
 }
 
 // poisson equation experiments
-void run_poisson_equation_experiments(Precision prec) {
+void run_poisson_equation_experiments(Precision prec, Precision prec_cholesky) {
   // run_all_jacobi_experiments(prec, 1);
-  run_all_block_jacobi_experiments(prec, 1);
+  run_all_block_jacobi_experiments(prec, prec_cholesky, 1);
 }
