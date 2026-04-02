@@ -127,13 +127,13 @@ __global__ void block_jacobi_rhs_kernel(const int N, const T *coeff,
   }
 }
 
-// block jacobi update step kernel
+/* block jacobi update step kernel
+ * 1. solve the linear system in prec_cholesky and save the data in prec
+ */
 template <typename T>
-__global__ void block_jacobi_update_step_kernel(const int num_tiles,
-                                                const int tile_size,
-                                                const T *chol, const T *rhs,
-                                                const T *state, T *state_new,
-                                                Precision prec) {
+__global__ void block_jacobi_update_step_kernel(
+    const int num_tiles, const int tile_size, const T *chol, const T *rhs,
+    const T *state, T *state_new, Precision prec, Precision prec_cholesky) {
   // initialzie
   extern __shared__ char smem_raw[];
   T *smem = reinterpret_cast<T *>(smem_raw);
@@ -148,42 +148,85 @@ __global__ void block_jacobi_update_step_kernel(const int num_tiles,
       chol + t * tile_size * tile_size;  // start of the cholesky factor
 
   // forward solve: L * y = rhs_tile
+  // solve in prec_cholesky and save in precison specified by T
   for (int i = 0; i < tile_size; i++) {
-    T sum = static_cast<T>(0.0);
-    if (prec == Double) {
+    if (prec_cholesky == Double) {
+      // compute rhs
+      double sum = 0.0;
       for (int j = 0; j < i; j++)
-        sum = __dadd_rn(sum, __dmul_rn(L[i * tile_size + j], y[j]));
-      y[i] =
-          __ddiv_rn(__dsub_rn(rhs[tile_start + i], sum), L[i * tile_size + i]);
-    } else if (prec == Single) {
+        sum =
+            __dadd_rn(sum, __dmul_rn(static_cast<double>(L[i * tile_size + j]),
+                                     static_cast<double>(y[j])));
+      // update
+      y[i] = static_cast<T>(
+          __ddiv_rn(__dsub_rn(static_cast<double>(rhs[tile_start + i]), sum),
+                    static_cast<double>(L[i * tile_size + i])));
+
+    } else if (prec_cholesky == Single) {
+      // compute rhs
+      float sum = 0.0f;
       for (int j = 0; j < i; j++)
-        sum = __fadd_rn(sum, __fmul_rn(L[i * tile_size + j], y[j]));
-      y[i] =
-          __fdiv_rn(__fsub_rn(rhs[tile_start + i], sum), L[i * tile_size + i]);
-    } else if (prec == Half) {
+        sum = __fadd_rn(sum, __fmul_rn(static_cast<float>(L[i * tile_size + j]),
+                                       static_cast<float>(y[j])));
+      // update
+      y[i] = static_cast<T>(
+          __fdiv_rn(__fsub_rn(static_cast<float>(rhs[tile_start + i]), sum),
+                    static_cast<float>(L[i * tile_size + i])));
+
+    } else if (prec_cholesky == Half) {
+      // compute rhs
+      half sum = static_cast<half>(0.0f);
       for (int j = 0; j < i; j++)
-        sum = __hadd_rn(sum, __hmul_rn(L[i * tile_size + j], y[j]));
-      y[i] = __hdiv(__hsub_rn(rhs[tile_start + i], sum), L[i * tile_size + i]);
+        sum = __hadd_rn(sum, __hmul_rn(static_cast<half>(L[i * tile_size + j]),
+                                       static_cast<half>(y[j])));
+      // update
+      y[i] = static_cast<T>(
+          __hdiv(__hsub_rn(static_cast<half>(rhs[tile_start + i]), sum),
+                 static_cast<half>(L[i * tile_size + i])));
+
     } else {
       printf("<Cuda Error>: Invalid precision\n");
     }
   }
 
   // backward solve: L^T * c = y
+  // solve in prec_cholesky and save in precison specified by T
   for (int i = tile_size - 1; i >= 0; i--) {
-    T sum = static_cast<T>(0.0);
-    if (prec == Double) {
+    if (prec_cholesky == Double) {
+      double sum = 0.0;
+
       for (int j = i + 1; j < tile_size; j++)
-        sum = __dadd_rn(sum, __dmul_rn(L[j * tile_size + i], c[j]));
-      c[i] = __ddiv_rn(__dsub_rn(y[i], sum), L[i * tile_size + i]);
-    } else if (prec == Single) {
+
+        sum =
+            __dadd_rn(sum, __dmul_rn(static_cast<double>(L[j * tile_size + i]),
+                                     static_cast<double>(c[j])));
+
+      c[i] =
+          static_cast<T>(__ddiv_rn(__dsub_rn(static_cast<double>(y[i]), sum),
+                                   static_cast<double>(L[i * tile_size + i])));
+
+    } else if (prec_cholesky == Single) {
+      float sum = 0.0f;
+
       for (int j = i + 1; j < tile_size; j++)
-        sum = __fadd_rn(sum, __fmul_rn(L[j * tile_size + i], c[j]));
-      c[i] = __fdiv_rn(__fsub_rn(y[i], sum), L[i * tile_size + i]);
-    } else if (prec == Half) {
+
+        sum = __fadd_rn(sum, __fmul_rn(static_cast<float>(L[j * tile_size + i]),
+                                       static_cast<float>(c[j])));
+
+      c[i] =
+          static_cast<T>(__fdiv_rn(__fsub_rn(static_cast<float>(y[i]), sum),
+                                   static_cast<float>(L[i * tile_size + i])));
+
+    } else if (prec_cholesky == Half) {
+      half sum = static_cast<half>(0.0f);
+
       for (int j = i + 1; j < tile_size; j++)
-        sum = __hadd_rn(sum, __hmul_rn(L[j * tile_size + i], c[j]));
-      c[i] = __hdiv(__hsub_rn(y[i], sum), L[i * tile_size + i]);
+        sum = __hadd_rn(sum, __hmul_rn(static_cast<half>(L[j * tile_size + i]),
+                                       static_cast<half>(c[j])));
+
+      c[i] = static_cast<T>(__hdiv(__hsub_rn(static_cast<half>(y[i]), sum),
+                                   static_cast<half>(L[i * tile_size + i])));
+
     } else {
       printf("<Cuda Error>: Invalid precision\n");
     }
@@ -192,11 +235,14 @@ __global__ void block_jacobi_update_step_kernel(const int num_tiles,
   // state update: state_new = state + c
   for (int k = 0; k < tile_size; k++) {
     if (prec == Double) {
-      state_new[tile_start + k] = __dadd_rn(state[tile_start + k], c[k]);
+      state_new[tile_start + k] =
+          __dadd_rn(state[tile_start + k], static_cast<double>(c[k]));
     } else if (prec == Single) {
-      state_new[tile_start + k] = __fadd_rn(state[tile_start + k], c[k]);
+      state_new[tile_start + k] =
+          __fadd_rn(state[tile_start + k], static_cast<float>(c[k]));
     } else if (prec == Half) {
-      state_new[tile_start + k] = __hadd_rn(state[tile_start + k], c[k]);
+      state_new[tile_start + k] =
+          __hadd_rn(state[tile_start + k], static_cast<half>(c[k]));
     } else {
       printf("<Cuda Error>: Invalid precision\n");
     }
@@ -274,15 +320,15 @@ void launch_block_jacobi_sequential_update_step(
 }
 
 // Block Jacobi update step
-// 1. perform the linear system solve for small blocks
+// 1. perform the linear system solve for small blocks in prec_cholesky
 // 2. update x^k+1 = x^k + c, where c is the solution from the linear system
-// solve
+// solve.
 template <typename T>
 void launch_block_jacobi_update_step(
     const int N, const std::vector<Matrix<T>> &cholesky_factors,
     const std::vector<T> &h_rhs, const std::vector<T> &h_state,
-    std::vector<T> &h_state_new, const int blk_jacobi_tile_size,
-    Precision prec) {
+    std::vector<T> &h_state_new, const int blk_jacobi_tile_size, Precision prec,
+    Precision prec_cholesky) {
   // initialization
   const int num_tiles = cholesky_factors.size();
   const int tile_size = blk_jacobi_tile_size;
@@ -317,7 +363,8 @@ void launch_block_jacobi_update_step(
   size_t smem_size = blockDim.x * 2 * tile_size * sizeof(T);
   // kernel launch
   block_jacobi_update_step_kernel<<<gridDim, blockDim, smem_size>>>(
-      num_tiles, tile_size, d_chol, d_rhs, d_state, d_state_new, prec);
+      num_tiles, tile_size, d_chol, d_rhs, d_state, d_state_new, prec,
+      prec_cholesky);
   cudaCheck(cudaGetLastError());
   // device -> host
   cudaCheck(cudaMemcpy(h_state_new.data(), d_state_new, N * sizeof(T),
@@ -354,7 +401,7 @@ void launch_block_jacobi_solver_single_step(
   // (3): block jacobi solve
   launch_block_jacobi_update_step(state_dim, cholesky_factors, h_rhs, h_state,
                                   h_state_new, poisson_cfg.blk_jacobi_tile_size,
-                                  poisson_cfg.prec);
+                                  poisson_cfg.prec, poisson_cfg.prec_cholesky);
 
   // compute relative L2 error: ||x_new - x_old|| / ||x_old||
   double num = 0.0, denom = 0.0;
@@ -367,7 +414,9 @@ void launch_block_jacobi_solver_single_step(
   h_error = std::sqrt(num) / std::sqrt(denom);
 }
 
-// Block Jacobi Solvert
+// Block Jacobi Solver
+// the cholesky factors are stored in higher precision so that when solving the
+// linear system there is no round-off error
 template <typename T>
 void launch_block_jacobi_solver(const poisson_rhs_config<T> &poisson_rhs_cfg,
                                 std::vector<T> &h_coeff,
@@ -394,7 +443,7 @@ void launch_block_jacobi_solver(const poisson_rhs_config<T> &poisson_rhs_cfg,
                                            h_error, poisson_cfg);
     error_history.push_back(h_error);
 
-    if (verbose && k % 10 == 0) {
+    if (verbose && k % 100 == 0) {
       printf("Iter %d | error: %e\n", k, h_error);
     }
 

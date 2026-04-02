@@ -31,8 +31,8 @@ int main(int argc, char **argv) {
     run_all_ode_experiments(Half);
   } else if (experiment == "testing") {
     // run_poisson_equation_experiments(Double);
-    run_poisson_equation_experiments(Single, Single);
-    run_poisson_equation_experiments(Half, Half);
+    // run_poisson_equation_experiments(Single, Single);
+    // run_poisson_equation_experiments(Half, Half);
     run_poisson_equation_experiments(Single, Half);
   }
   return 0;
