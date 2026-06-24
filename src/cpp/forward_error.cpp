@@ -10,6 +10,35 @@
 #include "poisson.hpp"
 #include "prob_model.hpp"
 #include "utils.hpp"
+
+namespace {
+
+Matrix<double> eigen_to_matrix(const Eigen::MatrixXd &src) {
+  Matrix<double> dst;
+  dst.rows = static_cast<size_t>(src.rows());
+  dst.cols = static_cast<size_t>(src.cols());
+  dst.nnz = dst.rows * dst.cols;
+  dst.data.resize(dst.nnz);
+  for (int r = 0; r < src.rows(); r++) {
+    for (int c = 0; c < src.cols(); c++) {
+      dst.data[r * src.cols() + c] = src(r, c);
+    }
+  }
+  return dst;
+}
+
+Eigen::MatrixXd matrix_to_eigen(const Matrix<double> &src) {
+  Eigen::MatrixXd dst(src.rows, src.cols);
+  for (size_t r = 0; r < src.rows; r++) {
+    for (size_t c = 0; c < src.cols; c++) {
+      dst(static_cast<int>(r), static_cast<int>(c)) =
+          src.data[r * src.cols + c];
+    }
+  }
+  return dst;
+}
+
+}  // namespace
 /*
  * compute the dot-product forward error.
  *
@@ -310,14 +339,14 @@ gamma_result compute_bvp_qoi_forward_error_bound(
  * ||R_ii^T||_\infty||R_ii||_\infty) < 1 for all i.
  */
 template <typename T>
-void compute_correction_G_matrix(const std::vector<T> &h_coeff,
-                                 const std::vector<Matrix<T>> &h_chol_factors,
-                                 const poisson_config &poisson_cfg) {
+correction_matrix_result compute_correction_G_matrix(
+    const std::vector<T> &h_coeff, const std::vector<Matrix<T>> &h_chol_factors,
+    const poisson_config &poisson_cfg) {
   const int state_dim = (poisson_cfg.X_res - 2) * (poisson_cfg.Y_res - 2);
   const int tile_size = poisson_cfg.blk_jacobi_tile_size;
   const int num_tiles = state_dim / tile_size;
   if (state_dim <= 0 || tile_size <= 0 || num_tiles <= 0) {
-    return;
+    return {};
   }
   if (static_cast<int>(h_chol_factors.size()) != num_tiles) {
     throw std::invalid_argument(
@@ -347,9 +376,9 @@ void compute_correction_G_matrix(const std::vector<T> &h_coeff,
       get_gamma(tile_size + 1, gamma_cfg_cholesky, one_minus_zeta);
   const gamma_result gamma_factor = gamma_T * gamma_T + 3.0L * gamma_Tp;
 
-  std::vector<Matrix<double>> g_tiles_det(num_tiles);
-  std::vector<Matrix<double>> g_tiles_mprea(num_tiles);
-  std::vector<Matrix<double>> g_tiles_vprea(num_tiles);
+  Eigen::MatrixXd g_det = Eigen::MatrixXd::Zero(state_dim, state_dim);
+  Eigen::MatrixXd g_mprea = Eigen::MatrixXd::Zero(state_dim, state_dim);
+  Eigen::MatrixXd g_vprea = Eigen::MatrixXd::Zero(state_dim, state_dim);
   long double max_condition_det = 0.0L;
   long double max_condition_mprea = 0.0L;
   long double max_condition_vprea = 0.0L;
@@ -387,27 +416,12 @@ void compute_correction_G_matrix(const std::vector<T> &h_coeff,
 
     const Eigen::MatrixXd base_tile =
         a_inv_abs * (r_tile.transpose().cwiseAbs() * r_tile.cwiseAbs());
-
-    auto eigen_to_matrix = [tile_size](const Eigen::MatrixXd &src) {
-      Matrix<double> dst;
-      dst.rows = tile_size;
-      dst.cols = tile_size;
-      dst.nnz = static_cast<size_t>(tile_size) * static_cast<size_t>(tile_size);
-      dst.data.resize(dst.nnz);
-      for (int r = 0; r < tile_size; r++) {
-        for (int c = 0; c < tile_size; c++) {
-          dst.data[r * tile_size + c] = src(r, c);
-        }
-      }
-      return dst;
-    };
-
-    g_tiles_det[t] = eigen_to_matrix(
-        static_cast<double>(gamma_factor.gamma_det) * base_tile);
-    g_tiles_mprea[t] = eigen_to_matrix(
-        static_cast<double>(gamma_factor.gamma_mprea) * base_tile);
-    g_tiles_vprea[t] = eigen_to_matrix(
-        static_cast<double>(gamma_factor.gamma_vprea) * base_tile);
+    g_det.block(tile_start, tile_start, tile_size, tile_size) =
+        static_cast<double>(gamma_factor.gamma_det) * base_tile;
+    g_mprea.block(tile_start, tile_start, tile_size, tile_size) =
+        static_cast<double>(gamma_factor.gamma_mprea) * base_tile;
+    g_vprea.block(tile_start, tile_start, tile_size, tile_size) =
+        static_cast<double>(gamma_factor.gamma_vprea) * base_tile;
   }
 
   if (max_condition_det >= 1.0L || max_condition_mprea >= 1.0L ||
@@ -418,9 +432,79 @@ void compute_correction_G_matrix(const std::vector<T> &h_coeff,
         "must be < 1");
   }
 
-  (void)g_tiles_det;
-  (void)g_tiles_mprea;
-  (void)g_tiles_vprea;
+  correction_matrix_result g(3);
+  g[0] = eigen_to_matrix(g_det);
+  g[1] = eigen_to_matrix(g_mprea);
+  g[2] = eigen_to_matrix(g_vprea);
+  return g;
+}
+
+/*
+ * H = (I - G)^-1 |D^-1| |A|.
+ * I: Identity matrix
+ * G: obtained from compute_correction_G_matrix
+ * D: blkdiag(D_ii), where D_ii is the diagonal block of the h_coeff of
+ * tile_size*tile_size A: h_coeff matrix.
+ */
+template <typename T>
+correction_matrix_result compute_correction_H_matrix(
+    const std::vector<T> &h_coeff, const std::vector<Matrix<T>> &h_chol_factors,
+    const poisson_config &poisson_cfg) {
+  const int state_dim = (poisson_cfg.X_res - 2) * (poisson_cfg.Y_res - 2);
+  const int tile_size = poisson_cfg.blk_jacobi_tile_size;
+  const int num_tiles = state_dim / tile_size;
+  if (state_dim <= 0 || tile_size <= 0 || num_tiles <= 0) {
+    return {};
+  }
+  if (static_cast<int>(h_coeff.size()) != state_dim * state_dim) {
+    throw std::invalid_argument(
+        "h_coeff size must equal the flattened dense coefficient matrix size");
+  }
+
+  const correction_matrix_result g =
+      compute_correction_G_matrix(h_coeff, h_chol_factors, poisson_cfg);
+  if (g.size() != 3) {
+    throw std::runtime_error(
+        "compute_correction_G_matrix must return 3 matrices");
+  }
+  const Eigen::MatrixXd g_det = matrix_to_eigen(g[0]);
+  const Eigen::MatrixXd g_mprea = matrix_to_eigen(g[1]);
+  const Eigen::MatrixXd g_vprea = matrix_to_eigen(g[2]);
+
+  Eigen::MatrixXd a_abs(state_dim, state_dim);
+  for (int r = 0; r < state_dim; r++) {
+    for (int c = 0; c < state_dim; c++) {
+      a_abs(r, c) = std::abs(static_cast<double>(h_coeff[r * state_dim + c]));
+    }
+  }
+
+  Eigen::MatrixXd d_inv_abs_a = Eigen::MatrixXd::Zero(state_dim, state_dim);
+  for (int t = 0; t < num_tiles; t++) {
+    const int tile_start = t * tile_size;
+    Eigen::MatrixXd d_tile(tile_size, tile_size);
+    for (int r = 0; r < tile_size; r++) {
+      for (int c = 0; c < tile_size; c++) {
+        d_tile(r, c) = static_cast<double>(
+            h_coeff[(tile_start + r) * state_dim + (tile_start + c)]);
+      }
+    }
+    const Eigen::MatrixXd d_inv_abs = d_tile.inverse().cwiseAbs();
+    d_inv_abs_a.block(tile_start, 0, tile_size, state_dim) =
+        d_inv_abs * a_abs.block(tile_start, 0, tile_size, state_dim);
+  }
+
+  const Eigen::MatrixXd i_minus_g_det =
+      Eigen::MatrixXd::Identity(state_dim, state_dim) - g_det;
+  const Eigen::MatrixXd i_minus_g_mprea =
+      Eigen::MatrixXd::Identity(state_dim, state_dim) - g_mprea;
+  const Eigen::MatrixXd i_minus_g_vprea =
+      Eigen::MatrixXd::Identity(state_dim, state_dim) - g_vprea;
+
+  correction_matrix_result h(3);
+  h[0] = eigen_to_matrix(i_minus_g_det.inverse() * d_inv_abs_a);
+  h[1] = eigen_to_matrix(i_minus_g_mprea.inverse() * d_inv_abs_a);
+  h[2] = eigen_to_matrix(i_minus_g_vprea.inverse() * d_inv_abs_a);
+  return h;
 }
 
 /* template initialization */
@@ -447,12 +531,22 @@ template gamma_result compute_bvp_qoi_forward_error_bound<half>(
     const int, const int, const std::vector<half> &,
     const std::vector<gamma_result> &, const gamma_config &, bool);
 
-template void compute_correction_G_matrix(const std::vector<double> &,
-                                          const std::vector<Matrix<double>> &,
-                                          const poisson_config &);
-template void compute_correction_G_matrix(const std::vector<float> &,
-                                          const std::vector<Matrix<float>> &,
-                                          const poisson_config &);
-template void compute_correction_G_matrix(const std::vector<half> &,
-                                          const std::vector<Matrix<half>> &,
-                                          const poisson_config &);
+template correction_matrix_result compute_correction_G_matrix(
+    const std::vector<double> &, const std::vector<Matrix<double>> &,
+    const poisson_config &);
+template correction_matrix_result compute_correction_G_matrix(
+    const std::vector<float> &, const std::vector<Matrix<float>> &,
+    const poisson_config &);
+template correction_matrix_result compute_correction_G_matrix(
+    const std::vector<half> &, const std::vector<Matrix<half>> &,
+    const poisson_config &);
+
+template correction_matrix_result compute_correction_H_matrix(
+    const std::vector<double> &, const std::vector<Matrix<double>> &,
+    const poisson_config &);
+template correction_matrix_result compute_correction_H_matrix(
+    const std::vector<float> &, const std::vector<Matrix<float>> &,
+    const poisson_config &);
+template correction_matrix_result compute_correction_H_matrix(
+    const std::vector<half> &, const std::vector<Matrix<half>> &,
+    const poisson_config &);

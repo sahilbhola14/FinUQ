@@ -17,6 +17,8 @@ struct forward_error_result {
     std::vector<gamma_result> forward_error_bound; // forward error
 };
 
+using correction_matrix_result = std::vector<Matrix<double>>;
+
 /* dot product forward error */
 void compute_sequential_dot_product_forward_error(double result, double result_true, double *forward_error);
 gamma_result compute_sequential_dot_product_forward_error_bound(const int vector_size, double result_true, double result_true_abs, const gamma_config &gamma_cfg, bool verbose=false);;
@@ -55,6 +57,15 @@ gamma_result compute_bvp_qoi_forward_error_bound(
 
 // compute correction G matrix
 template <typename T>
-void compute_correction_G_matrix(const std::vector<T> &h_coeff, const std::vector<Matrix<T>> &h_chol_factors, const poisson_config &poisson_cfg);
+correction_matrix_result compute_correction_G_matrix(
+    const std::vector<T> &h_coeff,
+    const std::vector<Matrix<T>> &h_chol_factors,
+    const poisson_config &poisson_cfg);
+
+template <typename T>
+correction_matrix_result compute_correction_H_matrix(
+    const std::vector<T> &h_coeff,
+    const std::vector<Matrix<T>> &h_chol_factors,
+    const poisson_config &poisson_cfg);
 
 #endif
