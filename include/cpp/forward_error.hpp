@@ -82,6 +82,12 @@ compute_block_jacobi_bound_coefficients(
     const std::vector<Matrix<T>> &h_chol_factors,
     const poisson_config &poisson_cfg);
 
+template <typename T>
+correction_matrix_result compute_block_jacobi_P_matrix(
+    const std::vector<T> &h_coeff,
+    const std::vector<Matrix<T>> &h_chol_factors,
+    const poisson_config &poisson_cfg);
+
 
 
 #endif

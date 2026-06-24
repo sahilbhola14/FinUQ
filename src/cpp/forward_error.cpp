@@ -590,15 +590,52 @@ block_jacobi_bound_coefficients_result compute_block_jacobi_bound_coefficients(
 
 /*
  * P = \beta_s (I + \alpha_s H)
- * \beta_s : obtained from compute_block_jacobi_constants
+ * I: Identity matrix
+ * H: obtained from compute_correction_H_matrix
  * \alpha_s: obtained from compute_block_jacobi_constants
+ * \beta_s : obtained from compute_block_jacobi_constants
  * \eta_s: obtained from compute_block_jacobi_constants
  */
-// template <typename T>
-// correction_matrix_result compute_block_jacobi_P_matrix(const std::vector<T>
-// &h_coeff, const std::vector<Matrix<T>> &h_chol_factors,
-//     const poisson_config &poisson_cfg) {
-// }
+template <typename T>
+correction_matrix_result compute_block_jacobi_P_matrix(
+    const std::vector<T> &h_coeff, const std::vector<Matrix<T>> &h_chol_factors,
+    const poisson_config &poisson_cfg) {
+  const int state_dim = (poisson_cfg.X_res - 2) * (poisson_cfg.Y_res - 2);
+  if (state_dim <= 0) {
+    return {};
+  }
+
+  const correction_matrix_result h =
+      compute_correction_H_matrix(h_coeff, h_chol_factors, poisson_cfg);
+  if (h.size() != 3) {
+    throw std::runtime_error(
+        "compute_correction_H_matrix must return three correction matrices");
+  }
+
+  const block_jacobi_bound_coefficients_result coeffs =
+      compute_block_jacobi_bound_coefficients(h_coeff, h_chol_factors,
+                                              poisson_cfg);
+  const Eigen::MatrixXd identity =
+      Eigen::MatrixXd::Identity(state_dim, state_dim);
+
+  correction_matrix_result p(3);
+  const long double alpha_values[3] = {coeffs.alpha_s.gamma_det,
+                                       coeffs.alpha_s.gamma_mprea,
+                                       coeffs.alpha_s.gamma_vprea};
+  const long double beta_values[3] = {coeffs.beta_s.gamma_det,
+                                      coeffs.beta_s.gamma_mprea,
+                                      coeffs.beta_s.gamma_vprea};
+
+  for (int i = 0; i < 3; i++) {
+    const Eigen::MatrixXd h_i = matrix_to_eigen(h[i]);
+    const Eigen::MatrixXd p_i =
+        static_cast<double>(beta_values[i]) *
+        (identity + static_cast<double>(alpha_values[i]) * h_i);
+    p[i] = eigen_to_matrix(p_i);
+  }
+
+  return p;
+}
 
 /* template initialization */
 template gamma_result compute_bvp_state_integral_forward_error_bound<double>(
@@ -656,3 +693,13 @@ template block_jacobi_bound_coefficients_result
 compute_block_jacobi_bound_coefficients(const std::vector<half> &,
                                         const std::vector<Matrix<half>> &,
                                         const poisson_config &);
+
+template correction_matrix_result compute_block_jacobi_P_matrix(
+    const std::vector<double> &, const std::vector<Matrix<double>> &,
+    const poisson_config &);
+template correction_matrix_result compute_block_jacobi_P_matrix(
+    const std::vector<float> &, const std::vector<Matrix<float>> &,
+    const poisson_config &);
+template correction_matrix_result compute_block_jacobi_P_matrix(
+    const std::vector<half> &, const std::vector<Matrix<half>> &,
+    const poisson_config &);
