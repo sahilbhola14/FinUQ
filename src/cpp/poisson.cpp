@@ -83,7 +83,9 @@ void run_block_jacobi_experiments_fixed_discretization(
         compute_cholesky_per_jacobi_tile(h_coeff, poisson_cfg);
     // compute correction G matrix
     // compute_correction_G_matrix(h_coeff, h_chol_factors, poisson_cfg);
-    compute_correction_H_matrix(h_coeff, h_chol_factors, poisson_cfg);
+    // compute_correction_H_matrix(h_coeff, h_chol_factors, poisson_cfg);
+    compute_block_jacobi_bound_coefficients(h_coeff, h_chol_factors,
+                                            poisson_cfg);
 
     // launch_block_jacobi_solver(poisson_rhs_cfg, h_coeff, h_state_initial,
     //                            poisson_cfg, true);

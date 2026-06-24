@@ -19,6 +19,12 @@ struct forward_error_result {
 
 using correction_matrix_result = std::vector<Matrix<double>>;
 
+struct block_jacobi_bound_coefficients_result {
+    gamma_result alpha_s;
+    gamma_result beta_s;
+    gamma_result eta_s;
+};
+
 /* dot product forward error */
 void compute_sequential_dot_product_forward_error(double result, double result_true, double *forward_error);
 gamma_result compute_sequential_dot_product_forward_error_bound(const int vector_size, double result_true, double result_true_abs, const gamma_config &gamma_cfg, bool verbose=false);;
@@ -62,10 +68,20 @@ correction_matrix_result compute_correction_G_matrix(
     const std::vector<Matrix<T>> &h_chol_factors,
     const poisson_config &poisson_cfg);
 
+// compute correction H matrix
 template <typename T>
 correction_matrix_result compute_correction_H_matrix(
     const std::vector<T> &h_coeff,
     const std::vector<Matrix<T>> &h_chol_factors,
     const poisson_config &poisson_cfg);
+
+template <typename T>
+block_jacobi_bound_coefficients_result
+compute_block_jacobi_bound_coefficients(
+    const std::vector<T> &h_coeff,
+    const std::vector<Matrix<T>> &h_chol_factors,
+    const poisson_config &poisson_cfg);
+
+
 
 #endif

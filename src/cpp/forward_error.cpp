@@ -9,6 +9,7 @@
 #include "backward_error.hpp"
 #include "poisson.hpp"
 #include "prob_model.hpp"
+#include "rounding_error_model.cuh"
 #include "utils.hpp"
 
 namespace {
@@ -507,6 +508,98 @@ correction_matrix_result compute_correction_H_matrix(
   return h;
 }
 
+/*
+ * \alpha_s: (1 + u_c)*(1 + u_s + \gamma_{m;s} + u_s * \gamma_{m;s} +
+ * u_s*\gamma_m;s}) \beta_s : (1 + u_s) \eta_s: (1 + u_c) * (1 + u_s) * (1 +
+ * u_s) u_s: unit roundoff for prec in poisson_cfg u_c: unit roundoff for
+ * prec_cholesky in poissoncfg
+ *
+ */
+template <typename T>
+block_jacobi_bound_coefficients_result compute_block_jacobi_bound_coefficients(
+    const std::vector<T> &h_coeff, const std::vector<Matrix<T>> &h_chol_factors,
+    const poisson_config &poisson_cfg) {
+  const int state_dim = (poisson_cfg.X_res - 2) * (poisson_cfg.Y_res - 2);
+  const int tile_size = poisson_cfg.blk_jacobi_tile_size;
+  if (state_dim <= 0 || tile_size <= 0) {
+    return {};
+  }
+  const int num_tiles = state_dim / tile_size;
+  if (num_tiles <= 0) {
+    return {};
+  }
+  if (static_cast<int>(h_chol_factors.size()) != num_tiles) {
+    throw std::invalid_argument(
+        "h_chol_factors size must match the number of block Jacobi tiles");
+  }
+  if (static_cast<int>(h_coeff.size()) != state_dim * state_dim) {
+    throw std::invalid_argument(
+        "h_coeff size must equal the flattened dense coefficient matrix size");
+  }
+
+  const long long state_dim_ll = static_cast<long long>(state_dim);
+  const long long tile_size_ll = static_cast<long long>(tile_size);
+  const long long per_iteration_bounds =
+      (state_dim_ll * tile_size_ll * tile_size_ll) / 6LL +
+      (3LL * state_dim_ll * tile_size_ll) / 2LL + (4LL * state_dim_ll) / 3LL +
+      state_dim_ll * state_dim_ll + 1LL;
+  const long long number_of_bounds =
+      static_cast<long long>(poisson_cfg.max_iter + 1) * per_iteration_bounds;
+  long double one_minus_zeta = compute_individual_bound_one_minus_zeta(
+      static_cast<int>(number_of_bounds), poisson_cfg.gamma_cfg.confidence);
+
+  const int matvec_tile_size = poisson_cfg.blk_jacobi_matvect_tile_size;
+  if (matvec_tile_size <= 0) {
+    throw std::invalid_argument(
+        "blk_jacobi_matvect_tile_size must be positive");
+  }
+
+  const int m = matvec_tile_size + state_dim / matvec_tile_size;
+
+  const gamma_result gamma_ms =
+      get_gamma(m, poisson_cfg.gamma_cfg, one_minus_zeta);
+  const long double u_s =
+      static_cast<long double>(compute_unit_roundoff(poisson_cfg.prec));
+  const long double u_c = static_cast<long double>(
+      compute_unit_roundoff(poisson_cfg.prec_cholesky));
+
+  const long double one_plus_u_s = 1.0L + u_s;
+  const long double one_plus_u_c = 1.0L + u_c;
+
+  block_jacobi_bound_coefficients_result result;
+
+  // alpha coefficient
+  result.alpha_s = {
+      gamma_ms.n,
+      one_plus_u_c * (one_plus_u_s + gamma_ms.gamma_det +
+                      u_s * gamma_ms.gamma_det + u_s * gamma_ms.gamma_det),
+      one_plus_u_c * (one_plus_u_s + gamma_ms.gamma_mprea +
+                      u_s * gamma_ms.gamma_mprea + u_s * gamma_ms.gamma_mprea),
+      one_plus_u_c * (one_plus_u_s + gamma_ms.gamma_vprea +
+                      u_s * gamma_ms.gamma_vprea + u_s * gamma_ms.gamma_vprea)};
+
+  // beta coefficient
+  result.beta_s = {0, one_plus_u_s, one_plus_u_s, one_plus_u_s};
+
+  // eta coefficient
+  const long double eta_scalar = one_plus_u_c * one_plus_u_s * one_plus_u_s;
+  result.eta_s = {0, eta_scalar, eta_scalar, eta_scalar};
+
+  return result;
+}
+
+/*
+ * P = \beta_s (I + \alpha_s H)
+ * \beta_s : obtained from compute_block_jacobi_constants
+ * \alpha_s: obtained from compute_block_jacobi_constants
+ * \eta_s: obtained from compute_block_jacobi_constants
+ */
+// template <typename T>
+// correction_matrix_result compute_block_jacobi_P_matrix(const std::vector<T>
+// &h_coeff, const std::vector<Matrix<T>> &h_chol_factors,
+//     const poisson_config &poisson_cfg) {
+// }
+
 /* template initialization */
 template gamma_result compute_bvp_state_integral_forward_error_bound<double>(
     const int, const int, const std::vector<double> &,
@@ -550,3 +643,16 @@ template correction_matrix_result compute_correction_H_matrix(
 template correction_matrix_result compute_correction_H_matrix(
     const std::vector<half> &, const std::vector<Matrix<half>> &,
     const poisson_config &);
+
+template block_jacobi_bound_coefficients_result
+compute_block_jacobi_bound_coefficients(const std::vector<double> &,
+                                        const std::vector<Matrix<double>> &,
+                                        const poisson_config &);
+template block_jacobi_bound_coefficients_result
+compute_block_jacobi_bound_coefficients(const std::vector<float> &,
+                                        const std::vector<Matrix<float>> &,
+                                        const poisson_config &);
+template block_jacobi_bound_coefficients_result
+compute_block_jacobi_bound_coefficients(const std::vector<half> &,
+                                        const std::vector<Matrix<half>> &,
+                                        const poisson_config &);

@@ -282,11 +282,11 @@ void print_gamma(const gamma_result &gamma_res, bool flat) {
            static_cast<double>(gamma_res.gamma_mprea),
            static_cast<double>(gamma_res.gamma_vprea));
   } else {
-    std::cout << "Deterministic: " << std::scientific << std::setprecision(3)
+    std::cout << "Deterministic: " << std::scientific << std::setprecision(10)
               << gamma_res.gamma_det << std::endl;
-    std::cout << "Mean-informed: " << std::scientific << std::setprecision(3)
+    std::cout << "Mean-informed: " << std::scientific << std::setprecision(10)
               << gamma_res.gamma_mprea << std::endl;
-    std::cout << "Varinance-informed: " << std::setprecision(3)
+    std::cout << "Varinance-informed: " << std::setprecision(10)
               << gamma_res.gamma_vprea << std::endl;
   }
 }
