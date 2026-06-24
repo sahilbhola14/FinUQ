@@ -4,6 +4,11 @@
 #include <vector>
 #include "gamma.hpp"
 
+template <typename T>
+struct Matrix;
+
+struct poisson_config;
+
 /* forward error results */
 struct forward_error_result {
     int n; //  characteristic dimension
@@ -48,5 +53,8 @@ gamma_result compute_bvp_qoi_forward_error_bound(
     bool verbose=false
     );
 
+// compute correction G matrix
+template <typename T>
+void compute_correction_G_matrix(const std::vector<T> &h_coeff, const std::vector<Matrix<T>> &h_chol_factors, const poisson_config &poisson_cfg);
 
 #endif
