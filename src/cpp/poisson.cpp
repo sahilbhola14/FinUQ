@@ -78,26 +78,13 @@ void run_block_jacobi_experiments_fixed_discretization(
     std::vector<T> h_coeff = poisson.get_coefficient_matrix();
     // initial state
     std::vector<T> h_state_initial = poisson.get_initial_state();
-    // // cholesky decomp
-    // std::vector<Matrix<T>> chol_factors =
-    //     compute_cholesky_per_jacobi_tile(h_coeff, poisson_cfg);
+    // cholesky decomp
+    std::vector<Matrix<T>> chol_factors =
+        compute_cholesky_per_jacobi_tile(h_coeff, poisson_cfg);
 
-    launch_block_jacobi_solver(poisson_rhs_cfg, h_coeff, h_state_initial,
-                               poisson_cfg, true);
+    // launch_block_jacobi_solver(poisson_rhs_cfg, h_coeff, h_state_initial,
+    //                            poisson_cfg, true);
 
-    // // print chol_factors
-    // std::cout << std::scientific << std::setprecision(4);
-    // for (int t = 0; t < static_cast<int>(chol_factors.size()); t++) {
-    //   const Matrix<T> &L = chol_factors[t];
-    //   std::cout << "Tile " << t << " L (" << L.rows << "x" << L.cols <<
-    //   "):\n"; for (int r = 0; r < static_cast<int>(L.rows); r++) {
-    //     for (int c = 0; c < static_cast<int>(L.cols); c++) {
-    //       std::cout << std::setw(14) << static_cast<double>(L.data[r * L.cols
-    //       + c]);
-    //     }
-    //     std::cout << "\n";
-    //   }
-    // }
     // // run the jacobi solver(s)
     // launch_jacobi_solver<T>(poisson_rhs_cfg, h_coeff, h_state_initial,
     //                         poisson_cfg.prec, poisson_cfg.etol,
@@ -173,6 +160,8 @@ void run_block_jacobi_experiments(const poisson_config &poisson_cfg) {
             << " Block Jacobi solver for Poisson equation config "
             << std::string(10, '-') << std::endl;
   print_poisson_config(poisson_cfg);
+  std::cout << "Cholesky precision: " << to_string(poisson_cfg.prec_cholesky)
+            << std::endl;
   std::cout << "Block Jacobi Tile size: " << poisson_cfg.blk_jacobi_tile_size
             << std::endl;
   std::cout << "Block Jacobi Mat-vec Tile size: "
@@ -235,8 +224,9 @@ void run_all_block_jacobi_experiments(Precision prec, Precision prec_cholesky,
   poisson_cfg.prec = prec;
   poisson_cfg.prec_cholesky = prec_cholesky;
 
-  poisson_cfg.num_experiments = num_experiments;
-  poisson_cfg.gamma_cfg.prec = prec;        // bound precision
+  poisson_cfg.num_experiments =
+      num_experiments;                // number of times the rhs is sampled
+  poisson_cfg.gamma_cfg.prec = prec;  // bound precision
   poisson_cfg.gamma_cfg.confidence = 0.99;  // overall confidence
   // std::vector <int> block_jacobi_tile_sizes = {4, 8, 16, 32};
   std::vector<int> block_jacobi_tile_sizes = {4};

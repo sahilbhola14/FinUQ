@@ -1,9 +1,10 @@
 #ifndef UTILS_HPP
 #define UTILS_HPP
 
-#include <vector>
+#include <iomanip>
 #include <iostream>
 #include <string>
+#include <vector>
 #include <cuda_fp16.h>
 #include "definition.hpp"
 #include "gamma.hpp"
@@ -83,6 +84,24 @@ std::vector<Matrix<double>> load_matrices_bin(const std::string& filename);
 std::vector<Matrix<double>> get_matrix_market_data(std::string filename="square_matrices.bin");
 template <typename T>
 void copy_matrix_and_convert_precision(const Matrix<double> &source, Matrix<T> &target);
+
+template <typename T>
+inline void print_matrix(const Matrix<T> &M, const std::string &label = "") {
+  if (!label.empty()) std::cout << label << " (" << M.rows << "x" << M.cols << "):\n";
+  std::cout << std::scientific << std::setprecision(4);
+  for (size_t r = 0; r < M.rows; r++) {
+    for (size_t c = 0; c < M.cols; c++)
+      std::cout << std::setw(14) << static_cast<double>(M.data[r * M.cols + c]);
+    std::cout << "\n";
+  }
+}
+
+template <typename T>
+inline void print_tiles(const std::vector<Matrix<T>> &tiles,
+                        const std::string &label = "Tile") {
+  for (size_t t = 0; t < tiles.size(); t++)
+    print_matrix(tiles[t], label + " " + std::to_string(t) + " L");
+}
 
 /* template initialization */
 template struct Matrix<double>;
