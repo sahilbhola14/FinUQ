@@ -29,6 +29,9 @@ struct poisson_config {
 };
 
 // Poisson class
+// Implement \nabla^2 u - \zeta u = f
+// f: forcing term. Considerred as 0
+// \zeta: random parameter
 template <typename T>
 class Poisson {
  private:
@@ -49,7 +52,7 @@ class Poisson {
   T get_diagonal_coefficient() const {
     T inv_dx_sq = get_inv_dx_sq();
     T inv_dy_sq = get_inv_dy_sq();
-    return static_cast<T>(2.0) * (inv_dx_sq + inv_dy_sq);
+    return static_cast<T>(2.0) * (inv_dx_sq + inv_dy_sq) + zeta;
   }
 
   T get_horizontal_offdiagonal_coefficient() const {
@@ -62,23 +65,23 @@ class Poisson {
   }
 
   // rhs eval plus top boundary condition contribution
-  std::vector<T> eval_rhs_host(const std::vector<T> &state) const {
+  std::vector<T> eval_rhs_host() const {
     const int n = get_state_dim();
     std::vector<T> rhs(n);
-    poisson_rhs_config<T> poisson_rhs_cfg = get_rhs_config();
-    eval_rhs(poisson_rhs_cfg, state.data(), rhs.data());
+    poisson_solver_config<T> poisson_solver_cfg = get_solver_config();
+    eval_rhs(poisson_solver_cfg, rhs.data());
     return rhs;
   }
 
  public:
   const int Nx;   // number of internal points in x direction
   const int Ny;   // number of internal points in y direction
-  const T zeta;   // zeta value for the rhs
+  const T zeta;   // zeta value for the solve configuration
 
   Poisson(const poisson_config &cfg, const T zeta)
       : Nx(cfg.X_res - 2), Ny(cfg.Y_res - 2), zeta(zeta) {
-    if (zeta <= static_cast<T>(0.0)) {
-      throw std::invalid_argument("zeta must be greater than 0");
+    if (zeta < static_cast<T>(0.0)) {
+      throw std::invalid_argument("zeta must be nonnegative");
     }
   }
 
@@ -88,7 +91,9 @@ class Poisson {
     return std::vector<T>(get_state_dim(), static_cast<T>(1.0));
   }
 
-  poisson_rhs_config<T> get_rhs_config() const {
+  std::vector<T> get_rhs() const { return eval_rhs_host(); }
+
+  poisson_solver_config<T> get_solver_config() const {
     return {zeta, get_inv_dy_sq(), Nx, get_state_dim()};
   }
 
@@ -130,8 +135,8 @@ class Poisson {
     }
   }
 
-  void print_rhs(const std::vector<T> &state) const {
-    for (auto &a : eval_rhs_host(state)) {
+  void print_rhs() const {
+    for (auto &a : eval_rhs_host()) {
       std::cout << static_cast<double>(a) << std::endl;
     }
   }

@@ -59,16 +59,14 @@ __global__ void launch_jacobi_solver_single_step_kernel(const int state_dim,
 template <typename T>
 void launch_jacobi_solver_single_step(
     std::vector<T> &h_coeff, std::vector<T> &h_state,
-    std::vector<T> &h_state_new, const poisson_rhs_config<T> &poisson_rhs_cfg,
-    double &h_error, Precision prec, bool verbose = false) {
+    std::vector<T> &h_state_new, std::vector<T> &h_rhs,
+    const poisson_solver_config<T> &poisson_solver_cfg, double &h_error,
+    Precision prec, bool verbose = false) {
   // initialize
-  const int state_dim = poisson_rhs_cfg.state_dim;
+  const int state_dim = poisson_solver_cfg.state_dim;
   int size = state_dim * sizeof(T);
   int size_mat = state_dim * state_dim * sizeof(T);
   T *d_coeff, *d_state, *d_state_new, *d_rhs;
-
-  std::vector<T> h_rhs(state_dim);
-  eval_rhs(poisson_rhs_cfg, h_state.data(), h_rhs.data());
 
   // memory allocation
   cudaCheck(cudaMalloc((void **)&d_coeff, size_mat));
@@ -114,18 +112,19 @@ void launch_jacobi_solver_single_step(
 }
 
 template <typename T>
-void launch_jacobi_solver(const poisson_rhs_config<T> &poisson_rhs_cfg,
-                          std::vector<T> &h_coeff, std::vector<T> &h_state,
-                          Precision prec, const double etol, const int max_iter,
+void launch_jacobi_solver(std::vector<T> &h_coeff, std::vector<T> &h_state,
+                          std::vector<T> &h_rhs, Precision prec,
+                          const double etol, const int max_iter,
+                          const poisson_solver_config<T> &poisson_solver_cfg,
                           bool verbose) {
-  const int state_dim = poisson_rhs_cfg.state_dim;
+  const int state_dim = poisson_solver_cfg.state_dim;
   std::vector<T> h_state_new(state_dim);
   double h_error = 2.0 * etol;  // ensure at least one iteration
 
   int k = 0;
   for (; k < max_iter && h_error > etol; k++) {
-    launch_jacobi_solver_single_step(h_coeff, h_state, h_state_new,
-                                     poisson_rhs_cfg, h_error, prec);
+    launch_jacobi_solver_single_step(h_coeff, h_state, h_state_new, h_rhs,
+                                     poisson_solver_cfg, h_error, prec);
     if (verbose && k % 10 == 0) {
       printf("Iter %d | error: %e\n", k, h_error);
     }
@@ -135,12 +134,12 @@ void launch_jacobi_solver(const poisson_rhs_config<T> &poisson_rhs_cfg,
   // Note: due to swapping, after the convergence: h_state is the final answer.
 
   // save solution to csv: columns = i_x, i_y, value
-  const int Nx = poisson_rhs_cfg.Nx;
-  // const int Ny = state_dim / Nx;
+  const int Nx = poisson_solver_cfg.Nx;
+  const int Ny = state_dim / Nx;
   std::ostringstream ss;
   ss << "poisson_solution_" << to_string(prec) << "_prec"
      << "_zeta_" << std::fixed << std::setprecision(6)
-     << static_cast<double>(poisson_rhs_cfg.zeta) << ".csv";
+     << static_cast<double>(poisson_solver_cfg.zeta) << ".csv";
   std::ofstream file(ss.str());
   if (!file.is_open()) {
     std::cerr << "Error: could not open file " << ss.str() << "\n";
@@ -161,15 +160,13 @@ void launch_jacobi_solver(const poisson_rhs_config<T> &poisson_rhs_cfg,
 }
 
 // explicit instantiations
-template void launch_jacobi_solver<double>(const poisson_rhs_config<double> &,
-                                           std::vector<double> &,
-                                           std::vector<double> &, Precision,
-                                           const double, const int, bool);
-template void launch_jacobi_solver<float>(const poisson_rhs_config<float> &,
-                                          std::vector<float> &,
-                                          std::vector<float> &, Precision,
-                                          const double, const int, bool);
-template void launch_jacobi_solver<half>(const poisson_rhs_config<half> &,
-                                         std::vector<half> &,
-                                         std::vector<half> &, Precision,
-                                         const double, const int, bool);
+template void launch_jacobi_solver<double>(
+    std::vector<double> &, std::vector<double> &, std::vector<double> &,
+    Precision, const double, const int, const poisson_solver_config<double> &,
+    bool);
+template void launch_jacobi_solver<float>(
+    std::vector<float> &, std::vector<float> &, std::vector<float> &, Precision,
+    const double, const int, const poisson_solver_config<float> &, bool);
+template void launch_jacobi_solver<half>(
+    std::vector<half> &, std::vector<half> &, std::vector<half> &, Precision,
+    const double, const int, const poisson_solver_config<half> &, bool);

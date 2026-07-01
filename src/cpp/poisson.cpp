@@ -42,21 +42,24 @@ void run_jacobi_experiments_fixed_discretization(
   // sample the zeta values
   std::vector<T> zeta_vals(poisson_cfg.num_experiments);
   std::mt19937 gen(/*seed=*/42);
-  sample_uniform_distribution(zeta_vals, 0.0, 1.0, gen);
+  sample_uniform_distribution(zeta_vals, 0.0, 0.0, gen);
 
   // run the experiment
   for (int i = 0; i < poisson_cfg.num_experiments; i++) {
     // initialize the poisson object
     Poisson<T> poisson(poisson_cfg, zeta_vals[i]);
-    poisson_rhs_config<T> poisson_rhs_cfg = poisson.get_rhs_config();
+    // rhs
+    std::vector<T> h_rhs = poisson.get_rhs();
     // coeffient matrix
     std::vector<T> h_coeff = poisson.get_coefficient_matrix();
     // initial state
     std::vector<T> h_state_initial = poisson.get_initial_state();
+    // solver config
+    poisson_solver_config<T> poisson_solver_cfg = poisson.get_solver_config();
     // jacobi solver
-    launch_jacobi_solver<T>(poisson_rhs_cfg, h_coeff, h_state_initial,
-                            poisson_cfg.prec, poisson_cfg.etol,
-                            poisson_cfg.max_iter, true);
+    launch_jacobi_solver<T>(h_coeff, h_state_initial, h_rhs, poisson_cfg.prec,
+                            poisson_cfg.etol, poisson_cfg.max_iter,
+                            poisson_solver_cfg, true);
   }
 }
 
@@ -73,19 +76,24 @@ void run_block_jacobi_experiments_fixed_discretization(
   for (int i = 0; i < poisson_cfg.num_experiments; i++) {
     // initialize the poisson object
     Poisson<T> poisson(poisson_cfg, zeta_vals[i]);
-    poisson_rhs_config<T> poisson_rhs_cfg = poisson.get_rhs_config();
-    // coeffient matrix
+    // rhs
+    std::vector<T> h_rhs = poisson.get_rhs();
+    // coefficient matrix
     std::vector<T> h_coeff = poisson.get_coefficient_matrix();
-    // initial state
-    std::vector<T> h_state_initial = poisson.get_initial_state();
+    // // initial state
+    // std::vector<T> h_state_initial = poisson.get_initial_state();
+    // poisson.print_coefficient_matrix();
     // cholesky decomp
-    std::vector<Matrix<T>> h_chol_factors =
-        compute_cholesky_per_jacobi_tile(h_coeff, poisson_cfg);
+    // std::vector<Matrix<T>> h_chol_factors =
+    //     compute_cholesky_per_jacobi_tile(h_coeff, poisson_cfg);
     // compute correction G matrix
     // compute_correction_G_matrix(h_coeff, h_chol_factors, poisson_cfg);
     // compute_correction_H_matrix(h_coeff, h_chol_factors, poisson_cfg);
-    compute_block_jacobi_bound_coefficients(h_coeff, h_chol_factors,
-                                            poisson_cfg);
+    // compute_block_jacobi_bound_coefficients(h_coeff, h_chol_factors,
+    //                                         poisson_cfg);
+    //
+    // compute_block_jacobi_forcing_vector(h_coeff, h_chol_factors,
+    // poisson_cfg);
 
     // launch_block_jacobi_solver(poisson_rhs_cfg, h_coeff, h_state_initial,
     //                            poisson_cfg, true);
@@ -258,6 +266,6 @@ void run_all_block_jacobi_experiments(Precision prec, Precision prec_cholesky,
 
 // poisson equation experiments
 void run_poisson_equation_experiments(Precision prec, Precision prec_cholesky) {
-  // run_all_jacobi_experiments(prec, 1);
-  run_all_block_jacobi_experiments(prec, prec_cholesky, 1);
+  run_all_jacobi_experiments(prec, 1);
+  // run_all_block_jacobi_experiments(prec, prec_cholesky, 1);
 }
