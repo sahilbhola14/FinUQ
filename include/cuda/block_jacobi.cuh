@@ -10,11 +10,10 @@
 /* block jacobi solver
  */
 template <typename T>
-void launch_block_jacobi_solver(const poisson_rhs_config<T> &poisson_rhs_cfg,
-                                std::vector<T> &h_coeff,
-                                std::vector<T> &h_state_initial,
-                                const poisson_config &poisson_cfg,
-                                bool verbose = false);
+void launch_block_jacobi_solver(
+    std::vector<T> &h_coeff, std::vector<T> &h_state_initial,
+    std::vector<T> &h_rhs, const poisson_config &poisson_cfg,
+    const poisson_solver_config<T> &poisson_solver_cfg, bool verbose = false);
 
 /* cholesky factors per tile
  */

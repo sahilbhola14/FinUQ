@@ -385,20 +385,17 @@ template <typename T>
 void launch_block_jacobi_solver_single_step(
     const std::vector<T> &h_coeff,
     const std::vector<Matrix<T>> &cholesky_factors, std::vector<T> &h_state,
-    std::vector<T> &h_state_new, const poisson_rhs_config<T> &poisson_rhs_cfg,
-    double &h_error, const poisson_config &poisson_cfg, bool verbose = false) {
+    std::vector<T> &h_state_new, std::vector<T> &h_b,
+    const poisson_solver_config<T> &poisson_solver_cfg, double &h_error,
+    const poisson_config &poisson_cfg, bool verbose = false) {
   // initialize
-  const int state_dim = poisson_rhs_cfg.state_dim;
-
-  // (1) evaluate b
-  std::vector<T> h_b(state_dim);
-  eval_rhs(poisson_rhs_cfg, h_state.data(), h_b.data());
-  // (2) b - Ax^k
+  const int state_dim = poisson_solver_cfg.state_dim;
+  // (1) b - Ax^k
   std::vector<T> h_rhs(state_dim, static_cast<T>(0.0));
   launch_block_jacobi_rhs(state_dim, h_coeff, h_state, h_b, h_rhs,
                           poisson_cfg.blk_jacobi_matvect_tile_size,
                           poisson_cfg.prec);
-  // (3): block jacobi solve
+  // (2): block jacobi solve
   launch_block_jacobi_update_step(state_dim, cholesky_factors, h_rhs, h_state,
                                   h_state_new, poisson_cfg.blk_jacobi_tile_size,
                                   poisson_cfg.prec, poisson_cfg.prec_cholesky);
@@ -418,15 +415,14 @@ void launch_block_jacobi_solver_single_step(
 // the cholesky factors are stored in higher precision so that when solving the
 // linear system there is no round-off error
 template <typename T>
-void launch_block_jacobi_solver(const poisson_rhs_config<T> &poisson_rhs_cfg,
-                                std::vector<T> &h_coeff,
-                                std::vector<T> &h_state,
-                                const poisson_config &poisson_cfg,
-                                bool verbose) {
+void launch_block_jacobi_solver(
+    std::vector<T> &h_coeff, std::vector<T> &h_state, std::vector<T> &h_rhs,
+    const poisson_config &poisson_cfg,
+    const poisson_solver_config<T> &poisson_solver_cfg, bool verbose) {
   // initializations
   const double etol = poisson_cfg.etol;
   const int max_iter = poisson_cfg.max_iter;
-  const int state_dim = poisson_rhs_cfg.state_dim;
+  const int state_dim = poisson_solver_cfg.state_dim;
   std::vector<T> h_state_new(state_dim);
   double h_error = 2.0 * etol;  // ensure at least one iteration
 
@@ -438,9 +434,9 @@ void launch_block_jacobi_solver(const poisson_rhs_config<T> &poisson_rhs_cfg,
   std::vector<double> error_history;
   int k = 0;
   for (; k < max_iter && h_error > etol; k++) {
-    launch_block_jacobi_solver_single_step(h_coeff, cholesky_factors, h_state,
-                                           h_state_new, poisson_rhs_cfg,
-                                           h_error, poisson_cfg);
+    launch_block_jacobi_solver_single_step(
+        h_coeff, cholesky_factors, h_state, h_state_new, h_rhs,
+        poisson_solver_cfg, h_error, poisson_cfg);
     error_history.push_back(h_error);
 
     if (verbose && k % 100 == 0) {
@@ -451,13 +447,13 @@ void launch_block_jacobi_solver(const poisson_rhs_config<T> &poisson_rhs_cfg,
   }
 
   // save solution to csv: columns = i_x, i_y, value
-  const int Nx = poisson_rhs_cfg.Nx;
-  // const int Ny = state_dim / Nx;
+  const int Nx = poisson_solver_cfg.Nx;
+  const int Ny = state_dim / Nx;
   std::ostringstream ss;
   ss << "poisson_solution_" << to_string(poisson_cfg.prec) << "_prec"
      << "_chol_" << to_string(poisson_cfg.prec_cholesky) << "_zeta_"
      << std::fixed << std::setprecision(6)
-     << static_cast<double>(poisson_rhs_cfg.zeta) << ".csv";
+     << static_cast<double>(poisson_solver_cfg.zeta) << ".csv";
   std::ofstream file(ss.str());
   if (!file.is_open()) {
     std::cerr << "Error: could not open file " << ss.str() << "\n";
@@ -477,7 +473,7 @@ void launch_block_jacobi_solver(const poisson_rhs_config<T> &poisson_rhs_cfg,
   ss_err << "poisson_convergence_" << to_string(poisson_cfg.prec) << "_prec"
          << "_chol_" << to_string(poisson_cfg.prec_cholesky) << "_zeta_"
          << std::fixed << std::setprecision(6)
-         << static_cast<double>(poisson_rhs_cfg.zeta) << ".csv";
+         << static_cast<double>(poisson_solver_cfg.zeta) << ".csv";
   std::ofstream err_file(ss_err.str());
   if (!err_file.is_open()) {
     std::cerr << "Error: could not open file " << ss_err.str() << "\n";
@@ -498,12 +494,11 @@ void launch_block_jacobi_solver(const poisson_rhs_config<T> &poisson_rhs_cfg,
 
 // template initialization
 template void launch_block_jacobi_solver<double>(
-    const poisson_rhs_config<double> &, std::vector<double> &,
-    std::vector<double> &, const poisson_config &, bool);
+    std::vector<double> &, std::vector<double> &, std::vector<double> &,
+    const poisson_config &, const poisson_solver_config<double> &, bool);
 template void launch_block_jacobi_solver<float>(
-    const poisson_rhs_config<float> &, std::vector<float> &,
-    std::vector<float> &, const poisson_config &, bool);
-template void launch_block_jacobi_solver<half>(const poisson_rhs_config<half> &,
-                                               std::vector<half> &,
-                                               std::vector<half> &,
-                                               const poisson_config &, bool);
+    std::vector<float> &, std::vector<float> &, std::vector<float> &,
+    const poisson_config &, const poisson_solver_config<float> &, bool);
+template void launch_block_jacobi_solver<half>(
+    std::vector<half> &, std::vector<half> &, std::vector<half> &,
+    const poisson_config &, const poisson_solver_config<half> &, bool);

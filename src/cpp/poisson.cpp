@@ -80,9 +80,10 @@ void run_block_jacobi_experiments_fixed_discretization(
     std::vector<T> h_rhs = poisson.get_rhs();
     // coefficient matrix
     std::vector<T> h_coeff = poisson.get_coefficient_matrix();
-    // // initial state
-    // std::vector<T> h_state_initial = poisson.get_initial_state();
-    // poisson.print_coefficient_matrix();
+    // initial state
+    std::vector<T> h_state_initial = poisson.get_initial_state();
+    // solver config
+    poisson_solver_config<T> poisson_solver_cfg = poisson.get_solver_config();
     // cholesky decomp
     // std::vector<Matrix<T>> h_chol_factors =
     //     compute_cholesky_per_jacobi_tile(h_coeff, poisson_cfg);
@@ -95,8 +96,8 @@ void run_block_jacobi_experiments_fixed_discretization(
     // compute_block_jacobi_forcing_vector(h_coeff, h_chol_factors,
     // poisson_cfg);
 
-    // launch_block_jacobi_solver(poisson_rhs_cfg, h_coeff, h_state_initial,
-    //                            poisson_cfg, true);
+    launch_block_jacobi_solver(h_coeff, h_state_initial, h_rhs, poisson_cfg,
+                               poisson_solver_cfg, true);
 
     // // run the jacobi solver(s)
     // launch_jacobi_solver<T>(poisson_rhs_cfg, h_coeff, h_state_initial,
@@ -266,6 +267,6 @@ void run_all_block_jacobi_experiments(Precision prec, Precision prec_cholesky,
 
 // poisson equation experiments
 void run_poisson_equation_experiments(Precision prec, Precision prec_cholesky) {
-  run_all_jacobi_experiments(prec, 1);
-  // run_all_block_jacobi_experiments(prec, prec_cholesky, 1);
+  // run_all_jacobi_experiments(prec, 1);
+  run_all_block_jacobi_experiments(prec, prec_cholesky, 1);
 }
