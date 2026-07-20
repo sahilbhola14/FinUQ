@@ -449,9 +449,11 @@ void run_all_backward_error_experiments(Precision prec,
   const int n_evals = 10;  // number of evaluations
   int n_max;               // maximum vector size
   if (prec == Single) {
-    n_max = 50000000;
-  } else if (prec == Half) {
+    // n_max = 50000000;
     n_max = 100000;
+  } else if (prec == Half) {
+    // n_max = 100000;
+    n_max = 1000;
   }
 
   /* data: U(0,1) */
@@ -557,9 +559,11 @@ void run_all_backward_error_experiments(Precision prec,
   const int n_evals = 10;  // number of evaluations
   int n_max;               // maximum vector size
   if (prec == Single) {
-    n_max = 50000000;
-  } else if (prec == Half) {
+    // n_max = 50000000;
     n_max = 100000;
+  } else if (prec == Half) {
+    // n_max = 100000;
+    n_max = 1000;
   }
 
   /* data: U(0,1) */
@@ -598,11 +602,11 @@ void run_all_backward_error_experiments(Precision prec,
 void run_all_dot_product_experiments(Precision prec) {
   /* sequential */
   // run all backward error experiments
-  // sequential_dot_product::run_all_backward_error_experiments(prec);
+  sequential_dot_product::run_all_backward_error_experiments(prec, 200);
   // run all forward error experiments
-  // sequential_dot_product::run_all_forward_error_experiments(prec);
+  // sequential_dot_product::run_all_forward_error_experiments(prec, 1);
 
   /* block */
   // run all backward error experiments
-  block_dot_product::run_all_backward_error_experiments(prec);
+  // block_dot_product::run_all_backward_error_experiments(prec, 200);
 }
