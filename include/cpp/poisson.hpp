@@ -14,18 +14,18 @@
 // configuration
 // Notes: (X_res, Y_res) = (5, 6), (10, 18), (18, 18), (18, 32), (34, 66)
 struct poisson_config {
-  int X_res = 33; // Number of points in x-direction
-  int Y_res = 66; // Number of points in y-direction
-  // int X_res = 5; // Number of points in x-direction
-  // int Y_res = 6; // Number of points in y-direction
+  // int X_res = 33; // Number of points in x-direction
+  // int Y_res = 66; // Number of points in y-direction
+  int X_res = 5; // Number of points in x-direction
+  int Y_res = 6; // Number of points in y-direction
   double etol = 1e-6; // Error tolerance
   int max_iter = 5000; // Maximum number of iterations
   Precision prec = Single; // precision for the solve
   Precision prec_cholesky = Single; // precision for cholesky in block jacobi
   int num_experiments = 100; // number of experiments (number of times RHS is sampled)
   gamma_config gamma_cfg; // bounds config
-  int blk_jacobi_tile_size = 64; // block jacobi tile size
-  int blk_jacobi_matvect_tile_size = 64; // tile size for the matrix vector product
+  int blk_jacobi_tile_size = 4; // block jacobi tile size
+  int blk_jacobi_matvect_tile_size = 4; // tile size for the matrix vector product
 };
 
 // Poisson class

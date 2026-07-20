@@ -9,6 +9,30 @@
 #include "prob_model.hpp"
 #include "utils.hpp"
 
+namespace {
+
+int get_poisson_state_dim(const poisson_config &poisson_cfg) {
+  return (poisson_cfg.X_res - 2) * (poisson_cfg.Y_res - 2);
+}
+
+void assert_valid_block_jacobi_tiling(const poisson_config &poisson_cfg) {
+  const int state_dim = get_poisson_state_dim(poisson_cfg);
+  assert(poisson_cfg.blk_jacobi_tile_size > 0 &&
+         "blk_jacobi_tile_size must be positive");
+  assert(poisson_cfg.blk_jacobi_matvect_tile_size > 0 &&
+         "blk_jacobi_matvect_tile_size must be positive");
+  assert(state_dim >= poisson_cfg.blk_jacobi_tile_size &&
+         "state dimension must be >= blk_jacobi_tile_size");
+  assert(state_dim >= poisson_cfg.blk_jacobi_matvect_tile_size &&
+         "state dimension must be >= blk_jacobi_matvect_tile_size");
+  assert(state_dim % poisson_cfg.blk_jacobi_tile_size == 0 &&
+         "state dimension must be divisible by blk_jacobi_tile_size");
+  assert(state_dim % poisson_cfg.blk_jacobi_matvect_tile_size == 0 &&
+         "state dimension must be divisible by blk_jacobi_matvect_tile_size");
+}
+
+}  // namespace
+
 /* print poisson config */
 void print_poisson_config(const poisson_config &poisson_cfg) {
   std::cout << "Compute precision: " << to_string(poisson_cfg.prec)
@@ -36,13 +60,15 @@ void print_poisson_config(const poisson_config &poisson_cfg) {
 }
 
 // jacobi experiments (fixed discretization)
+// for each experiment, a new \zeta value is sampled
+// the solver solves \nabla^2 u - \zeta u = f.
 template <typename T>
 void run_jacobi_experiments_fixed_discretization(
     const poisson_config &poisson_cfg) {
   // sample the zeta values
   std::vector<T> zeta_vals(poisson_cfg.num_experiments);
   std::mt19937 gen(/*seed=*/42);
-  sample_uniform_distribution(zeta_vals, 0.0, 0.0, gen);
+  sample_uniform_distribution(zeta_vals, 10.0, 10.0, gen);
 
   // run the experiment
   for (int i = 0; i < poisson_cfg.num_experiments; i++) {
@@ -60,6 +86,16 @@ void run_jacobi_experiments_fixed_discretization(
     launch_jacobi_solver<T>(h_coeff, h_state_initial, h_rhs, poisson_cfg.prec,
                             poisson_cfg.etol, poisson_cfg.max_iter,
                             poisson_solver_cfg, true);
+
+    const correction_matrix_result asymptotic_bounds =
+        compute_asymptotic_bounds(h_coeff, h_rhs, poisson_cfg);
+    const char *bound_labels[3] = {"Asymptotic bound (deterministic)",
+                                   "Asymptotic bound (mean-informed)",
+                                   "Asymptotic bound (variance-informed)"};
+    for (int j = 0; j < static_cast<int>(asymptotic_bounds.size()) && j < 3;
+         j++) {
+      print_matrix(asymptotic_bounds[j], bound_labels[j]);
+    }
   }
 }
 
@@ -70,7 +106,7 @@ void run_block_jacobi_experiments_fixed_discretization(
   // sample the zeta values
   std::vector<T> zeta_vals(poisson_cfg.num_experiments);
   std::mt19937 gen(/*seed=*/42);
-  sample_uniform_distribution(zeta_vals, 0.0, 1.0, gen);
+  sample_uniform_distribution(zeta_vals, 0.0, 0.0, gen);
 
   // run the experiment
   for (int i = 0; i < poisson_cfg.num_experiments; i++) {
@@ -122,6 +158,7 @@ void run_jacobi_experiments(const poisson_config &poisson_cfg) {
   /* assert statements */
   assert(poisson_cfg.prec == poisson_cfg.gamma_cfg.prec &&
          "Bound precision and compute precision must be the same");
+  assert_valid_block_jacobi_tiling(poisson_cfg);
 
   // run the experiment
   switch (poisson_cfg.prec) {
@@ -149,18 +186,6 @@ void run_block_jacobi_experiments(const poisson_config &poisson_cfg) {
   if (poisson_cfg.X_res <= 2 || poisson_cfg.Y_res <= 2) {
     throw std::invalid_argument("X_res and Y_res must be greater that 2");
   }
-  if (((poisson_cfg.X_res - 2) * (poisson_cfg.Y_res - 2)) %
-          poisson_cfg.blk_jacobi_tile_size !=
-      0) {
-    const int coeff_size = (poisson_cfg.X_res - 2) * (poisson_cfg.Y_res - 2);
-    std::cout << "[DEBUG] Coeff size = " << coeff_size
-              << ", Tile size = " << poisson_cfg.blk_jacobi_tile_size
-              << ", Remainder = "
-              << (coeff_size % poisson_cfg.blk_jacobi_tile_size) << std::endl;
-    throw std::invalid_argument(
-        "Coefficient matrix size: not divisible by tile size (Required for "
-        "Block Jacobi)");
-  }
 
   // Cholesky must be performed at the same or lower precision than the solver
   // (lower precision = larger urd, i.e. higher enum value)
@@ -184,6 +209,7 @@ void run_block_jacobi_experiments(const poisson_config &poisson_cfg) {
   /* assert statements */
   assert(poisson_cfg.prec == poisson_cfg.gamma_cfg.prec &&
          "Bound precision and compute precision must be the same");
+  assert_valid_block_jacobi_tiling(poisson_cfg);
 
   // run the experiment
   switch (poisson_cfg.prec) {
@@ -267,6 +293,6 @@ void run_all_block_jacobi_experiments(Precision prec, Precision prec_cholesky,
 
 // poisson equation experiments
 void run_poisson_equation_experiments(Precision prec, Precision prec_cholesky) {
-  // run_all_jacobi_experiments(prec, 1);
-  run_all_block_jacobi_experiments(prec, prec_cholesky, 1);
+  run_all_jacobi_experiments(prec, 1);
+  // run_all_block_jacobi_experiments(prec, prec_cholesky, 1);
 }

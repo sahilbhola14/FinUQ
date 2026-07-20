@@ -88,6 +88,18 @@ correction_matrix_result compute_block_jacobi_P_matrix(
     const std::vector<Matrix<T>> &h_chol_factors,
     const poisson_config &poisson_cfg);
 
+template <typename T>
+void compute_block_jacobi_forcing_vector(
+    const std::vector<T> &h_coeff,
+    const std::vector<T> &h_rhs,
+    const poisson_config &poisson_cfg);
+
+template <typename T>
+correction_matrix_result compute_asymptotic_bounds(
+    const std::vector<T> &h_coeff,
+    const std::vector<T> &h_rhs,
+    const poisson_config &poisson_cfg);
+
 
 
 #endif
