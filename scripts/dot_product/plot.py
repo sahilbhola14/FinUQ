@@ -7,6 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy import interpolate
 import argparse
+from pathlib import Path
 from matplotlib.ticker import LogLocator
 
 plt.style.use("../journal.mplstyle")
@@ -50,6 +51,12 @@ parser.add_argument(
     "--beta", type=float, default=2.0, help="Beta bound model beta value"
 )
 parser.add_argument("--confidence", type=float, default=0.99, help="Bound confidence")
+parser.add_argument(
+    "--folder",
+    type=Path,
+    default=Path("."),
+    help="Folder containing sequential dot-product CSV results",
+)
 args = parser.parse_args()
 
 
@@ -75,7 +82,7 @@ def get_filename(
     if model.lower() == "beta":
         base += f"_a_{alpha:0.5f}_b_{beta:0.5f}"
 
-    return base + ".csv"
+    return args.folder / f"{base}.csv"
 
 
 def get_savefig_name(experiment="backward"):
@@ -95,7 +102,7 @@ def get_savefig_name(experiment="backward"):
 
     base += f"_b_{args.beta:0.5f}"
 
-    return base + ".png"
+    return args.folder / f"{base}.png"
 
 
 def get_backward_error_data(model, dist, alpha=None, beta=None):
