@@ -145,7 +145,15 @@ void run_block_jacobi_experiments_fixed_discretization(
     // compute P matrix
     // compute_block_jacobi_P_matrix(h_coeff, h_chol_factors, poisson_cfg);
     // compute forcing vector
-    compute_block_jacobi_forcing_vector(h_coeff, h_rhs, poisson_cfg);
+    // compute_block_jacobi_forcing_vector(h_coeff, h_rhs, poisson_cfg);
+    // compute asymptotic bounds
+    // compute_asymptotic_bounds(h_coeff, h_rhs, poisson_cfg);
+    // compute iteration bounds
+    // compute_per_iteration_bounds(h_coeff, h_rhs, poisson_cfg);
+    // compute true solution bounds
+    Matrix<double> true_solution_bounds =
+        compute_true_solution_bounds(h_coeff, h_rhs, poisson_cfg);
+    print_matrix(true_solution_bounds, "true");
 
     launch_block_jacobi_solver(h_coeff, h_state_initial, h_rhs, poisson_cfg,
                                poisson_solver_cfg, true);

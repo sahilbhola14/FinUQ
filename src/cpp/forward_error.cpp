@@ -867,15 +867,20 @@ template <typename T>
 correction_matrix_result compute_asymptotic_bounds(
     const std::vector<T> &h_coeff, const std::vector<T> &h_rhs,
     const poisson_config &poisson_cfg) {
+  // init
   const int state_dim = (poisson_cfg.X_res - 2) * (poisson_cfg.Y_res - 2);
+  // checks
   if (state_dim <= 0) {
     return {};
   }
 
+  // cholesky factors
   const std::vector<Matrix<T>> h_chol_factors =
       compute_cholesky_per_jacobi_tile(h_coeff, poisson_cfg);
+  // P
   const correction_matrix_result p =
       compute_block_jacobi_P_matrix(h_coeff, h_chol_factors, poisson_cfg);
+  // f
   const correction_matrix_result f =
       compute_block_jacobi_forcing_vector(h_coeff, h_rhs, poisson_cfg);
 
@@ -886,11 +891,12 @@ correction_matrix_result compute_asymptotic_bounds(
 
   const Eigen::MatrixXd identity =
       Eigen::MatrixXd::Identity(state_dim, state_dim);
+
   correction_matrix_result bounds(3);
+  // compute for all types of bounds
   for (int i = 0; i < 3; i++) {
     const Eigen::MatrixXd p_i = matrix_to_eigen(p[i]);
     const double p_inf_norm = p_i.cwiseAbs().rowwise().sum().maxCoeff();
-
     assert(p_inf_norm < 1.0 &&
            "compute_asymptotic_bounds requires ||P||_inf < 1");
     const Eigen::MatrixXd f_i = matrix_to_eigen(f[i]);
@@ -899,6 +905,91 @@ correction_matrix_result compute_asymptotic_bounds(
   return bounds;
 }
 
+// compute true solution bounds
+// |x| <= (I - |D^{-1} N|)^{-1} |D^{-1} b|
+// I: Identity matrix
+// D: blkdiag(D_ii), where D_ii is the diagonal block of the h_coeff of
+// tile_size*tile_size
+// A: h_coeff matrix.
+// b: rhs vector
+// D^{-1}: blkdiag(D_ii^{-1}), where D_ii^{-1} is the inverse of hte block D_ii
+// of D N = A - D sufficient condition: ||D^{-1} N ||_{infty} < 1
+template <typename T>
+Matrix<double> compute_true_solution_bounds(const std::vector<T> &h_coeff,
+                                            const std::vector<T> &h_rhs,
+                                            const poisson_config &poisson_cfg) {
+  // init
+  const int state_dim = (poisson_cfg.X_res - 2) * (poisson_cfg.Y_res - 2);
+  const int tile_size = poisson_cfg.blk_jacobi_tile_size;
+  // checks
+  if (state_dim <= 0 || tile_size <= 0) {
+    return {};
+  }
+  if (state_dim % tile_size != 0) {
+    throw std::invalid_argument(
+        "state dimension must be divisible by blk_jacobi_tile_size");
+  }
+  if (static_cast<int>(h_coeff.size()) != state_dim * state_dim) {
+    throw std::invalid_argument(
+        "h_coeff size must equal the flattened dense coefficient matrix size");
+  }
+  if (static_cast<int>(h_rhs.size()) != state_dim) {
+    throw std::invalid_argument("h_rhs size must equal the state dimension");
+  }
+
+  Eigen::MatrixXd a(state_dim, state_dim);
+  Eigen::MatrixXd d = Eigen::MatrixXd::Zero(state_dim, state_dim);
+  Eigen::MatrixXd d_inv = Eigen::MatrixXd::Zero(state_dim, state_dim);
+  Eigen::MatrixXd d_inv_abs = Eigen::MatrixXd::Zero(state_dim, state_dim);
+  Eigen::VectorXd rhs_abs(state_dim);
+  // extract A and |b|
+  for (int r = 0; r < state_dim; r++) {
+    rhs_abs(r) = std::abs(static_cast<double>(h_rhs[r]));
+    for (int c = 0; c < state_dim; c++) {
+      a(r, c) = static_cast<double>(h_coeff[r * state_dim + c]);
+    }
+  }
+  // extract D and required inverses
+  for (int tile_start = 0; tile_start < state_dim; tile_start += tile_size) {
+    Eigen::MatrixXd d_tile(tile_size, tile_size);
+    for (int r = 0; r < tile_size; r++) {
+      for (int c = 0; c < tile_size; c++) {
+        d_tile(r, c) = static_cast<double>(
+            h_coeff[(tile_start + r) * state_dim + (tile_start + c)]);
+      }
+    }
+    // update D matrix with block D_ii
+    d.block(tile_start, tile_start, tile_size, tile_size) = d_tile;
+    // D_ii^{-1}
+    const Eigen::MatrixXd d_tile_inv = d_tile.inverse();
+    // update D^{-1} with D_ii^{-1}
+    d_inv.block(tile_start, tile_start, tile_size, tile_size) = d_tile_inv;
+    // |D^{-1}|
+    d_inv_abs.block(tile_start, tile_start, tile_size, tile_size) =
+        d_tile_inv.cwiseAbs();
+  }
+  // N = A - D
+  const Eigen::MatrixXd n = a - d;
+  // |D^{-1} N|
+  const Eigen::MatrixXd d_inv_n_abs = (d_inv * n).cwiseAbs();
+  // sufficient condition for (I - |D^{-1} N|)^{-1} to exist as a convergent
+  // Neumann series (I - |D^{-1} N|)^{-1} = sum_k |D^{-1} N|^k: ||D^{-1}
+  // N||_inf < 1
+  const double d_inv_n_abs_inf_norm = d_inv_n_abs.rowwise().sum().maxCoeff();
+  assert(d_inv_n_abs_inf_norm < 1.0 &&
+         "compute_true_solution_bounds requires ||D^{-1} N||_inf < 1");
+  const Eigen::MatrixXd identity =
+      Eigen::MatrixXd::Identity(state_dim, state_dim);
+  // I - |D^{-1} N|
+  const Eigen::MatrixXd i_minus_d_inv_n_abs = identity - d_inv_n_abs;
+  // |D^{-1}| |b|
+  const Eigen::VectorXd d_inv_abs_b = d_inv_abs * rhs_abs;
+
+  // (I - |D^{-1} N|)^{-1} |D^{-1}| |b|
+  const Eigen::VectorXd bounds = i_minus_d_inv_n_abs.inverse() * d_inv_abs_b;
+
+  return eigen_to_matrix(bounds);
+}
 /* template initialization */
 template gamma_result compute_bvp_state_integral_forward_error_bound<double>(
     const int, const int, const std::vector<double> &,
@@ -985,3 +1076,13 @@ template correction_matrix_result compute_asymptotic_bounds(
 template correction_matrix_result compute_asymptotic_bounds(
     const std::vector<half> &, const std::vector<half> &,
     const poisson_config &);
+
+template Matrix<double> compute_true_solution_bounds(
+    const std::vector<double> &, const std::vector<double> &,
+    const poisson_config &);
+template Matrix<double> compute_true_solution_bounds(const std::vector<float> &,
+                                                     const std::vector<float> &,
+                                                     const poisson_config &);
+template Matrix<double> compute_true_solution_bounds(const std::vector<half> &,
+                                                     const std::vector<half> &,
+                                                     const poisson_config &);

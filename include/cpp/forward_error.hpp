@@ -100,6 +100,17 @@ correction_matrix_result compute_asymptotic_bounds(
     const std::vector<T> &h_rhs,
     const poisson_config &poisson_cfg);
 
+template <typename T>
+correction_matrix_result compute_per_iteration_bounds(
+    const std::vector<T> &h_coeff,
+    const std::vector<T> &h_rhs,
+    const poisson_config &poisson_cfg);
 
+// compute true solution bounds: |x| <= (I - |D^{-1} N|)^{-1} |D^{-1}| |b|
+template <typename T>
+Matrix<double> compute_true_solution_bounds(
+    const std::vector<T> &h_coeff,
+    const std::vector<T> &h_rhs,
+    const poisson_config &poisson_cfg);
 
 #endif
