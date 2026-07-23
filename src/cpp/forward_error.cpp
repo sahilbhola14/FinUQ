@@ -61,7 +61,7 @@ Eigen::MatrixXd matrix_to_eigen(const Matrix<double> &src) {
 template <typename T>
 correction_matrix_result compute_block_jacobi_forcing_vector(
     const std::vector<T> &h_coeff, const std::vector<T> &h_rhs,
-    const poisson_config &poisson_cfg) {
+    const poisson_config &poisson_cfg, const int iteration_idx) {
   // init
   const int state_dim = (poisson_cfg.X_res - 2) * (poisson_cfg.Y_res - 2);
   const int tile_size = poisson_cfg.blk_jacobi_tile_size;
@@ -80,19 +80,20 @@ correction_matrix_result compute_block_jacobi_forcing_vector(
   if (static_cast<int>(h_rhs.size()) != state_dim) {
     throw std::invalid_argument("h_rhs size must equal the state dimension");
   }
+
   // cholesky factors
   const std::vector<Matrix<T>> h_chol_factors =
       compute_cholesky_per_jacobi_tile(h_coeff, poisson_cfg);
   // G
-  const correction_matrix_result g =
-      compute_correction_G_matrix(h_coeff, h_chol_factors, poisson_cfg);
+  const correction_matrix_result g = compute_correction_G_matrix(
+      h_coeff, h_chol_factors, poisson_cfg, iteration_idx);
   // H
-  const correction_matrix_result h =
-      compute_correction_H_matrix(h_coeff, h_chol_factors, poisson_cfg);
+  const correction_matrix_result h = compute_correction_H_matrix(
+      h_coeff, h_chol_factors, poisson_cfg, iteration_idx);
   // coefficients
   const block_jacobi_bound_coefficients_result coeffs =
       compute_block_jacobi_bound_coefficients(h_coeff, h_chol_factors,
-                                              poisson_cfg);
+                                              poisson_cfg, iteration_idx);
   if (g.size() != 3 || h.size() != 3) {
     throw std::runtime_error(
         "block Jacobi correction helpers must return three bound-model "
@@ -482,6 +483,8 @@ long double compute_block_jacobi_one_minus_zeta(
     return {};
   }
 
+  assert(iteration_idx >= 0 && "iteration_idx must be >= 0");
+
   // bound parameteres
   const long long state_dim_ll = static_cast<long long>(state_dim);
   const long long tile_size_ll = static_cast<long long>(tile_size);
@@ -504,16 +507,18 @@ long double compute_block_jacobi_one_minus_zeta(
  * G_ii = (\gamma_{T;c}^2 + 3 \gamma_{T+1;c}) |A_ii^-1| |hat{R}_ii^T||hat{R}_ii|
  * gamma_factor = (\gamma_{T;c}^2 + 3 \gamma_{T+1;c})
  * G is blkdiag(G_ii)
- * for computing the probabilistic bounds, max_iteations is used to obtain the
- * probabilitity Q_solve = Q((k+1)(nT^2/6 + 3nT/2 + 4n/3 + n^2 + 1;\zeta).
+ * for computing the probabilistic bounds, iteration_idx (k) is used to obtain
+ * the probabilitity Q_solve = Q((k+1)(nT^2/6 + 3nT/2 + 4n/3 + n^2 + 1;\zeta).
  * condition to be satisfied: gamma_factor max_i (||A_ii^-1||_\infty
  * ||R_ii^T||_\infty||R_ii||_\infty) < 1 for all i.
  * Note, R_ii^T is stored in h_chol_factors
+ * iteration_idx: the (k) iteration index used to compute one_minus_zeta,
+ * must be >= 0
  */
 template <typename T>
 correction_matrix_result compute_correction_G_matrix(
     const std::vector<T> &h_coeff, const std::vector<Matrix<T>> &h_chol_factors,
-    const poisson_config &poisson_cfg) {
+    const poisson_config &poisson_cfg, const int iteration_idx) {
   // parameters
   const int state_dim = (poisson_cfg.X_res - 2) * (poisson_cfg.Y_res - 2);
   const int tile_size = poisson_cfg.blk_jacobi_tile_size;
@@ -523,6 +528,7 @@ correction_matrix_result compute_correction_G_matrix(
   if (state_dim <= 0 || tile_size <= 0 || num_tiles <= 0) {
     return {};
   }
+  assert(iteration_idx >= 0 && "iteration_idx must be >= 0");
   if (static_cast<int>(h_chol_factors.size()) != num_tiles) {
     throw std::invalid_argument(
         "h_chol_factors size must match the number of block Jacobi tiles");
@@ -532,10 +538,9 @@ correction_matrix_result compute_correction_G_matrix(
         "h_coeff size must equal the flattened dense coefficient matrix size");
   }
 
-  // compute block jacobi one minus zeta. Presently uses the max iteration count
-  // is used
+  // compute block jacobi one minus zeta using the given iteration index (k)
   const long double one_minus_zeta =
-      compute_block_jacobi_one_minus_zeta(poisson_cfg.max_iter, poisson_cfg);
+      compute_block_jacobi_one_minus_zeta(iteration_idx, poisson_cfg);
 
   // compute \gamma_{T;c}, \gamma{T+1;c}, where c is the precision for cholesky)
   gamma_config gamma_cfg_cholesky = poisson_cfg.gamma_cfg;
@@ -644,7 +649,7 @@ correction_matrix_result compute_correction_G_matrix(
 template <typename T>
 correction_matrix_result compute_correction_H_matrix(
     const std::vector<T> &h_coeff, const std::vector<Matrix<T>> &h_chol_factors,
-    const poisson_config &poisson_cfg) {
+    const poisson_config &poisson_cfg, const int iteration_idx) {
   // params
   const int state_dim = (poisson_cfg.X_res - 2) * (poisson_cfg.Y_res - 2);
   const int tile_size = poisson_cfg.blk_jacobi_tile_size;
@@ -658,9 +663,11 @@ correction_matrix_result compute_correction_H_matrix(
         "h_coeff size must equal the flattened dense coefficient matrix size");
   }
 
+  assert(iteration_idx >= 0 && "iteration_idx must be >= 0");
+
   // compute G matrix of (state_dim, state_dim) for (det, mprea, vprea)
-  const correction_matrix_result g =
-      compute_correction_G_matrix(h_coeff, h_chol_factors, poisson_cfg);
+  const correction_matrix_result g = compute_correction_G_matrix(
+      h_coeff, h_chol_factors, poisson_cfg, iteration_idx);
 
   if (g.size() != 3) {
     throw std::runtime_error(
@@ -729,7 +736,7 @@ correction_matrix_result compute_correction_H_matrix(
 template <typename T>
 block_jacobi_bound_coefficients_result compute_block_jacobi_bound_coefficients(
     const std::vector<T> &h_coeff, const std::vector<Matrix<T>> &h_chol_factors,
-    const poisson_config &poisson_cfg) {
+    const poisson_config &poisson_cfg, const int iteration_idx) {
   // init
   const int state_dim = (poisson_cfg.X_res - 2) * (poisson_cfg.Y_res - 2);
   const int tile_size = poisson_cfg.blk_jacobi_tile_size;
@@ -753,19 +760,8 @@ block_jacobi_bound_coefficients_result compute_block_jacobi_bound_coefficients(
   // compute block jacobi one minus zeta. Presently uses the max iteration count
   // is used
   const long double one_minus_zeta =
-      compute_block_jacobi_one_minus_zeta(poisson_cfg.max_iter, poisson_cfg);
+      compute_block_jacobi_one_minus_zeta(iteration_idx, poisson_cfg);
 
-  // const long long state_dim_ll = static_cast<long long>(state_dim);
-  // const long long tile_size_ll = static_cast<long long>(tile_size);
-  // const long long per_iteration_bounds =
-  //     (state_dim_ll * tile_size_ll * tile_size_ll) / 6LL +
-  //     (3LL * state_dim_ll * tile_size_ll) / 2LL + (4LL * state_dim_ll) / 3LL
-  //     + state_dim_ll * state_dim_ll + 1LL;
-  // const long long number_of_bounds =
-  //     static_cast<long long>(poisson_cfg.max_iter + 1) *
-  //     per_iteration_bounds;
-  // long double one_minus_zeta = compute_individual_bound_one_minus_zeta(
-  //     static_cast<int>(number_of_bounds), poisson_cfg.gamma_cfg.confidence);
   // Tile size used for matrix-vector product: S
   const int matvec_tile_size = poisson_cfg.blk_jacobi_matvect_tile_size;
   if (matvec_tile_size <= 0) {
@@ -820,15 +816,16 @@ block_jacobi_bound_coefficients_result compute_block_jacobi_bound_coefficients(
 template <typename T>
 correction_matrix_result compute_block_jacobi_P_matrix(
     const std::vector<T> &h_coeff, const std::vector<Matrix<T>> &h_chol_factors,
-    const poisson_config &poisson_cfg) {
+    const poisson_config &poisson_cfg, const int iteration_idx) {
   // init
   const int state_dim = (poisson_cfg.X_res - 2) * (poisson_cfg.Y_res - 2);
   if (state_dim <= 0) {
     return {};
   }
   // H matrix
-  const correction_matrix_result h =
-      compute_correction_H_matrix(h_coeff, h_chol_factors, poisson_cfg);
+  const correction_matrix_result h = compute_correction_H_matrix(
+      h_coeff, h_chol_factors, poisson_cfg, iteration_idx);
+
   if (h.size() != 3) {
     throw std::runtime_error(
         "compute_correction_H_matrix must return three correction matrices");
@@ -836,7 +833,7 @@ correction_matrix_result compute_block_jacobi_P_matrix(
   // coefficients
   const block_jacobi_bound_coefficients_result coeffs =
       compute_block_jacobi_bound_coefficients(h_coeff, h_chol_factors,
-                                              poisson_cfg);
+                                              poisson_cfg, iteration_idx);
   const Eigen::MatrixXd identity =
       Eigen::MatrixXd::Identity(state_dim, state_dim);
 
@@ -878,11 +875,11 @@ correction_matrix_result compute_asymptotic_bounds(
   const std::vector<Matrix<T>> h_chol_factors =
       compute_cholesky_per_jacobi_tile(h_coeff, poisson_cfg);
   // P
-  const correction_matrix_result p =
-      compute_block_jacobi_P_matrix(h_coeff, h_chol_factors, poisson_cfg);
+  const correction_matrix_result p = compute_block_jacobi_P_matrix(
+      h_coeff, h_chol_factors, poisson_cfg, poisson_cfg.max_iter);
   // f
-  const correction_matrix_result f =
-      compute_block_jacobi_forcing_vector(h_coeff, h_rhs, poisson_cfg);
+  const correction_matrix_result f = compute_block_jacobi_forcing_vector(
+      h_coeff, h_rhs, poisson_cfg, poisson_cfg.max_iter);
 
   if (p.size() != 3 || f.size() != 3) {
     throw std::runtime_error(
@@ -1055,56 +1052,56 @@ template gamma_result compute_bvp_qoi_forward_error_bound<half>(
 
 template correction_matrix_result compute_correction_G_matrix(
     const std::vector<double> &, const std::vector<Matrix<double>> &,
-    const poisson_config &);
+    const poisson_config &, const int);
 template correction_matrix_result compute_correction_G_matrix(
     const std::vector<float> &, const std::vector<Matrix<float>> &,
-    const poisson_config &);
+    const poisson_config &, const int);
 template correction_matrix_result compute_correction_G_matrix(
     const std::vector<half> &, const std::vector<Matrix<half>> &,
-    const poisson_config &);
+    const poisson_config &, const int);
 
 template correction_matrix_result compute_correction_H_matrix(
     const std::vector<double> &, const std::vector<Matrix<double>> &,
-    const poisson_config &);
+    const poisson_config &, const int);
 template correction_matrix_result compute_correction_H_matrix(
     const std::vector<float> &, const std::vector<Matrix<float>> &,
-    const poisson_config &);
+    const poisson_config &, const int);
 template correction_matrix_result compute_correction_H_matrix(
     const std::vector<half> &, const std::vector<Matrix<half>> &,
-    const poisson_config &);
+    const poisson_config &, const int);
 
 template block_jacobi_bound_coefficients_result
 compute_block_jacobi_bound_coefficients(const std::vector<double> &,
                                         const std::vector<Matrix<double>> &,
-                                        const poisson_config &);
+                                        const poisson_config &, const int);
 template block_jacobi_bound_coefficients_result
 compute_block_jacobi_bound_coefficients(const std::vector<float> &,
                                         const std::vector<Matrix<float>> &,
-                                        const poisson_config &);
+                                        const poisson_config &, const int);
 template block_jacobi_bound_coefficients_result
 compute_block_jacobi_bound_coefficients(const std::vector<half> &,
                                         const std::vector<Matrix<half>> &,
-                                        const poisson_config &);
+                                        const poisson_config &, const int);
 
 template correction_matrix_result compute_block_jacobi_P_matrix(
     const std::vector<double> &, const std::vector<Matrix<double>> &,
-    const poisson_config &);
+    const poisson_config &, const int);
 template correction_matrix_result compute_block_jacobi_P_matrix(
     const std::vector<float> &, const std::vector<Matrix<float>> &,
-    const poisson_config &);
+    const poisson_config &, const int);
 template correction_matrix_result compute_block_jacobi_P_matrix(
     const std::vector<half> &, const std::vector<Matrix<half>> &,
-    const poisson_config &);
+    const poisson_config &, const int);
 
 template correction_matrix_result compute_block_jacobi_forcing_vector(
     const std::vector<double> &, const std::vector<double> &,
-    const poisson_config &);
+    const poisson_config &, const int);
 template correction_matrix_result compute_block_jacobi_forcing_vector(
     const std::vector<float> &, const std::vector<float> &,
-    const poisson_config &);
+    const poisson_config &, const int);
 template correction_matrix_result compute_block_jacobi_forcing_vector(
     const std::vector<half> &, const std::vector<half> &,
-    const poisson_config &);
+    const poisson_config &, const int);
 
 template correction_matrix_result compute_asymptotic_bounds(
     const std::vector<double> &, const std::vector<double> &,

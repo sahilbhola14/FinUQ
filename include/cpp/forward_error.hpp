@@ -66,7 +66,8 @@ template <typename T>
 correction_matrix_result compute_correction_G_matrix(
     const std::vector<T> &h_coeff,
     const std::vector<Matrix<T>> &h_chol_factors,
-    const poisson_config &poisson_cfg);
+    const poisson_config &poisson_cfg,
+    const int iteration_idx);
 
 // compute correction H matrix
 template <typename T>

@@ -95,8 +95,8 @@ void run_jacobi_experiments_fixed_discretization(
         compute_cholesky_per_jacobi_tile(h_coeff, poisson_cfg);
 
     // test the bound matrices
-    const correction_matrix_result test =
-        compute_correction_G_matrix(h_coeff, h_chol_factors, poisson_cfg);
+    const correction_matrix_result test = compute_correction_G_matrix(
+        h_coeff, h_chol_factors, poisson_cfg, poisson_cfg.max_iter);
 
     // const correction_matrix_result asymptotic_bounds =
     //     compute_asymptotic_bounds(h_coeff, h_rhs, poisson_cfg);
