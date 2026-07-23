@@ -151,9 +151,11 @@ void run_block_jacobi_experiments_fixed_discretization(
     // compute iteration bounds
     // compute_per_iteration_bounds(h_coeff, h_rhs, poisson_cfg);
     // compute true solution bounds
-    Matrix<double> true_solution_bounds =
-        compute_true_solution_bounds(h_coeff, h_rhs, poisson_cfg);
-    print_matrix(true_solution_bounds, "true");
+    // Matrix<double> true_solution_bounds =
+    //     compute_true_solution_bounds(h_coeff, h_rhs, poisson_cfg);
+    // compute initial error bounds
+    // Matrix<double> initial_error_bounds = compute_initial_error_bounds(
+    //     h_coeff, h_rhs, h_state_initial, poisson_cfg);
 
     launch_block_jacobi_solver(h_coeff, h_state_initial, h_rhs, poisson_cfg,
                                poisson_solver_cfg, true);

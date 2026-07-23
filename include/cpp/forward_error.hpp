@@ -113,4 +113,12 @@ Matrix<double> compute_true_solution_bounds(
     const std::vector<T> &h_rhs,
     const poisson_config &poisson_cfg);
 
+// compute initial error bounds: |e^0| <= |x^0| + |x|
+template <typename T>
+Matrix<double> compute_initial_error_bounds(
+    const std::vector<T> &h_coeff,
+    const std::vector<T> &h_rhs,
+    const std::vector<T> &h_state_initial,
+    const poisson_config &poisson_cfg);
+
 #endif

@@ -990,6 +990,45 @@ Matrix<double> compute_true_solution_bounds(const std::vector<T> &h_coeff,
 
   return eigen_to_matrix(bounds);
 }
+
+// compute initial error bounds
+// |e^0| \leq |x^0| + |x|
+// x: true solution, where |x| is bounded using compute_true_solution_bounds
+// x^0: initial solution guess
+template <typename T>
+Matrix<double> compute_initial_error_bounds(
+    const std::vector<T> &h_coeff, const std::vector<T> &h_rhs,
+    const std::vector<T> &h_state_initial, const poisson_config &poisson_cfg) {
+  // init
+  const int state_dim = (poisson_cfg.X_res - 2) * (poisson_cfg.Y_res - 2);
+  // checks
+  if (state_dim <= 0) {
+    return {};
+  }
+  if (static_cast<int>(h_state_initial.size()) != state_dim) {
+    throw std::invalid_argument(
+        "h_state_initial size must equal the state dimension");
+  }
+
+  // |x|: true solution bounds
+  const Matrix<double> true_solution_bounds =
+      compute_true_solution_bounds(h_coeff, h_rhs, poisson_cfg);
+
+  // |x^0| + |x|
+  Matrix<double> initial_error_bounds;
+  initial_error_bounds.rows = static_cast<size_t>(state_dim);
+  initial_error_bounds.cols = 1;
+  initial_error_bounds.nnz = static_cast<size_t>(state_dim);
+  initial_error_bounds.data.resize(state_dim);
+  for (int i = 0; i < state_dim; i++) {
+    initial_error_bounds.data[i] =
+        std::abs(static_cast<double>(h_state_initial[i])) +
+        true_solution_bounds.data[i];
+  }
+
+  return initial_error_bounds;
+}
+
 /* template initialization */
 template gamma_result compute_bvp_state_integral_forward_error_bound<double>(
     const int, const int, const std::vector<double> &,
@@ -1084,5 +1123,17 @@ template Matrix<double> compute_true_solution_bounds(const std::vector<float> &,
                                                      const std::vector<float> &,
                                                      const poisson_config &);
 template Matrix<double> compute_true_solution_bounds(const std::vector<half> &,
+                                                     const std::vector<half> &,
+                                                     const poisson_config &);
+
+template Matrix<double> compute_initial_error_bounds(
+    const std::vector<double> &, const std::vector<double> &,
+    const std::vector<double> &, const poisson_config &);
+template Matrix<double> compute_initial_error_bounds(const std::vector<float> &,
+                                                     const std::vector<float> &,
+                                                     const std::vector<float> &,
+                                                     const poisson_config &);
+template Matrix<double> compute_initial_error_bounds(const std::vector<half> &,
+                                                     const std::vector<half> &,
                                                      const std::vector<half> &,
                                                      const poisson_config &);
