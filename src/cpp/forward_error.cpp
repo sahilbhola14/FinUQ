@@ -433,6 +433,36 @@ gamma_result compute_bvp_qoi_forward_error_bound(
   return qoi_bounds;
 }
 
+// compute block jacobi one minus zeta
+long double compute_block_jacobi_one_minus_zeta(
+    const int iteration_idx, const poisson_config &poisson_cfg) {
+  const int state_dim = (poisson_cfg.X_res - 2) * (poisson_cfg.Y_res - 2);  // n
+  const int tile_size = poisson_cfg.blk_jacobi_tile_size;                   // T
+  const int num_tiles = state_dim / tile_size;
+
+  // checks
+  if (state_dim <= 0 || tile_size <= 0 || num_tiles <= 0) {
+    return {};
+  }
+
+  // bound parameteres
+  const long long state_dim_ll = static_cast<long long>(state_dim);
+  const long long tile_size_ll = static_cast<long long>(tile_size);
+
+  const long long per_iteration_bounds =
+      (state_dim_ll * tile_size_ll * tile_size_ll) / 6LL +
+      (3LL * state_dim_ll * tile_size_ll) / 2LL + (4LL * state_dim_ll) / 3LL +
+      state_dim_ll * state_dim_ll + 1LL;
+
+  const long long number_of_bounds =
+      static_cast<long long>(iteration_idx + 1) * per_iteration_bounds;
+
+  long double one_minus_zeta = compute_individual_bound_one_minus_zeta(
+      static_cast<int>(number_of_bounds), poisson_cfg.gamma_cfg.confidence);
+
+  return one_minus_zeta;
+}
+
 /*
  * G_ii = (\gamma_{T;c}^2 + 3 \gamma_{T+1;c}) |A_ii^-1| |hat{R}_ii^T||hat{R}_ii|
  * gamma_factor = (\gamma_{T;c}^2 + 3 \gamma_{T+1;c})
@@ -441,14 +471,18 @@ gamma_result compute_bvp_qoi_forward_error_bound(
  * probabilitity Q_solve = Q((k+1)(nT^2/6 + 3nT/2 + 4n/3 + n^2 + 1;\zeta).
  * condition to be satisfied: gamma_factor max_i (||A_ii^-1||_\infty
  * ||R_ii^T||_\infty||R_ii||_\infty) < 1 for all i.
+ * Note, R_ii^T is stored in h_chol_factors
  */
 template <typename T>
 correction_matrix_result compute_correction_G_matrix(
     const std::vector<T> &h_coeff, const std::vector<Matrix<T>> &h_chol_factors,
     const poisson_config &poisson_cfg) {
+  // parameters
   const int state_dim = (poisson_cfg.X_res - 2) * (poisson_cfg.Y_res - 2);
   const int tile_size = poisson_cfg.blk_jacobi_tile_size;
   const int num_tiles = state_dim / tile_size;
+
+  // checks
   if (state_dim <= 0 || tile_size <= 0 || num_tiles <= 0) {
     return {};
   }
@@ -461,23 +495,21 @@ correction_matrix_result compute_correction_G_matrix(
         "h_coeff size must equal the flattened dense coefficient matrix size");
   }
 
-  const long long state_dim_ll = static_cast<long long>(state_dim);
-  const long long tile_size_ll = static_cast<long long>(tile_size);
-  const long long per_iteration_bounds =
-      (state_dim_ll * tile_size_ll * tile_size_ll) / 6LL +
-      (3LL * state_dim_ll * tile_size_ll) / 2LL + (4LL * state_dim_ll) / 3LL +
-      state_dim_ll * state_dim_ll + 1LL;
-  const long long number_of_bounds =
-      static_cast<long long>(poisson_cfg.max_iter + 1) * per_iteration_bounds;
-  long double one_minus_zeta = compute_individual_bound_one_minus_zeta(
-      static_cast<int>(number_of_bounds), poisson_cfg.gamma_cfg.confidence);
+  // compute block jacobi one minus zeta. Presently uses the max iteration count
+  // is used
+  const long double one_minus_zeta =
+      compute_block_jacobi_one_minus_zeta(poisson_cfg.max_iter, poisson_cfg);
 
+  // compute \gamma_{T;c}, \gamma{T+1;c}, where c is the precision for cholesky)
   gamma_config gamma_cfg_cholesky = poisson_cfg.gamma_cfg;
   gamma_cfg_cholesky.prec = poisson_cfg.prec_cholesky;
+
   gamma_result gamma_T =
       get_gamma(tile_size, gamma_cfg_cholesky, one_minus_zeta);
+
   gamma_result gamma_Tp =
       get_gamma(tile_size + 1, gamma_cfg_cholesky, one_minus_zeta);
+
   const gamma_result gamma_factor = gamma_T * gamma_T + 3.0L * gamma_Tp;
 
   Eigen::MatrixXd g_det = Eigen::MatrixXd::Zero(state_dim, state_dim);
@@ -488,29 +520,43 @@ correction_matrix_result compute_correction_G_matrix(
   long double max_condition_vprea = 0.0L;
 
   for (int t = 0; t < num_tiles; t++) {
-    Eigen::MatrixXd a_tile(tile_size, tile_size);
-    Eigen::MatrixXd r_tile(tile_size, tile_size);
+    // Extract A_ii and R_ii^T
+    Eigen::MatrixXd a_tile(tile_size, tile_size);   // A_ii
+    Eigen::MatrixXd rt_tile(tile_size, tile_size);  // R_ii^T
     const int tile_start = t * tile_size;
-
     for (int r = 0; r < tile_size; r++) {
       for (int c = 0; c < tile_size; c++) {
+        // extract A_ii
         a_tile(r, c) = static_cast<double>(
             h_coeff[(tile_start + r) * state_dim + (tile_start + c)]);
-        r_tile(r, c) =
+        // h_chol_factors stores R_ii^T.
+        rt_tile(r, c) =
             static_cast<double>(h_chol_factors[t].data[r * tile_size + c]);
       }
     }
 
-    const Eigen::MatrixXd a_inv_abs = a_tile.inverse().cwiseAbs();
+    const Eigen::MatrixXd a_inv_abs =
+        a_tile.inverse().cwiseAbs();  // |A_ii^{-1}|
     const double a_inv_inf_norm =
-        a_inv_abs.cwiseAbs().rowwise().sum().maxCoeff();
+        a_inv_abs.rowwise().sum().maxCoeff();  // ||A_ii^{-1}||_{infty}
     const double rt_inf_norm =
-        r_tile.transpose().cwiseAbs().rowwise().sum().maxCoeff();
-    const double r_inf_norm = r_tile.cwiseAbs().rowwise().sum().maxCoeff();
+        rt_tile.cwiseAbs().rowwise().sum().maxCoeff();  // ||R_ii^T||_{infty}
+    const double r_inf_norm = rt_tile.transpose()
+                                  .cwiseAbs()
+                                  .rowwise()
+                                  .sum()
+                                  .maxCoeff();  // ||R_ii||_{infty}
+
+    // ||A_ii^{-1}||_{\infty} ||R_ii^T||_{\infty} ||R_ii||_{\infty}
     const long double tile_condition =
         static_cast<long double>(a_inv_inf_norm) *
         static_cast<long double>(rt_inf_norm) *
         static_cast<long double>(r_inf_norm);
+
+    // print_matrix(eigen_to_matrix(rt_tile),
+    //              "R_ii^T tile " + std::to_string(t));
+
+    // max_i (gamma_factor * tile_condition) < 1 for the inverse to exist
     max_condition_det =
         std::max(max_condition_det, gamma_factor.gamma_det * tile_condition);
     max_condition_mprea = std::max(max_condition_mprea,
@@ -518,8 +564,11 @@ correction_matrix_result compute_correction_G_matrix(
     max_condition_vprea = std::max(max_condition_vprea,
                                    gamma_factor.gamma_vprea * tile_condition);
 
+    // |A_ii^{-1}| |R_ii^T| | R_ii|
     const Eigen::MatrixXd base_tile =
-        a_inv_abs * (r_tile.transpose().cwiseAbs() * r_tile.cwiseAbs());
+        a_inv_abs * (rt_tile.cwiseAbs() * rt_tile.transpose().cwiseAbs());
+
+    // G_ii for each type of bound
     g_det.block(tile_start, tile_start, tile_size, tile_size) =
         static_cast<double>(gamma_factor.gamma_det) * base_tile;
     g_mprea.block(tile_start, tile_start, tile_size, tile_size) =
@@ -528,6 +577,7 @@ correction_matrix_result compute_correction_G_matrix(
         static_cast<double>(gamma_factor.gamma_vprea) * base_tile;
   }
 
+  // condition for valid bounds
   if (max_condition_det >= 1.0L || max_condition_mprea >= 1.0L ||
       max_condition_vprea >= 1.0L) {
     throw std::runtime_error(
@@ -540,6 +590,10 @@ correction_matrix_result compute_correction_G_matrix(
   g[0] = eigen_to_matrix(g_det);
   g[1] = eigen_to_matrix(g_mprea);
   g[2] = eigen_to_matrix(g_vprea);
+
+  // print_matrix(g[0], "G (det)");
+  // print_matrix(g[1], "G (mprea)");
+  // print_matrix(g[2], "G (vprea)");
   return g;
 }
 
@@ -554,9 +608,11 @@ template <typename T>
 correction_matrix_result compute_correction_H_matrix(
     const std::vector<T> &h_coeff, const std::vector<Matrix<T>> &h_chol_factors,
     const poisson_config &poisson_cfg) {
+  // params
   const int state_dim = (poisson_cfg.X_res - 2) * (poisson_cfg.Y_res - 2);
   const int tile_size = poisson_cfg.blk_jacobi_tile_size;
   const int num_tiles = state_dim / tile_size;
+  // checks
   if (state_dim <= 0 || tile_size <= 0 || num_tiles <= 0) {
     return {};
   }
@@ -565,16 +621,21 @@ correction_matrix_result compute_correction_H_matrix(
         "h_coeff size must equal the flattened dense coefficient matrix size");
   }
 
+  // compute G matrix of (state_dim, state_dim) for (det, mprea, vprea)
   const correction_matrix_result g =
       compute_correction_G_matrix(h_coeff, h_chol_factors, poisson_cfg);
+
   if (g.size() != 3) {
     throw std::runtime_error(
-        "compute_correction_G_matrix must return 3 matrices");
+        "compute_correction_G_matrix must return 3 matrices (dprea, mprea, and "
+        "vprea)");
   }
+
   const Eigen::MatrixXd g_det = matrix_to_eigen(g[0]);
   const Eigen::MatrixXd g_mprea = matrix_to_eigen(g[1]);
   const Eigen::MatrixXd g_vprea = matrix_to_eigen(g[2]);
 
+  // |A|
   Eigen::MatrixXd a_abs(state_dim, state_dim);
   for (int r = 0; r < state_dim; r++) {
     for (int c = 0; c < state_dim; c++) {
@@ -582,9 +643,11 @@ correction_matrix_result compute_correction_H_matrix(
     }
   }
 
+  //
   Eigen::MatrixXd d_inv_abs_a = Eigen::MatrixXd::Zero(state_dim, state_dim);
   for (int t = 0; t < num_tiles; t++) {
     const int tile_start = t * tile_size;
+    // D_ii is the diagonal block of A
     Eigen::MatrixXd d_tile(tile_size, tile_size);
     for (int r = 0; r < tile_size; r++) {
       for (int c = 0; c < tile_size; c++) {
@@ -592,7 +655,9 @@ correction_matrix_result compute_correction_H_matrix(
             h_coeff[(tile_start + r) * state_dim + (tile_start + c)]);
       }
     }
+    // |D_ii^{-1}|
     const Eigen::MatrixXd d_inv_abs = d_tile.inverse().cwiseAbs();
+    // |D^{-1}| |A|
     d_inv_abs_a.block(tile_start, 0, tile_size, state_dim) =
         d_inv_abs * a_abs.block(tile_start, 0, tile_size, state_dim);
   }
@@ -608,6 +673,11 @@ correction_matrix_result compute_correction_H_matrix(
   h[0] = eigen_to_matrix(i_minus_g_det.inverse() * d_inv_abs_a);
   h[1] = eigen_to_matrix(i_minus_g_mprea.inverse() * d_inv_abs_a);
   h[2] = eigen_to_matrix(i_minus_g_vprea.inverse() * d_inv_abs_a);
+
+  print_matrix(h[0], "H (det)");
+  print_matrix(h[1], "H (mprea)");
+  print_matrix(h[2], "H (vprea)");
+
   return h;
 }
 

@@ -68,7 +68,8 @@ void run_jacobi_experiments_fixed_discretization(
   // sample the zeta values
   std::vector<T> zeta_vals(poisson_cfg.num_experiments);
   std::mt19937 gen(/*seed=*/42);
-  sample_uniform_distribution(zeta_vals, 10.0, 10.0, gen);
+  // sample_uniform_distribution(zeta_vals, 10.0, 10.0, gen);
+  sample_uniform_distribution(zeta_vals, 0.0, 0.0, gen);
 
   // run the experiment
   for (int i = 0; i < poisson_cfg.num_experiments; i++) {
@@ -82,20 +83,30 @@ void run_jacobi_experiments_fixed_discretization(
     std::vector<T> h_state_initial = poisson.get_initial_state();
     // solver config
     poisson_solver_config<T> poisson_solver_cfg = poisson.get_solver_config();
+    // poisson.print_coefficient_matrix();
     // jacobi solver
-    launch_jacobi_solver<T>(h_coeff, h_state_initial, h_rhs, poisson_cfg.prec,
-                            poisson_cfg.etol, poisson_cfg.max_iter,
-                            poisson_solver_cfg, true);
+    // launch_jacobi_solver<T>(h_coeff, h_state_initial, h_rhs,
+    // poisson_cfg.prec,
+    //                         poisson_cfg.etol, poisson_cfg.max_iter,
+    //                         poisson_solver_cfg, true);
+    //
+    // compute cholesky factors for each block
+    std::vector<Matrix<T>> h_chol_factors =
+        compute_cholesky_per_jacobi_tile(h_coeff, poisson_cfg);
 
-    const correction_matrix_result asymptotic_bounds =
-        compute_asymptotic_bounds(h_coeff, h_rhs, poisson_cfg);
-    const char *bound_labels[3] = {"Asymptotic bound (deterministic)",
-                                   "Asymptotic bound (mean-informed)",
-                                   "Asymptotic bound (variance-informed)"};
-    for (int j = 0; j < static_cast<int>(asymptotic_bounds.size()) && j < 3;
-         j++) {
-      print_matrix(asymptotic_bounds[j], bound_labels[j]);
-    }
+    // test the bound matrices
+    const correction_matrix_result test =
+        compute_correction_G_matrix(h_coeff, h_chol_factors, poisson_cfg);
+
+    // const correction_matrix_result asymptotic_bounds =
+    //     compute_asymptotic_bounds(h_coeff, h_rhs, poisson_cfg);
+    // const char *bound_labels[3] = {"Asymptotic bound (deterministic)",
+    //                                "Asymptotic bound (mean-informed)",
+    //                                "Asymptotic bound (variance-informed)"};
+    // for (int j = 0; j < static_cast<int>(asymptotic_bounds.size()) && j < 3;
+    //      j++) {
+    //   print_matrix(asymptotic_bounds[j], bound_labels[j]);
+    // }
   }
 }
 
@@ -121,11 +132,11 @@ void run_block_jacobi_experiments_fixed_discretization(
     // solver config
     poisson_solver_config<T> poisson_solver_cfg = poisson.get_solver_config();
     // cholesky decomp
-    // std::vector<Matrix<T>> h_chol_factors =
-    //     compute_cholesky_per_jacobi_tile(h_coeff, poisson_cfg);
+    std::vector<Matrix<T>> h_chol_factors =
+        compute_cholesky_per_jacobi_tile(h_coeff, poisson_cfg);
     // compute correction G matrix
     // compute_correction_G_matrix(h_coeff, h_chol_factors, poisson_cfg);
-    // compute_correction_H_matrix(h_coeff, h_chol_factors, poisson_cfg);
+    compute_correction_H_matrix(h_coeff, h_chol_factors, poisson_cfg);
     // compute_block_jacobi_bound_coefficients(h_coeff, h_chol_factors,
     //                                         poisson_cfg);
     //
@@ -293,6 +304,6 @@ void run_all_block_jacobi_experiments(Precision prec, Precision prec_cholesky,
 
 // poisson equation experiments
 void run_poisson_equation_experiments(Precision prec, Precision prec_cholesky) {
-  run_all_jacobi_experiments(prec, 1);
-  // run_all_block_jacobi_experiments(prec, prec_cholesky, 1);
+  // run_all_jacobi_experiments(prec, 1);
+  run_all_block_jacobi_experiments(prec, prec_cholesky, 1);
 }
