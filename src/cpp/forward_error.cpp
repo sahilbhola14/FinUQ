@@ -1039,7 +1039,7 @@ template <typename T>
 correction_matrix_result compute_per_iteration_bounds(
     const std::vector<T> &h_coeff, const std::vector<T> &h_rhs,
     const std::vector<T> &h_state_initial, const poisson_config &poisson_cfg,
-    const int iteration_idx) {
+    const int iteration_idx, bool verbose) {
   // init
   const int state_dim = (poisson_cfg.X_res - 2) * (poisson_cfg.Y_res - 2);
   // checks
@@ -1064,6 +1064,24 @@ correction_matrix_result compute_per_iteration_bounds(
   if (p.size() != 3 || f.size() != 3) {
     throw std::runtime_error(
         "compute_per_iteration_bounds requires three bound-model matrices");
+  }
+
+  if (verbose) {
+    static const char *bound_names[3] = {"det", "mprea", "vprea"};
+    std::cout << std::string(10, '-')
+              << " P matrix spectral radius / infinity norm at iteration "
+              << iteration_idx << " " << std::string(10, '-') << std::endl;
+    for (int i = 0; i < 3; i++) {
+      const Eigen::MatrixXd p_i = matrix_to_eigen(p[i]);
+      const double p_inf_norm = p_i.cwiseAbs().rowwise().sum().maxCoeff();
+      const double p_spectral_radius =
+          Eigen::EigenSolver<Eigen::MatrixXd>(p_i, false)
+              .eigenvalues()
+              .cwiseAbs()
+              .maxCoeff();
+      std::cout << bound_names[i] << ": spectral radius = " << p_spectral_radius
+                << ", infinity norm = " << p_inf_norm << std::endl;
+    }
   }
 
   const Eigen::MatrixXd e0_mat = matrix_to_eigen(e0);
@@ -1226,13 +1244,13 @@ template correction_matrix_result compute_asymptotic_bounds(
 
 template correction_matrix_result compute_per_iteration_bounds(
     const std::vector<double> &, const std::vector<double> &,
-    const std::vector<double> &, const poisson_config &, const int);
+    const std::vector<double> &, const poisson_config &, const int, bool);
 template correction_matrix_result compute_per_iteration_bounds(
     const std::vector<float> &, const std::vector<float> &,
-    const std::vector<float> &, const poisson_config &, const int);
+    const std::vector<float> &, const poisson_config &, const int, bool);
 template correction_matrix_result compute_per_iteration_bounds(
     const std::vector<half> &, const std::vector<half> &,
-    const std::vector<half> &, const poisson_config &, const int);
+    const std::vector<half> &, const poisson_config &, const int, bool);
 
 template Matrix<double> compute_true_solution_bounds(
     const std::vector<double> &, const std::vector<double> &,

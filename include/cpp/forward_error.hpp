@@ -111,7 +111,8 @@ correction_matrix_result compute_per_iteration_bounds(
     const std::vector<T> &h_rhs,
     const std::vector<T> &h_state_initial,
     const poisson_config &poisson_cfg,
-    const int iteration_idx);
+    const int iteration_idx,
+    bool verbose = false);
 
 // compute true solution bounds: |x| <= (I - |D^{-1} N|)^{-1} |D^{-1}| |b|
 template <typename T>

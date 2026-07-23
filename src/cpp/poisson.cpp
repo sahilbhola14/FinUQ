@@ -117,7 +117,7 @@ void run_block_jacobi_experiments_fixed_discretization(
   // sample the zeta values
   std::vector<T> zeta_vals(poisson_cfg.num_experiments);
   std::mt19937 gen(/*seed=*/42);
-  sample_uniform_distribution(zeta_vals, 0.0, 0.0, gen);
+  sample_uniform_distribution(zeta_vals, 1000.0, 1000.0, gen);
 
   // run the experiment
   for (int i = 0; i < poisson_cfg.num_experiments; i++) {
@@ -135,16 +135,10 @@ void run_block_jacobi_experiments_fixed_discretization(
     std::vector<Matrix<T>> h_chol_factors =
         compute_cholesky_per_jacobi_tile(h_coeff, poisson_cfg);
 
-    // // compute per iteration bounds
-    // const correction_matrix_result per_iteration_bounds =
-    //     compute_per_iteration_bounds(h_coeff, h_rhs, h_state_initial,
-    //                                  poisson_cfg, poisson_cfg.max_iter);
-    // print_matrix(per_iteration_bounds[0], "drea");
-    // print_matrix(per_iteration_bounds[1], "mprea");
-    // print_matrix(per_iteration_bounds[2], "vprea");
-
     // sweep per iteration bounds over all iterations and save to csv
-    save_per_iteration_bounds(h_coeff, h_rhs, h_state_initial, poisson_cfg);
+    compute_per_iteration_bounds(h_coeff, h_rhs, h_state_initial, poisson_cfg,
+                                 1, true);
+    // save_per_iteration_bounds(h_coeff, h_rhs, h_state_initial, poisson_cfg);
 
     // jacobi solver
     launch_block_jacobi_solver(h_coeff, h_state_initial, h_rhs, poisson_cfg,
