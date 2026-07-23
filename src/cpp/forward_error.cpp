@@ -5,7 +5,9 @@
 #include <Eigen/Dense>
 #include <algorithm>
 #include <cassert>
+#include <fstream>
 #include <iostream>
+#include <sstream>
 
 #include "backward_error.hpp"
 #include "block_jacobi.cuh"
@@ -1026,6 +1028,115 @@ Matrix<double> compute_initial_error_bounds(
   return initial_error_bounds;
 }
 
+// compute per iteration bounds
+// |e^{k+1}| \leq P^{k+1} |e^0| + \sum_{j=0}^{k} P^j * f
+// k: iteration_idx (0, ..., poisson_cfg.max_iter)
+// P^{k+1}: P * P * ... P , in total k+1 times
+// P: obtained from compute_block_jacobi_P_matrix
+// f: obtained from compute_block_jacobi_forcing_vector
+// e^0: obtained from compute_initial_error_bounds
+template <typename T>
+correction_matrix_result compute_per_iteration_bounds(
+    const std::vector<T> &h_coeff, const std::vector<T> &h_rhs,
+    const std::vector<T> &h_state_initial, const poisson_config &poisson_cfg,
+    const int iteration_idx) {
+  // init
+  const int state_dim = (poisson_cfg.X_res - 2) * (poisson_cfg.Y_res - 2);
+  // checks
+  if (state_dim <= 0) {
+    return {};
+  }
+  assert(iteration_idx >= 0 && "iteration_idx must be >= 0");
+
+  // cholesky factors
+  const std::vector<Matrix<T>> h_chol_factors =
+      compute_cholesky_per_jacobi_tile(h_coeff, poisson_cfg);
+  // P
+  const correction_matrix_result p = compute_block_jacobi_P_matrix(
+      h_coeff, h_chol_factors, poisson_cfg, iteration_idx);
+  // f
+  const correction_matrix_result f = compute_block_jacobi_forcing_vector(
+      h_coeff, h_rhs, poisson_cfg, iteration_idx);
+  // e^0
+  const Matrix<double> e0 = compute_initial_error_bounds(
+      h_coeff, h_rhs, h_state_initial, poisson_cfg);
+
+  if (p.size() != 3 || f.size() != 3) {
+    throw std::runtime_error(
+        "compute_per_iteration_bounds requires three bound-model matrices");
+  }
+
+  const Eigen::MatrixXd e0_mat = matrix_to_eigen(e0);
+  const Eigen::MatrixXd identity =
+      Eigen::MatrixXd::Identity(state_dim, state_dim);
+
+  correction_matrix_result bounds(3);
+  // compute for all types of bounds
+  for (int i = 0; i < 3; i++) {
+    const Eigen::MatrixXd p_i = matrix_to_eigen(p[i]);
+    const Eigen::MatrixXd f_i = matrix_to_eigen(f[i]);
+
+    // P^{k+1} |e^0| + \sum_{j=0}^{k} P^j |f|
+    Eigen::MatrixXd p_power = identity;  // P^0
+    Eigen::MatrixXd sum_p_pow_f = Eigen::MatrixXd::Zero(state_dim, 1);
+    for (int j = 0; j <= iteration_idx; j++) {
+      sum_p_pow_f += p_power * f_i;
+      p_power = p_power * p_i;  // advance to P^{j+1}
+    }
+    // p_power is now P^{iteration_idx + 1}
+    bounds[i] = eigen_to_matrix(p_power * e0_mat + sum_p_pow_f);
+  }
+
+  return bounds;
+}
+
+/*
+ * sweep compute_per_iteration_bounds over iteration_idx = 0, ..., max_iter and
+ * write the resulting bounds to a csv so their variation across iterations
+ * can be inspected (e.g. plotted).
+ * CSV format: iter,det,mprea,vprea, where each column holds the infinity norm
+ * (max abs entry over the state) of the per-iteration error bound of that type
+ */
+template <typename T>
+void save_per_iteration_bounds(const std::vector<T> &h_coeff,
+                               const std::vector<T> &h_rhs,
+                               const std::vector<T> &h_state_initial,
+                               const poisson_config &poisson_cfg) {
+  std::ostringstream ss;
+  ss << "poisson_per_iteration_bounds_" << to_string(poisson_cfg.prec)
+     << "_prec_chol_" << to_string(poisson_cfg.prec_cholesky) << ".csv";
+  std::ofstream file(ss.str());
+  if (!file.is_open()) {
+    std::cerr << "Error: could not open file " << ss.str() << "\n";
+    return;
+  }
+
+  file << "iter,det,mprea,vprea\n";
+  for (int k = 0; k <= poisson_cfg.max_iter; k++) {
+    const correction_matrix_result bounds = compute_per_iteration_bounds(
+        h_coeff, h_rhs, h_state_initial, poisson_cfg, k);
+    if (bounds.size() != 3) {
+      throw std::runtime_error(
+          "compute_per_iteration_bounds must return three bound-model "
+          "matrices");
+    }
+
+    double bound_inf_norm[3] = {0.0, 0.0, 0.0};
+    for (int i = 0; i < 3; i++) {
+      for (const double &val : bounds[i].data) {
+        bound_inf_norm[i] = std::max(bound_inf_norm[i], std::abs(val));
+      }
+    }
+
+    file << k << "," << std::scientific << std::setprecision(10)
+         << bound_inf_norm[0] << "," << bound_inf_norm[1] << ","
+         << bound_inf_norm[2] << "\n";
+  }
+  file.close();
+
+  std::cout << "per-iteration bounds saved to " << ss.str() << "\n";
+}
+
 /* template initialization */
 template gamma_result compute_bvp_state_integral_forward_error_bound<double>(
     const int, const int, const std::vector<double> &,
@@ -1113,6 +1224,16 @@ template correction_matrix_result compute_asymptotic_bounds(
     const std::vector<half> &, const std::vector<half> &,
     const poisson_config &);
 
+template correction_matrix_result compute_per_iteration_bounds(
+    const std::vector<double> &, const std::vector<double> &,
+    const std::vector<double> &, const poisson_config &, const int);
+template correction_matrix_result compute_per_iteration_bounds(
+    const std::vector<float> &, const std::vector<float> &,
+    const std::vector<float> &, const poisson_config &, const int);
+template correction_matrix_result compute_per_iteration_bounds(
+    const std::vector<half> &, const std::vector<half> &,
+    const std::vector<half> &, const poisson_config &, const int);
+
 template Matrix<double> compute_true_solution_bounds(
     const std::vector<double> &, const std::vector<double> &,
     const poisson_config &);
@@ -1134,3 +1255,16 @@ template Matrix<double> compute_initial_error_bounds(const std::vector<half> &,
                                                      const std::vector<half> &,
                                                      const std::vector<half> &,
                                                      const poisson_config &);
+
+template void save_per_iteration_bounds(const std::vector<double> &,
+                                        const std::vector<double> &,
+                                        const std::vector<double> &,
+                                        const poisson_config &);
+template void save_per_iteration_bounds(const std::vector<float> &,
+                                        const std::vector<float> &,
+                                        const std::vector<float> &,
+                                        const poisson_config &);
+template void save_per_iteration_bounds(const std::vector<half> &,
+                                        const std::vector<half> &,
+                                        const std::vector<half> &,
+                                        const poisson_config &);

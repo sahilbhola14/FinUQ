@@ -134,29 +134,19 @@ void run_block_jacobi_experiments_fixed_discretization(
     // cholesky decomp
     std::vector<Matrix<T>> h_chol_factors =
         compute_cholesky_per_jacobi_tile(h_coeff, poisson_cfg);
-    // compute correction G matrix
-    // compute_correction_G_matrix(h_coeff, h_chol_factors, poisson_cfg);
-    // compute correction H matrix
-    // compute_correction_H_matrix(h_coeff, h_chol_factors, poisson_cfg);
-    // block jacobi bounds coefficients
-    // block_jacobi_bound_coefficients_result res =
-    // compute_block_jacobi_bound_coefficients(h_coeff, h_chol_factors,
-    //                                         poisson_cfg);
-    // compute P matrix
-    // compute_block_jacobi_P_matrix(h_coeff, h_chol_factors, poisson_cfg);
-    // compute forcing vector
-    // compute_block_jacobi_forcing_vector(h_coeff, h_rhs, poisson_cfg);
-    // compute asymptotic bounds
-    // compute_asymptotic_bounds(h_coeff, h_rhs, poisson_cfg);
-    // compute iteration bounds
-    // compute_per_iteration_bounds(h_coeff, h_rhs, poisson_cfg);
-    // compute true solution bounds
-    // Matrix<double> true_solution_bounds =
-    //     compute_true_solution_bounds(h_coeff, h_rhs, poisson_cfg);
-    // compute initial error bounds
-    // Matrix<double> initial_error_bounds = compute_initial_error_bounds(
-    //     h_coeff, h_rhs, h_state_initial, poisson_cfg);
 
+    // // compute per iteration bounds
+    // const correction_matrix_result per_iteration_bounds =
+    //     compute_per_iteration_bounds(h_coeff, h_rhs, h_state_initial,
+    //                                  poisson_cfg, poisson_cfg.max_iter);
+    // print_matrix(per_iteration_bounds[0], "drea");
+    // print_matrix(per_iteration_bounds[1], "mprea");
+    // print_matrix(per_iteration_bounds[2], "vprea");
+
+    // sweep per iteration bounds over all iterations and save to csv
+    save_per_iteration_bounds(h_coeff, h_rhs, h_state_initial, poisson_cfg);
+
+    // jacobi solver
     launch_block_jacobi_solver(h_coeff, h_state_initial, h_rhs, poisson_cfg,
                                poisson_solver_cfg, true);
 

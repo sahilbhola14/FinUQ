@@ -74,26 +74,30 @@ template <typename T>
 correction_matrix_result compute_correction_H_matrix(
     const std::vector<T> &h_coeff,
     const std::vector<Matrix<T>> &h_chol_factors,
-    const poisson_config &poisson_cfg);
+    const poisson_config &poisson_cfg,
+    const int iteration_idx);
 
 template <typename T>
 block_jacobi_bound_coefficients_result
 compute_block_jacobi_bound_coefficients(
     const std::vector<T> &h_coeff,
     const std::vector<Matrix<T>> &h_chol_factors,
-    const poisson_config &poisson_cfg);
+    const poisson_config &poisson_cfg,
+    const int iteration_idx);
 
 template <typename T>
 correction_matrix_result compute_block_jacobi_P_matrix(
     const std::vector<T> &h_coeff,
     const std::vector<Matrix<T>> &h_chol_factors,
-    const poisson_config &poisson_cfg);
+    const poisson_config &poisson_cfg,
+    const int iteration_idx);
 
 template <typename T>
 correction_matrix_result compute_block_jacobi_forcing_vector(
     const std::vector<T> &h_coeff,
     const std::vector<T> &h_rhs,
-    const poisson_config &poisson_cfg);
+    const poisson_config &poisson_cfg,
+    const int iteration_idx);
 
 template <typename T>
 correction_matrix_result compute_asymptotic_bounds(
@@ -105,7 +109,9 @@ template <typename T>
 correction_matrix_result compute_per_iteration_bounds(
     const std::vector<T> &h_coeff,
     const std::vector<T> &h_rhs,
-    const poisson_config &poisson_cfg);
+    const std::vector<T> &h_state_initial,
+    const poisson_config &poisson_cfg,
+    const int iteration_idx);
 
 // compute true solution bounds: |x| <= (I - |D^{-1} N|)^{-1} |D^{-1}| |b|
 template <typename T>
@@ -117,6 +123,15 @@ Matrix<double> compute_true_solution_bounds(
 // compute initial error bounds: |e^0| <= |x^0| + |x|
 template <typename T>
 Matrix<double> compute_initial_error_bounds(
+    const std::vector<T> &h_coeff,
+    const std::vector<T> &h_rhs,
+    const std::vector<T> &h_state_initial,
+    const poisson_config &poisson_cfg);
+
+// sweep compute_per_iteration_bounds over iteration_idx = 0, ..., max_iter and
+// write the resulting bounds (all bound types) to a csv
+template <typename T>
+void save_per_iteration_bounds(
     const std::vector<T> &h_coeff,
     const std::vector<T> &h_rhs,
     const std::vector<T> &h_state_initial,
