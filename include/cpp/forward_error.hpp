@@ -89,7 +89,7 @@ correction_matrix_result compute_block_jacobi_P_matrix(
     const poisson_config &poisson_cfg);
 
 template <typename T>
-void compute_block_jacobi_forcing_vector(
+correction_matrix_result compute_block_jacobi_forcing_vector(
     const std::vector<T> &h_coeff,
     const std::vector<T> &h_rhs,
     const poisson_config &poisson_cfg);

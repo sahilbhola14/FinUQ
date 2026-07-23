@@ -277,10 +277,11 @@ void run_all_compare_gamma_experiments(Precision prec) {
 // printing
 void print_gamma(const gamma_result &gamma_res, bool flat) {
   if (flat == true) {
-    printf("Deterministic: %.3e Mean-informed: %.3e Varinance-informed: %.3e\n",
-           static_cast<double>(gamma_res.gamma_det),
-           static_cast<double>(gamma_res.gamma_mprea),
-           static_cast<double>(gamma_res.gamma_vprea));
+    printf(
+        "Deterministic: %.10e Mean-informed: %.10e Varinance-informed: %.10e\n",
+        static_cast<double>(gamma_res.gamma_det),
+        static_cast<double>(gamma_res.gamma_mprea),
+        static_cast<double>(gamma_res.gamma_vprea));
   } else {
     std::cout << "Deterministic: " << std::scientific << std::setprecision(10)
               << gamma_res.gamma_det << std::endl;
