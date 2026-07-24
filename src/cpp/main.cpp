@@ -33,7 +33,7 @@ int main(int argc, char **argv) {
     // run_all_dot_product_experiments(Single);
     // run_all_dot_product_experiments(Half);
     // run_poisson_equation_experiments(Double);
-    run_poisson_equation_experiments(Single, Single);
+    run_poisson_equation_experiments(Double, Double);
     // run_poisson_equation_experiments(Half, Half);
     // run_poisson_equation_experiments(Single, Half);
   }
